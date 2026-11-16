@@ -11,7 +11,7 @@
   "web_accessible_resources": [
     { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*"] }
   ],
-  "permissions": ["storage", "declarativeNetRequest"],
+  "permissions": ["storage", "declarativeNetRequest", "cookies"],
   "host_permissions": ["https://www.youtube.com/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [

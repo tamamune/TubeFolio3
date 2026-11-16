@@ -182,6 +182,59 @@ dialog .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .pl-row .thumb img{width:100%}
 .pv-pop{position:fixed;z-index:90;width:320px;height:180px;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 8px 32px rgba(0,0,0,.55);border:1px solid var(--line);pointer-events:none}
 .pv-pop iframe,.pv-pop img{width:100%;height:100%;border:0;object-fit:cover;display:block}
+.yt-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:2px 2px 8px;margin-bottom:8px}
+.yt-chips .tab{flex:none;white-space:nowrap;border-radius:8px;font-weight:500}
+.yt-chips .tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.pl-prev .seg{display:inline-flex;gap:4px}
+
+/* ===== コメント(右パネル) ===== */
+#d-cmts{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+#d-cmts[hidden]{display:none}
+#d-cmts summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;padding:4px 0;list-style-position:inside}
+#d-cmts summary:hover{color:var(--fg)}
+#d-cmts-n{font-weight:400}
+.cm-sorts{display:flex;gap:6px;margin:8px 0 4px}
+.cm{display:flex;gap:10px;padding:10px 0}
+.cm+.cm{border-top:1px solid var(--line)}
+.cm-av{width:32px;height:32px;border-radius:50%;flex:none;background:var(--active);object-fit:cover}
+.cm-main{flex:1;min-width:0}
+.cm-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:12px;color:var(--muted)}
+.cm-head b{color:var(--fg);font-size:13px}
+.cm-head b.cm-owner{background:var(--active);padding:0 6px;border-radius:999px}
+.cm-pin{width:100%;font-size:11px}
+.cm-text{margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.cm-text a{color:var(--acc);cursor:pointer}
+.cm-foot{display:flex;gap:14px;margin-top:4px;font-size:12px;color:var(--muted)}
+.cm-empty{color:var(--muted);padding:12px 0;font-size:13px}
+.cm-empty .chip{margin-top:8px}
+.cm-more{display:block;margin:8px auto 4px}
+
+/* ===== 埋め込み不可の動画 ===== */
+.ne-badge{position:absolute;left:6px;bottom:6px;padding:1px 6px;border-radius:5px;background:rgba(0,0,0,.78);color:#fbbf24;font-size:11px;font-weight:600;line-height:1.5;pointer-events:none}
+.pv-note{position:absolute;left:0;right:0;bottom:0;padding:16px 10px 6px;background:linear-gradient(transparent,rgba(0,0,0,.8));color:#fff;font-size:12px}
+.player{position:relative}
+.player-block{position:absolute;inset:0;display:grid;place-items:center;text-align:center;background:#000 center/cover no-repeat;overflow:hidden}
+.player-block::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.player-block>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:#fff}
+.player-block small{color:rgba(255,255,255,.75);margin-bottom:8px}
+.pl-prev .sep{width:1px;height:18px;background:var(--line);margin:0 6px}
+
+/* ===== 動画一覧の「一覧(グリッド)」表示: YouTubeのような大きいサムネイル ===== */
+.dur-badge{display:none;position:absolute;right:6px;bottom:6px;padding:1px 5px;border-radius:5px;background:rgba(0,0,0,.8);color:#fff;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.5}
+.pl-rows.as-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px 16px;align-content:start}
+.pl-rows.as-grid .pl-row{position:relative;flex-direction:column;align-items:stretch;gap:10px;padding:0 0 8px;border:0;border-radius:12px}
+.pl-rows.as-grid .pl-row:hover{background:none}
+.pl-rows.as-grid .pl-row.playing{background:none;outline:2px solid var(--acc);outline-offset:4px}
+.pl-rows.as-grid .idx,.pl-rows.as-grid .pl-row>.dur{display:none}
+.pl-rows.as-grid .thumb{width:100%}
+.pl-rows.as-grid .thumb img{width:100%;border-radius:12px;display:block;transition:border-radius .15s}
+.pl-rows.as-grid .pl-row:hover .thumb img{border-radius:4px}
+.pl-rows.as-grid .dur-badge{display:block}
+.pl-rows.as-grid .meta{padding:0 2px}
+.pl-rows.as-grid .meta b{font-size:15px;line-height:1.4;margin-bottom:4px}
+.pl-rows.as-grid .meta small{font-size:13px;line-height:1.5}
+.pl-rows.as-grid .pl-row>.chip{position:absolute;top:8px;right:8px;z-index:2;background:rgba(0,0,0,.72);color:#fff;border-color:transparent}
+.pl-rows.as-grid .pl-row>.chip:hover{background:var(--acc)}
 
 /* ===== YouTube検索結果の再生(右パネル) ===== */
 #detail.yt h3,#detail.yt #d-bms,#detail.yt #bm-form,#detail.yt #d-folders,#detail.yt #d-delete,#detail.yt .pl-only{display:none}

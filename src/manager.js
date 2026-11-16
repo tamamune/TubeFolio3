@@ -14,7 +14,8 @@ const ls = {
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
 };
 // サブフォルダ(1階層まで): folder.parent に親IDを持つ
-const SYS = (id) => id === "all" || id === "home" || id === "playlists" || id === "search";
+const SYS = (id) => id === "all" || id === "home" || id === "playlists" || id === "search" || id === "recs";
+const isYtList = () => cur === "search" || cur === "recs"; // YouTubeから取得した動画の一覧を表示中か
 const pls = () => (data.playlists ||= []);
 const kids = (id) => data.folders.filter((f) => f.parent === id);
 const descIds = (id) => [id, ...kids(id).map((k) => k.id)];
@@ -31,6 +32,7 @@ function toast(msg) {
 const ICON_ALL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>`;
 const ICON_HOME = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>`;
 const ICON_PL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h12M3 11h12M3 16h7"/><path d="m16 14 5 3-5 3z"/></svg>`;
+const ICON_RECS = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>`;
 const iconFolder = (c) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
 
 /* ---------- 描画 ---------- */
@@ -38,10 +40,10 @@ const CHEV = `<svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill=
 function renderFolders() {
   const n = (id) => id === "playlists" ? pls().length : Object.values(data.videos).filter((v) => inFolder(v, id)).length;
   const item = (id, icon, name, o = {}) =>
-    `<button class="nav-item ${cur === id ? "on" : ""} ${o.sub ? "sub" : ""} ${o.open ? "open" : ""}" data-f="${id}" data-tip="${esc(name)}" ${o.drag ? 'draggable="true"' : ""}>${o.sub ? '<span class="bullet"></span>' : icon}<span class="name">${esc(name)}</span>${id === "home" ? "" : `<span class="n">${n(id)}</span>`}${o.kids ? CHEV : ""}</button>`;
-  // ホーム / 再生リスト(YouTube側) / ライブラリ(自分で整理した動画とフォルダ)の3区画
+    `<button class="nav-item ${cur === id ? "on" : ""} ${o.sub ? "sub" : ""} ${o.open ? "open" : ""}" data-f="${id}" data-tip="${esc(name)}" ${o.drag ? 'draggable="true"' : ""}>${o.sub ? '<span class="bullet"></span>' : icon}<span class="name">${esc(name)}</span>${id === "home" || id === "recs" ? "" : `<span class="n">${n(id)}</span>`}${o.kids ? CHEV : ""}</button>`;
+  // ホーム / YouTube(おすすめ・再生リスト) / ライブラリ(自分で整理した動画とフォルダ)の3区画
   let h = item("home", ICON_HOME, "ホーム")
-    + `<div class="nav-label">再生リスト</div>` + item("playlists", ICON_PL, "YouTubeの再生リスト")
+    + `<div class="nav-label">YouTube</div>` + item("recs", ICON_RECS, "おすすめ") + item("playlists", ICON_PL, "YouTubeの再生リスト")
     + `<div class="nav-label">ライブラリ</div>` + item("all", ICON_ALL, "すべての動画");
   for (const f of data.folders.filter((x) => !x.parent)) {
     const ks = kids(f.id), open = expanded.has(f.id);
@@ -77,6 +79,7 @@ function renderList() {
   const q = $("q").value.trim().toLowerCase();
   const list = $("list");
   if (cur === "search") { list.className = ""; list.innerHTML = renderSearch(); return; }
+  if (cur === "recs") { list.className = ""; list.innerHTML = renderRecs(); return; }
   if (cur === "playlists") { list.className = ""; list.innerHTML = openPl ? renderPlDetail() : renderPlaylists(q); return; }
   if (cur === "home" && !q) { list.className = "home"; list.innerHTML = renderHome(); return; }
   list.className = "";
@@ -88,7 +91,7 @@ function renderList() {
 }
 
 function play(id, start = 0) {
-  $("player").src = `https://www.youtube.com/embed/${id}?start=${start}&autoplay=${start ? 1 : 0}&rel=0`;
+  $("player").src = `https://www.youtube.com/embed/${id}?start=${start}&autoplay=${start ? 1 : 0}&rel=0&enablejsapi=1`;
 }
 
 function select(id) {
@@ -125,8 +128,10 @@ $("folders").addEventListener("click", (e) => {
   cur = b.dataset.f; openPl = null;
   // 子を持つフォルダは、押すたびにアコーディオンを開閉
   if (kids(cur).length) { expanded.has(cur) ? expanded.delete(cur) : expanded.add(cur); saveExpanded(); }
+  hidePreview();
   render();
   if (cur === "playlists") autoSyncPlaylists();
+  if (cur === "recs") autoLoadRecs();
 });
 $("list").addEventListener("click", (e) => {
   const tab = e.target.closest("[data-pltab]");
@@ -137,6 +142,8 @@ $("list").addEventListener("click", (e) => {
   if (delPl) { e.stopPropagation(); deletePlaylist(delPl.dataset.delpl); return; }
   const pl = e.target.closest("[data-pl]");
   if (pl) { openPlaylist(pl.dataset.pl); return; }
+  const vw = e.target.closest("[data-view]");
+  if (vw) { rowView = vw.dataset.view; ls.set("tf-view", rowView); hidePreview(); renderList(); return; }
   const pv = e.target.closest("[data-prev]");
   if (pv) { prevMode = pv.dataset.prev; ls.set("tf-prev", prevMode); hidePreview(); renderList(); return; }
   if (e.target.closest("[data-back]")) { openPl = null; renderList(); return; }
@@ -145,7 +152,10 @@ $("list").addEventListener("click", (e) => {
   const vsave = e.target.closest("[data-savevid]");
   if (vsave) { e.stopPropagation(); saveVideoFromPl(vsave.dataset.savevid); return; }
   const vrow = e.target.closest("[data-vid]");
-  if (vrow) { cur === "search" ? playYt(vrow.dataset.vid) : playInPlaylist(vrow.dataset.vid); return; }
+  if (vrow) { isYtList() ? playYt(vrow.dataset.vid) : playInPlaylist(vrow.dataset.vid); return; }
+  if (e.target.closest("[data-recreload]")) { loadRecs(); return; }
+  const chip = e.target.closest("[data-chip]");
+  if (chip) { selectChip(+chip.dataset.chip); return; }
   if (e.target.closest("[data-playall]")) { selectPlaylist(openPl, true); return; }
   if (e.target.closest("[data-reload]")) { const p = pls().find((x) => x.id === openPl); if (p) loadPlItems(p, false); return; }
   const del = e.target.closest("[data-del]");
@@ -390,7 +400,7 @@ function embedSrc(p, i = 0, auto = false) {
   const items = p.items || [];
   if (kindOf(p) === "own" && items.length)
     return `https://www.youtube.com/embed/${items[i].id}?rel=0&autoplay=${auto ? 1 : 0}&enablejsapi=1`;
-  return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(p.id)}&autoplay=${auto ? 1 : 0}`;
+  return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(p.id)}&autoplay=${auto ? 1 : 0}&enablejsapi=1`;
 }
 // 「作成した」リストはリスト自体が非公開で埋め込めないことが多いので、動画を1本ずつ再生し、終わったら次へ進む
 function playIndex(p, i, auto) {
@@ -400,17 +410,193 @@ function playIndex(p, i, auto) {
   $("d-meta").textContent = `再生中 (${i + 1}/${p.items.length}): ${v.title}`;
   document.querySelectorAll(".pl-row").forEach((r) => r.classList.toggle("playing", r.dataset.vid === v.id));
 }
-$("player").addEventListener("load", () => {
-  // 再生終了を受け取るため、プレイヤーへ購読を依頼する
-  try { $("player").contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"); } catch {}
-});
+/* ---------- 埋め込みプレイヤーとのやりとり ---------- */
+// プレイヤー(enablejsapi=1)へ購読を依頼し、イベントを受け取る。読み込み直後は応答しないことがあるので、
+// 公式のIFrame APIと同じく応答が来るまで繰り返し依頼する。
+const playerSubs = new Map(); // iframe -> handler
+function listenPlayer(frame, handler) {
+  let timer = null, got = false;
+  const ping = () => { try { frame.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"); } catch {} };
+  const start = () => { // 読み込みのたびに、応答が来るまで(最大10秒)購読を依頼し直す
+    clearInterval(timer); got = false; let n = 0;
+    timer = setInterval(() => { if (got || ++n > 40 || !frame.isConnected) return clearInterval(timer); ping(); }, 250);
+  };
+  frame.addEventListener("load", start);
+  playerSubs.set(frame, (m) => { got = true; handler(m); });
+  start();
+}
 addEventListener("message", (e) => {
-  if (e.source !== $("player").contentWindow || !nowPlaying) return;
-  let m; try { m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
-  const ended = (m?.event === "onStateChange" && m.info === 0) || (m?.event === "infoDelivery" && m.info?.playerState === 0);
+  for (const [frame, h] of playerSubs) {
+    if (!frame.isConnected) { playerSubs.delete(frame); continue; }
+    if (e.source !== frame.contentWindow) continue;
+    let m; try { m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
+    if (m && typeof m === "object") h(m);
+    return;
+  }
+});
+
+// 101/150: 所有者が埋め込みを禁止 / 152,153: 埋め込み元の制限
+const EMBED_ERRS = new Set([101, 150, 152, 153]);
+const NE_BADGE = `<span class="ne-badge" title="所有者が他のサイトでの再生を許可していないため、YouTubeでのみ再生できます">埋め込み不可</span>`;
+// 埋め込み不可と分かった動画を覚えておく(次からはプレビューを試さず、一覧に印を付ける)
+const noEmbed = new Set((() => { try { return JSON.parse(ls.get("tf-noembed", "[]")); } catch { return []; } })());
+function markNoEmbed(id) {
+  if (!id || noEmbed.has(id)) return;
+  noEmbed.add(id);
+  ls.set("tf-noembed", JSON.stringify([...noEmbed].slice(-500)));
+  document.querySelectorAll(`.pl-row[data-vid="${CSS.escape(id)}"] .thumb`).forEach((t) => { if (!t.querySelector(".ne-badge")) t.insertAdjacentHTML("beforeend", NE_BADGE); });
+}
+
+// 右パネルのプレイヤー: 再生終了で次へ(「作成した」リスト)、埋め込み不可なら案内を表示
+const playerVid = () => ($("player").src.match(/\/embed\/([\w-]{11})/) || [])[1] || "";
+listenPlayer($("player"), (m) => {
+  if (m.event === "onError" && EMBED_ERRS.has(+m.info)) return showBlocked();
+  if (!nowPlaying) return;
+  const ended = (m.event === "onStateChange" && m.info === 0) || (m.event === "infoDelivery" && m.info?.playerState === 0);
   if (!ended) return;
   const p = pls().find((x) => x.id === nowPlaying.plId);
   if (p?.items && nowPlaying.idx + 1 < p.items.length) playIndex(p, nowPlaying.idx + 1, true);
+});
+function showBlocked() {
+  const id = playerVid();
+  markNoEmbed(id);
+  const box = $("player").parentElement;
+  box.querySelector(".player-block")?.remove();
+  const href = id ? `https://www.youtube.com/watch?v=${id}` : $("d-open").href;
+  box.insertAdjacentHTML("beforeend", `<div class="player-block" ${id ? `style="background-image:url('https://i.ytimg.com/vi/${id}/hqdefault.jpg')"` : ""}>
+      <div><b>この動画はYouTubeでのみ再生できます</b><small>動画の所有者が、他のサイトでの再生を許可していません</small>
+      <a class="chip accent" href="${esc(href)}" target="_blank" rel="noopener">YouTubeで開く ↗</a></div></div>`);
+  // 「作成した」リストを順番に再生中なら、飛ばして次の動画へ
+  const p = nowPlaying && pls().find((x) => x.id === nowPlaying.plId);
+  if (p?.items && nowPlaying.idx + 1 < p.items.length) {
+    const next = nowPlaying.idx + 1;
+    toast("埋め込み不可の動画をスキップします");
+    setTimeout(() => { if (nowPlaying?.plId === p.id && nowPlaying.idx === next - 1) playIndex(p, next, true); }, 2500);
+  }
+}
+// 別の動画に切り替えたら案内を消し、コメント欄を新しい動画に合わせる
+new MutationObserver(() => { $("player").parentElement.querySelector(".player-block")?.remove(); setCommentsVideo(playerVid()); })
+  .observe($("player"), { attributes: true, attributeFilter: ["src"] });
+
+/* ---------- コメント(右パネル、APIを使わない方式) ---------- */
+// 動画ページの埋め込みデータからコメント欄のトークンを取り出し、YouTubeのページと同じく内部API(next)で取得する
+const cmts = { vid: "", cache: {}, loading: false }; // cache[動画ID] = { cfg, list, next, sorts, count, error }
+function deepFind(n, key, skip) {
+  let r; (function w(x) {
+    if (r !== undefined || !x || typeof x !== "object") return;
+    if (!Array.isArray(x) && key in x) { r = x[key]; return; }
+    for (const [k, v] of Object.entries(x)) if (k !== skip) w(v);
+  })(n);
+  return r;
+}
+function walkKey(n, key, fn, skip) {
+  (function w(x) {
+    if (!x || typeof x !== "object") return;
+    if (Array.isArray(x)) return x.forEach(w);
+    if (x[key]) fn(x[key]);
+    for (const [k, v] of Object.entries(x)) if (k !== skip && k !== key) w(v);
+  })(n);
+}
+function findCommentToken(data) {
+  let token = "";
+  walkKey(data, "itemSectionRenderer", (s) => { if (!token && s.sectionIdentifier === "comment-item-section") token = deepFind(s, "continuationCommand")?.token || ""; });
+  return token;
+}
+function parseComments(r) {
+  const txt = (o) => o?.simpleText || o?.runs?.map((x) => x.text).join("") || o?.content || "";
+  const ents = new Map();
+  for (const m of r.frameworkUpdates?.entityBatchUpdate?.mutations || []) if (m.payload?.commentEntityPayload) ents.set(m.entityKey, m.payload.commentEntityPayload);
+  const list = [];
+  // 表示順はスレッドの並びに従う(新形式: commentViewModel → entity / 旧形式: commentRenderer)
+  walkKey(r, "commentThreadRenderer", (t) => {
+    const vm = t.commentViewModel?.commentViewModel, e = vm && ents.get(vm.commentKey);
+    if (e) {
+      list.push({ author: e.author?.displayName || "", avatar: e.author?.avatarThumbnailUrl || e.avatar?.image?.sources?.[0]?.url || "",
+        text: e.properties?.content?.content || "", time: e.properties?.publishedTime || "", likes: e.toolbar?.likeCountNotliked?.trim() || "",
+        replies: +(e.toolbar?.replyCount || 0) || 0, creator: !!e.author?.isCreator, pinned: !!vm.pinnedText });
+      return;
+    }
+    const c = t.comment?.commentRenderer;
+    if (c) list.push({ author: txt(c.authorText), avatar: c.authorThumbnail?.thumbnails?.[0]?.url || "", text: txt(c.contentText), time: txt(c.publishedTimeText),
+      likes: txt(c.voteCount), replies: +(c.replyCount || 0) || 0, creator: !!c.authorIsChannelOwner, pinned: !!c.pinnedCommentBadge });
+  });
+  let next = "";
+  walkKey(r, "continuationItemRenderer", (c) => { next = deepFind(c, "continuationCommand")?.token || next; }, "commentThreadRenderer"); // 返信の続きは除く
+  const sorts = [];
+  walkKey(r, "sortFilterSubMenuRenderer", (s) => (s.subMenuItems || []).forEach((it) =>
+    sorts.push({ title: it.title, selected: !!it.selected, token: deepFind(it, "continuationCommand")?.token || "" })));
+  let count = "";
+  walkKey(r, "commentsHeaderRenderer", (h) => { count = count || txt(h.countText); });
+  return { list, next, sorts, count };
+}
+
+const cmtsOpen = () => $("d-cmts").open;
+function setCommentsVideo(vid) {
+  if (vid === cmts.vid) return;
+  cmts.vid = vid;
+  $("d-cmts").hidden = !vid;
+  renderComments();
+  if (vid && cmtsOpen()) loadComments();
+}
+async function loadComments(mode = "first", sortToken = "") {
+  const vid = cmts.vid; if (!vid || cmts.loading) return;
+  let c = cmts.cache[vid];
+  if (mode === "first" && c) return renderComments();
+  cmts.loading = true; renderComments();
+  try {
+    if (!c) {
+      const { data, html } = await fetchYtData(`https://www.youtube.com/watch?v=${encodeURIComponent(vid)}`, true);
+      c = cmts.cache[vid] = { cfg: ytCfgFrom(html), list: [], next: findCommentToken(data), sorts: [], count: "", error: "" };
+      if (!c.next || !c.cfg) c.error = "この動画のコメントはオフになっているか、取得できませんでした。";
+    }
+    if (mode === "sort") { c.list = []; c.next = sortToken; c.sorts.forEach((s) => (s.selected = s.token === sortToken)); }
+    if (c.next && c.cfg) {
+      const p = parseComments(await ytContinue(c.next, "/youtubei/v1/next", c.cfg));
+      c.list.push(...p.list); c.next = p.next;
+      if (p.sorts.length && mode === "first") c.sorts = p.sorts; // 並べ替えの選択肢は最初の読み込みのものを使い続ける
+      if (p.count) c.count = p.count;
+      if (!c.list.length) c.error = "コメントはまだありません。";
+    }
+  } catch {
+    c = cmts.cache[vid] ||= { list: [], sorts: [] };
+    c.error = "コメントを読み込めませんでした(ログイン状態やYouTubeの仕様変更が原因かもしれません)。";
+  } finally { cmts.loading = false; if (cmts.vid === vid) renderComments(); }
+}
+// コメント中の「1:23」のような時刻は、押すとその位置へ移動できるようにする
+const linkTimes = (s) => esc(s).replace(/(^|[^\d:])((?:\d{1,2}:)?\d{1,2}:\d{2})(?![\d:])/g, (m, pre, t) => `${pre}<a data-seek="${parse(t)}">${t}</a>`);
+function renderComments() {
+  const body = $("d-cmts-body"), c = cmts.cache[cmts.vid];
+  $("d-cmts-n").textContent = c?.count && c.count !== "コメント" ? ` ・ ${c.count}` : "";
+  if (!cmts.vid) { body.innerHTML = ""; return; }
+  if (!c) { body.innerHTML = cmts.loading ? `<div class="cm-empty">読み込み中…</div>` : ""; return; }
+  const sorts = c.sorts?.length > 1 ? `<div class="cm-sorts">${c.sorts.map((s) => `<button class="tab ${s.selected ? "on" : ""}" data-csort="${esc(s.token)}">${esc(s.title)}</button>`).join("")}</div>` : "";
+  const items = (c.list || []).map((m) => `
+    <div class="cm">
+      ${m.avatar ? `<img class="cm-av" loading="lazy" src="${esc(m.avatar)}" alt="">` : `<span class="cm-av"></span>`}
+      <div class="cm-main">
+        <div class="cm-head">${m.pinned ? `<span class="cm-pin">📌 固定</span>` : ""}<b class="${m.creator ? "cm-owner" : ""}">${esc(m.author)}</b><span>${esc(m.time)}</span></div>
+        <div class="cm-text">${linkTimes(m.text)}</div>
+        <div class="cm-foot">${m.likes ? `<span>👍 ${esc(m.likes)}</span>` : ""}${m.replies ? `<span>返信 ${m.replies}件</span>` : ""}</div>
+      </div>
+    </div>`).join("");
+  const tail = cmts.loading ? `<div class="cm-empty">読み込み中…</div>`
+    : c.error && !c.list?.length ? `<div class="cm-empty">${esc(c.error)}<br><button class="chip" data-creload>もう一度読み込む</button></div>`
+    : c.next ? `<button class="chip cm-more" data-cmore>もっと見る</button>` : "";
+  body.innerHTML = sorts + items + tail;
+}
+$("d-cmts").addEventListener("toggle", () => { ls.set("tf-cmts", cmtsOpen() ? "1" : "0"); if (cmtsOpen()) loadComments(); });
+$("d-cmts").open = ls.get("tf-cmts", "0") === "1";
+$("d-cmts-body").addEventListener("click", (e) => {
+  const seek = e.target.closest("[data-seek]");
+  if (seek) {
+    const post = (func, args = []) => { try { $("player").contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*"); } catch {} };
+    post("seekTo", [+seek.dataset.seek, true]); post("playVideo");
+    return;
+  }
+  if (e.target.closest("[data-cmore]")) return loadComments("more");
+  const s = e.target.closest("[data-csort]");
+  if (s && !s.classList.contains("on")) return loadComments("sort", s.dataset.csort);
+  if (e.target.closest("[data-creload]")) { delete cmts.cache[cmts.vid]; loadComments(); }
 });
 
 function selectPlaylist(id, auto = false) {
@@ -536,13 +722,12 @@ function renderPlDetail() {
       <button class="chip accent" data-playall>▶ 全部再生</button>
       <button class="chip" data-reload title="YouTubeから最新の内容を読み込み直します">更新</button>
     </div>`;
-  const prevBar = `<div class="pl-prev"><span>ホバープレビュー:</span><button class="tab ${prevMode === "B" ? "on" : ""}" data-prev="${prevMode === "B" ? "off" : "B"}">${prevMode === "B" ? "オン" : "オフ"}</button></div>`;
   if (plLoading.has(p.id) && !items.length) return head + `<div class="empty">読み込み中…</div>`;
   if (!items.length) return head + `<div class="empty">動画を読み込めていません。YouTubeにログインしているか確認して「更新」を押してください。</div>`;
-  return head + prevBar + `<div class="pl-rows">` + items.map((v, i) => `
+  return head + viewBar() + `<div class="${rowsCls()}">` + items.map((v, i) => `
     <div class="pl-row ${nowPlaying?.plId === p.id && nowPlaying.idx === i ? "playing" : ""}" data-vid="${esc(v.id)}">
       <span class="idx">${i + 1}</span>
-      <div class="thumb"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt=""></div>
+      ${thumbHtml(v)}
       <div class="meta"><b>${esc(v.title)}</b><small>${esc(v.channel)}</small></div>
       <span class="dur">${esc(v.duration || "")}</span>
       <button class="chip" data-savevid="${esc(v.id)}" title="ライブラリに保存">📁 保存</button>
@@ -563,7 +748,7 @@ function playInPlaylist(vid) {
   $("detail").hidden = false;
   if (kindOf(p) === "own" && i >= 0) return playIndex(p, i, true);
   nowPlaying = null;
-  $("player").src = `https://www.youtube.com/embed/${vid}?list=${encodeURIComponent(p.id)}&autoplay=1&rel=0`;
+  $("player").src = `https://www.youtube.com/embed/${vid}?list=${encodeURIComponent(p.id)}&autoplay=1&rel=0&enablejsapi=1`;
   if (v) $("d-meta").textContent = `再生中: ${v.title}`;
 }
 
@@ -619,20 +804,45 @@ $("d-close").onclick = () => {
 
 /* ---------- ホバープレビュー(埋め込みの無音再生) ---------- */
 let prevMode = ls.get("tf-prev", "B") === "off" ? "off" : "B";
+// 動画一覧の表示形式: "list"(1行ずつ) / "grid"(YouTubeのような大きいサムネイルの一覧)
+let rowView = ls.get("tf-view", "list") === "grid" ? "grid" : "list";
+const rowsCls = () => "pl-rows" + (rowView === "grid" ? " as-grid" : "");
+const thumbHtml = (v) => `<div class="thumb"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="">${v.duration ? `<span class="dur-badge">${esc(v.duration)}</span>` : ""}${noEmbed.has(v.id) ? NE_BADGE : ""}</div>`;
+const viewBar = () => `<div class="pl-prev">
+    <span class="seg" role="group" aria-label="表示形式"><button class="tab ${rowView === "list" ? "on" : ""}" data-view="list" title="リスト表示">☰ リスト</button><button class="tab ${rowView === "grid" ? "on" : ""}" data-view="grid" title="YouTubeのような一覧表示">▦ 一覧</button></span>
+    <span class="sep"></span>
+    <span>ホバープレビュー:</span><button class="tab ${prevMode === "B" ? "on" : ""}" data-prev="${prevMode === "B" ? "off" : "B"}">${prevMode === "B" ? "オン" : "オフ"}</button></div>`;
 let pvTimer = null, pvEl = null, pvRow = null;
 function hidePreview() { clearTimeout(pvTimer); pvEl?.remove(); pvEl = null; pvRow = null; }
 const toSec = (d) => (d || "").split(":").reduce((a, x) => a * 60 + (+x || 0), 0);
+// 埋め込み不可の動画: YouTubeのホバー用アニメーションがあればそれを、なければ静止サムネイルを出す
+function showPreviewFallback(box, v) {
+  const src = v.anim || `https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/hqdefault.jpg`;
+  box.innerHTML = `<img src="${esc(src)}" alt=""><span class="pv-note">${v.anim ? "埋め込み不可のため短いプレビューを表示中" : "埋め込み不可のためプレビューできません"}</span>`;
+}
 
 function showPreview(row) {
-  const v = cur === "search" ? ytResults?.find((x) => x.id === row.dataset.vid) : pls().find((x) => x.id === openPl)?.items?.find((x) => x.id === row.dataset.vid);
+  const v = isYtList() ? ytList()?.find((x) => x.id === row.dataset.vid) : pls().find((x) => x.id === openPl)?.items?.find((x) => x.id === row.dataset.vid);
   if (!v) return;
   const box = document.createElement("div");
   box.className = "pv-pop";
   const start = Math.floor(toSec(v.duration) * 0.3); // イントロを飛ばして動画の30%付近から
-  box.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.id)}?autoplay=1&mute=1&controls=0&disablekb=1&playsinline=1&rel=0&modestbranding=1&start=${start}" allow="autoplay; encrypted-media"></iframe>`;
+  if (noEmbed.has(v.id)) showPreviewFallback(box, v);
+  else {
+    box.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.id)}?autoplay=1&mute=1&controls=0&disablekb=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&start=${start}" allow="autoplay; encrypted-media"></iframe>`;
+    // 埋め込みが禁止されている動画はプレイヤーがエラーを返すので、その場で代わりの表示に切り替える
+    listenPlayer(box.querySelector("iframe"), (m) => {
+      if (m.event === "onError" && EMBED_ERRS.has(+m.info)) { markNoEmbed(v.id); if (pvEl === box) showPreviewFallback(box, v); }
+    });
+  }
   const t = row.querySelector(".thumb").getBoundingClientRect();
-  box.style.left = Math.max(8, Math.min(t.right + 12, innerWidth - 336)) + "px";
-  box.style.top = Math.max(8, Math.min(t.top + t.height / 2 - 90, innerHeight - 190)) + "px";
+  if (rowView === "grid") {
+    // 一覧表示ではYouTubeと同じくサムネイルの上でそのまま再生する
+    Object.assign(box.style, { left: t.left + "px", top: t.top + "px", width: t.width + "px", height: t.height + "px" });
+  } else {
+    box.style.left = Math.max(8, Math.min(t.right + 12, innerWidth - 336)) + "px";
+    box.style.top = Math.max(8, Math.min(t.top + t.height / 2 - 90, innerHeight - 190)) + "px";
+  }
   document.body.append(box);
   pvEl = box;
 }
@@ -666,55 +876,214 @@ $("q").addEventListener("keydown", (e) => {
 });
 applyQmode();
 
-function collectSearchResults(root) {
+// YouTubeのページ(検索結果・ホームのおすすめ)から動画を取り出す。
+// 旧形式(videoRenderer)と新形式(lockupViewModel)の両方に対応。広告とショートは除外する。
+function collectYtVideos(root) {
   const out = new Map();
   const txt = (o) => o?.simpleText || o?.runs?.map((r) => r.text).join("") || "";
+  const badge = (lv) => {
+    let t = "";
+    (function w(n) {
+      if (t || !n || typeof n !== "object") return;
+      if (n.thumbnailBadgeViewModel?.text) { t = n.thumbnailBadgeViewModel.text; return; }
+      Object.values(n).forEach(w);
+    })(lv.contentImage);
+    return t;
+  };
   (function walk(n) {
     if (!n || typeof n !== "object") return;
     if (Array.isArray(n)) return n.forEach(walk);
     const r = n.videoRenderer;
     if (r?.videoId && !out.has(r.videoId))
       out.set(r.videoId, { id: r.videoId, title: txt(r.title), channel: txt(r.ownerText) || txt(r.longBylineText), duration: txt(r.lengthText) || (r.badges ? "LIVE" : ""), views: txt(r.viewCountText), published: txt(r.publishedTimeText) });
-    Object.values(n).forEach(walk);
+    const lv = n.lockupViewModel;
+    if (lv && /VIDEO/.test(lv.contentType || "") && lv.contentId && !out.has(lv.contentId)) {
+      const md = lv.metadata?.lockupMetadataViewModel;
+      const rows = md?.metadata?.contentMetadataViewModel?.metadataRows || [];
+      const parts = (i) => (rows[i]?.metadataParts || []).map((p) => p.text?.content || "").filter(Boolean);
+      const [views = "", published = ""] = parts(1);
+      // anim: YouTubeがサムネイルのホバー時に流す数秒のアニメーション(埋め込み不可の動画のプレビューに使う)
+      let anim = ""; (function w(x) { if (anim || !x || typeof x !== "object") return; const s = x.animatedThumbnailOverlayViewModel?.thumbnail?.sources; if (s?.length) { anim = s[s.length - 1].url; return; } Object.values(x).forEach(w); })(lv.contentImage);
+      out.set(lv.contentId, { id: lv.contentId, title: md?.title?.content || lv.contentId, channel: parts(0).join(" "), duration: badge(lv), views, published, anim });
+    }
+    for (const [k, v] of Object.entries(n)) if (!/^ad|Ad[A-Z]|^promoted/.test(k)) walk(v);
   })(root);
   return [...out.values()];
+}
+// ログイン中のブラウザの権限でYouTubeのページを読み込み、埋め込みデータ(ytInitialData)を取り出す
+async function fetchYtData(url, withHtml = false) {
+  const html = await (await fetch(url, { credentials: "include" })).text();
+  const start = html.indexOf("ytInitialData = "), end = html.indexOf(";</script>", start);
+  if (start < 0 || end < 0) throw new Error("data");
+  const data = JSON.parse(html.slice(start + 16, end));
+  return withHtml ? { data, html } : data;
 }
 async function searchYouTube(q) {
   ytq = q; ytLoading = true; ytError = ""; ytResults = null; cur = "search"; openPl = null; hidePreview(); render();
   try {
-    const html = await (await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=EgIQAQ%253D%253D`, { credentials: "include" })).text();
-    const start = html.indexOf("ytInitialData = "), end = html.indexOf(";</script>", start);
-    if (start < 0 || end < 0) throw new Error("data");
-    const res = collectSearchResults(JSON.parse(html.slice(start + 16, end)));
+    const res = collectYtVideos(await fetchYtData(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=EgIQAQ%253D%253D`));
     if (ytq === q) ytResults = res;
   } catch { if (ytq === q) ytError = "検索結果を取得できませんでした(ネットワークやYouTubeの仕様変更が原因かもしれません)"; }
   finally { if (ytq === q) { ytLoading = false; if (cur === "search") renderList(); } }
 }
 
 function renderSearch() {
-  const head = `<div class="pl-head"><div class="pl-head-title"><b>「${esc(ytq)}」のYouTube検索結果</b><small>${ytLoading ? "検索中…" : ytResults ? `${ytResults.length}件(動画のみ・先頭の約20件)` : ""}</small></div></div>
-    <div class="pl-prev"><span>ホバープレビュー:</span><button class="tab ${prevMode === "B" ? "on" : ""}" data-prev="${prevMode === "B" ? "off" : "B"}">${prevMode === "B" ? "オン" : "オフ"}</button></div>`;
+  const head = `<div class="pl-head"><div class="pl-head-title"><b>「${esc(ytq)}」のYouTube検索結果</b><small>${ytLoading ? "検索中…" : ytResults ? `${ytResults.length}件(動画のみ・先頭の約20件)` : ""}</small></div></div>` + viewBar();
   if (ytLoading) return head + `<div class="empty">検索中…</div>`;
   if (ytError) return head + `<div class="empty">${esc(ytError)}</div>`;
   if (!ytResults?.length) return head + `<div class="empty">見つかりませんでした</div>`;
-  return head + `<div class="pl-rows">` + ytResults.map((v, i) => `
+  return head + ytRowsHtml(ytResults);
+}
+
+const ytRowsHtml = (list) => `<div class="${rowsCls()}">` + list.map((v, i) => `
     <div class="pl-row ${ytPlaying === v.id ? "playing" : ""}" data-vid="${esc(v.id)}">
       <span class="idx">${i + 1}</span>
-      <div class="thumb"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt=""></div>
+      ${thumbHtml(v)}
       <div class="meta"><b>${esc(v.title)}</b><small>${esc([v.channel, v.views, v.published].filter(Boolean).join(" ・ "))}</small></div>
       <span class="dur">${esc(v.duration)}</span>
       <button class="chip" data-ytsave="${esc(v.id)}">${data.videos[v.id] ? "✓ 保存済み" : "📁 保存"}</button>
     </div>`).join("") + `</div>`;
+
+/* ---------- YouTubeのおすすめ(ホームフィード、APIを使わない方式) ---------- */
+// chips: YouTubeのホーム上部のカテゴリ(すべて・音楽・ニュースなど)。byChip: カテゴリごとに取得した動画のキャッシュ
+let recs = { items: null, loading: false, error: "", at: 0, chips: [], chip: 0, byChip: {}, cfg: null };
+const ytList = () => (cur === "recs" ? recs.items : ytResults);
+const NO_RECS = "おすすめを取得できませんでした。YouTubeにログインしているか、YouTubeの「再生履歴」がオンになっているか確認してください(履歴がオフだとおすすめは表示されません)。";
+
+async function loadRecs() {
+  if (recs.loading) return;
+  recs.loading = true; recs.error = "";
+  if (cur === "recs") renderList();
+  try {
+    const { data: d, html } = await fetchYtData("https://www.youtube.com/", true);
+    const items = collectYtVideos(d);
+    recs.cfg = ytCfgFrom(html);
+    recs.chips = collectChips(d);
+    recs.chip = Math.max(0, recs.chips.findIndex((c) => c.selected));
+    recs.byChip = { [recs.chip]: items };
+    recs.items = items; recs.at = Date.now();
+    if (!items.length) recs.error = NO_RECS;
+  } catch { recs.error = "おすすめを読み込めませんでした(ログイン状態やYouTubeの仕様変更が原因かもしれません)"; }
+  finally { recs.loading = false; if (cur === "recs") renderList(); }
+}
+
+// カテゴリを切り替える。YouTubeのページがタブを押したときと同じく、内部API(youtubei)に続きのトークンを送って取得する
+async function selectChip(i) {
+  const c = recs.chips[i]; if (!c || recs.loading) return;
+  recs.chip = i; recs.error = ""; hidePreview();
+  if (recs.byChip[i]) { recs.items = recs.byChip[i]; renderList(); return; }
+  if (!c.token || !recs.cfg) { recs.items = []; recs.error = "このカテゴリは読み込めませんでした。「更新」を押してからもう一度お試しください。"; renderList(); return; }
+  recs.loading = true; recs.items = null; renderList();
+  try {
+    const items = collectYtVideos(await ytContinue(c.token, c.apiUrl));
+    if (recs.chip !== i) return;
+    recs.byChip[i] = items; recs.items = items;
+    if (!items.length) recs.error = `「${c.title}」の動画が見つかりませんでした。`;
+  } catch {
+    if (recs.chip === i) { recs.items = []; recs.error = "このカテゴリを読み込めませんでした(ログイン状態やYouTubeの仕様変更が原因かもしれません)。「更新」を押してからもう一度お試しください。"; }
+  } finally { recs.loading = false; if (cur === "recs") renderList(); }
+}
+
+// ホーム上部のカテゴリ(チップ)を取り出す。新形式(chipViewModel)と旧形式(chipCloudChipRenderer)に対応
+function collectChips(root) {
+  const out = [], seen = new Set();
+  const find = (n, key) => {
+    let r; (function w(x) {
+      if (r !== undefined || !x || typeof x !== "object") return;
+      if (key in x && !Array.isArray(x)) { r = x[key]; return; }
+      Object.values(x).forEach(w);
+    })(n);
+    return r;
+  };
+  const add = (title, selected, chip) => {
+    title = (title || "").trim();
+    if (!title || seen.has(title)) return;
+    const token = find(chip, "continuationCommand")?.token;
+    if (!token && !selected) return; // 切り替えできないチップ(フィードとは別の操作)は除外
+    seen.add(title);
+    out.push({ title, selected: !!selected, token: token || "", apiUrl: find(chip, "webCommandMetadata")?.apiUrl || "/youtubei/v1/browse" });
+  };
+  (function walk(n) {
+    if (!n || typeof n !== "object") return;
+    if (Array.isArray(n)) return n.forEach(walk);
+    if (n.chipViewModel) add(n.chipViewModel.text, n.chipViewModel.selected, n.chipViewModel);
+    const r = n.chipCloudChipRenderer;
+    if (r) add(r.text?.simpleText || r.text?.runs?.map((x) => x.text).join(""), r.isSelected, r);
+    Object.values(n).forEach(walk);
+  })(root);
+  return out;
+}
+
+// ページに埋め込まれた ytcfg から、内部APIに必要なクライアント情報を取り出す
+function jsonAfter(str, key) {
+  let i = str.indexOf(key); if (i < 0) return null;
+  i = str.indexOf("{", i + key.length);
+  let depth = 0, inStr = false;
+  for (let j = i; j < str.length; j++) {
+    const ch = str[j];
+    if (inStr) { if (ch === "\\") j++; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) { try { return JSON.parse(str.slice(i, j + 1)); } catch { return null; } }
+  }
+  return null;
+}
+function ytCfgFrom(html) {
+  const context = jsonAfter(html, '"INNERTUBE_CONTEXT":');
+  const version = (html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/) || [])[1] || context?.client?.clientVersion || "";
+  return context ? { context, version } : null;
+}
+
+// ログイン中のアカウントとしてリクエストするための認証ヘッダー(youtube.com 自身が付けているものと同じ形式)
+async function sha1hex(s) {
+  const b = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function ytAuthHeader() {
+  if (!chrome.cookies?.get) return "";
+  const get = async (name) => (await chrome.cookies.get({ url: "https://www.youtube.com", name }).catch(() => null))?.value || "";
+  const sid = (await get("SAPISID")) || (await get("__Secure-3PAPISID"));
+  if (!sid) return "";
+  const ts = Math.floor(Date.now() / 1000), origin = "https://www.youtube.com";
+  const part = async (label, v) => `${label} ${ts}_${await sha1hex(`${ts} ${v} ${origin}`)}`;
+  const parts = [await part("SAPISIDHASH", sid)];
+  const p1 = await get("__Secure-1PAPISID"), p3 = await get("__Secure-3PAPISID");
+  if (p1) parts.push(await part("SAPISID1PHASH", p1));
+  if (p3) parts.push(await part("SAPISID3PHASH", p3));
+  return parts.join(" ");
+}
+async function ytContinue(token, apiUrl = "/youtubei/v1/browse", cfg = recs.cfg) {
+  const { context, version } = cfg;
+  const headers = { "Content-Type": "application/json", "X-Youtube-Client-Name": "1", "X-Youtube-Client-Version": version, "X-Origin": "https://www.youtube.com", "X-Goog-AuthUser": "0" };
+  const auth = await ytAuthHeader(); if (auth) headers.Authorization = auth;
+  const r = await fetch(`https://www.youtube.com${apiUrl}?prettyPrint=false`, { method: "POST", credentials: "include", headers, body: JSON.stringify({ context, continuation: token }) });
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+// 開いたとき、未取得か前回から10分以上たっていれば読み込む
+function autoLoadRecs() { if (!recs.items || Date.now() - recs.at > 10 * 60 * 1000) loadRecs(); }
+
+function renderRecs() {
+  const info = recs.loading ? "読み込み中…" : recs.items?.length ? `${recs.items.length}件 ・ 取得 ${fmtAgo(recs.at)}` : "";
+  const head = `<div class="pl-head"><div class="pl-head-title"><b>YouTubeのおすすめ</b><small>${info}</small></div>
+      <button class="chip" data-recreload title="YouTubeから最新のおすすめを読み込み直します" ${recs.loading ? "disabled" : ""}>更新</button></div>`
+    + (recs.chips.length > 1 ? `<div class="yt-chips" role="tablist">${recs.chips.map((c, i) =>
+        `<button class="tab ${i === recs.chip ? "on" : ""}" role="tab" aria-selected="${i === recs.chip}" data-chip="${i}">${esc(c.title)}</button>`).join("")}</div>` : "")
+    + viewBar();
+  if (recs.loading && !recs.items?.length) return head + `<div class="empty">読み込み中…</div>`;
+  if (recs.error) return head + `<div class="empty">${esc(recs.error)}</div>`;
+  if (!recs.items?.length) return head + `<div class="empty">まだ読み込んでいません。「更新」を押してください。</div>`;
+  return head + ytRowsHtml(recs.items);
 }
 
 function playYt(vid) {
-  const v = ytResults?.find((x) => x.id === vid); if (!v) return;
+  const v = ytList()?.find((x) => x.id === vid); if (!v) return;
   ytPlaying = vid; sel = null; selPl = null; nowPlaying = null; plNeedsPlayer = null;
   $("detail").hidden = false;
   $("detail").classList.remove("pl"); $("detail").classList.add("yt");
   $("d-title").textContent = v.title;
   $("d-meta").textContent = [v.channel, v.duration].filter(Boolean).join(" ・ ");
   $("d-open").href = `https://www.youtube.com/watch?v=${vid}`;
-  $("player").src = `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&rel=0`;
+  $("player").src = `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&rel=0&enablejsapi=1`;
   document.querySelectorAll(".pl-row").forEach((r) => r.classList.toggle("playing", r.dataset.vid === vid));
 }

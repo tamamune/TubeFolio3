@@ -28,6 +28,31 @@ async function setupEmbedReferer() {
 chrome.runtime.onInstalled.addListener(setupEmbedReferer);
 chrome.runtime.onStartup.addListener(setupEmbedReferer);
 
+// おすすめのカテゴリ(音楽・ニュースなど)の切り替え:
+// YouTubeの内部API(youtubei)へのリクエストを、youtube.com のページから送ったものと同じ扱いにするため
+// この拡張機能自身が送るリクエストにだけ Origin / Referer を付ける。
+async function setupInnertubeOrigin() {
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [2],
+      addRules: [{
+        id: 2, priority: 1,
+        action: { type: "modifyHeaders", requestHeaders: [
+          { header: "Origin", operation: "set", value: "https://www.youtube.com" },
+          { header: "Referer", operation: "set", value: "https://www.youtube.com/" },
+        ] },
+        condition: {
+          urlFilter: "||www.youtube.com/youtubei/",
+          resourceTypes: ["xmlhttprequest"],
+          initiatorDomains: [chrome.runtime.id],
+        },
+      }],
+    });
+  } catch (e) { console.warn("TubeFolio3: youtubei header rule failed", e); }
+}
+chrome.runtime.onInstalled.addListener(setupInnertubeOrigin);
+chrome.runtime.onStartup.addListener(setupInnertubeOrigin);
+
 // ブラウザのツールバーのアイコンから管理ページを開く
 chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") }));
 
