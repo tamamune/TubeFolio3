@@ -1,0 +1,15 @@
+.tf-btn{display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;border-radius:18px;
+  background:var(--yt-spec-badge-chip-background,rgba(0,0,0,.05));color:var(--yt-spec-text-primary,#0f0f0f);
+  height:36px;padding:0 14px;font:500 14px Roboto,Arial,sans-serif;margin-left:8px}
+.tf-btn img{display:block}
+.tf-btn.saved{background:var(--yt-spec-text-primary,#0f0f0f);color:var(--yt-spec-base-background,#fff)}
+.tf-thumb-btn{position:absolute;top:8px;left:8px;z-index:10;width:32px;height:32px;border:0;border-radius:50%;
+  background:rgba(0,0,0,.7);color:#fff;cursor:pointer;opacity:0;transition:opacity .15s}
+.tf-host:hover .tf-thumb-btn,.tf-thumb-btn.saved{opacity:1}
+.tf-thumb-btn.saved{background:#6366f1}
+.tf-pop{position:fixed;z-index:99999;min-width:200px;background:#fff;color:#0f0f0f;border-radius:12px;
+  box-shadow:0 4px 24px rgba(0,0,0,.3);padding:8px;font:14px Roboto,Arial,sans-serif}
+html[dark] .tf-pop{background:#282828;color:#f1f1f1}
+.tf-pop label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer}
+.tf-pop label:hover{background:rgba(128,128,128,.2)}
+.tf-dot{width:10px;height:10px;border-radius:50%}
