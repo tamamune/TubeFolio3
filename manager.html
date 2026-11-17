@@ -15,6 +15,7 @@
   </div>
   <div id="nav-scroll">
   <nav id="nav-list"></nav>
+  <button class="ni" id="test-nav" data-t="test" title="テスト"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9V3"/><path d="M7.5 15h9"/></svg><span class="lbl">テスト</span></button>
   <button class="ni" id="settings" title="設定"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">設定</span></button>
   </div>
   <div class="acct" id="acct" title="YouTubeアカウント"><img class="av" id="acct-img" alt="" hidden><span class="av ph" id="acct-ph"></span><div class="acct-t"><b id="acct-name">YouTube</b><small id="acct-sub">確認中…</small></div></div>
@@ -22,16 +23,19 @@
 <header id="top"><div id="tabs"></div></header>
 <main id="main"></main>
 <dialog id="pl"><button id="pl-x" class="ib" aria-label="閉じる">✕</button><div class="pl-box"><iframe id="pl-f" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pl-info"><h2 id="pl-t"></h2><p id="pl-m"></p><a id="pl-o" target="_blank" rel="noopener">YouTubeで開く ↗</a><button type="button" id="pl-bm" class="btn s" data-bm="">🔖 ブックマーク</button></div></dialog>
-<dialog id="set"><h2>設定</h2><p class="hint">ホームの行の表示・並び順や、再生リストごとの表示を選べます。</p><label class="set-row"><span>YouTube由来の動画・再生リストをダミー表示にする</span><input type="checkbox" id="set-dummy"></label><label class="set-row"><span>動画のアップロード日の表記</span><select id="set-date" class="sel"><option value="rel">〇日前</option><option value="abs">アップロード日(日付)</option><option value="both">日付と〇日前(2026/11/11 ・ 6日前)</option></select></label><label class="set-row"><span>一覧を自動で横スクロールする</span><input type="checkbox" id="set-auto"></label><div id="set-list"></div><div class="set-act"><button class="btn s" id="set-reload">一覧を再読み込み</button><button class="btn p" id="set-close">閉じる</button></div></dialog>
+<section id="set" hidden><h2>設定</h2><p class="hint">ホームの行の表示・並び順や、再生リストごとの表示を選べます。</p><label class="set-row"><span>YouTube由来の動画・再生リストをダミー表示にする</span><input type="checkbox" id="set-dummy"></label><label class="set-row"><span>動画のアップロード日の表記</span><select id="set-date" class="sel"><option value="rel">〇日前</option><option value="abs">アップロード日(日付)</option><option value="both">日付と〇日前(2026/11/11 ・ 6日前)</option></select></label><label class="set-row"><span>サムネイルをクリックしたときの再生</span><select id="set-play" class="sel"><option value="embed">TubeFolio内で再生(埋め込み)</option><option value="yt">YouTubeで開く(新しいタブ・履歴に残る)</option></select></label><label class="set-row"><span>検索結果の🕒ボタンで追加する再生リスト</span><select id="set-wl" class="sel"></select></label><label class="set-row"><span>一覧を自動で横スクロールする</span><input type="checkbox" id="set-auto"></label><div id="set-list"></div><div class="set-act"><button class="btn s" id="set-reload">一覧を再読み込み</button><button class="btn p" id="set-close">ホームへ戻る</button></div></section>
 <dialog id="fd"><form id="fd-form" method="dialog"><h2 id="fd-t">フォルダを追加</h2><input id="fd-name" class="in" maxlength="40" placeholder="フォルダ名" required><div class="set-act"><button type="button" class="btn s" id="fd-cancel">キャンセル</button><button class="btn p">保存</button></div></form></dialog>
 <dialog id="chd"><h2 id="chd-t"></h2><p class="hint">入れるフォルダを選びます(複数可)。</p><div id="chd-list"></div><div class="set-act"><button class="btn p" id="chd-close">閉じる</button></div></dialog>
 <div id="toast" role="status"></div>
 <dialog id="kwd"><h2 id="kwd-t">キーワード</h2><p class="hint">1行に1つ(またはカンマ区切り)。チャンネル名・ハンドル名・そのチャンネルの動画タイトルにキーワードが含まれると、このフォルダの候補として表示します(自動では入れません)。</p><textarea id="kwd-text" class="in" rows="6" placeholder="例:&#10;ゲーム&#10;実況&#10;game"></textarea><div class="set-act"><button type="button" class="btn s" id="kwd-reset" title="「候補から外した」チャンネルを、また候補に出します">無視を解除</button><button type="button" class="btn s" id="kwd-cancel">キャンセル</button><button class="btn p" id="kwd-save">保存</button></div></dialog>
+<script src="src/ytapi.js"></script>
+<script src="src/plsync.js"></script>
 <script src="src/home.js"></script>
 <script src="src/channels.js"></script>
 <script src="src/bookmarks.js"></script>
 <script src="src/subtest.js"></script>
 <script src="src/viewmode.js"></script>
 <script src="src/search.js"></script>
+<script src="src/plmenu.js"></script>
 </body>
 </html>

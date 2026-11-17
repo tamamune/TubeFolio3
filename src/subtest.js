@@ -52,11 +52,23 @@ function absDate(rel) {
   const d = new Date(Date.now() - n * UNIT[u]), p = (x) => String(x).padStart(2, "0");
   return /月|年/.test(u) ? `約${d.getFullYear()}/${p(d.getMonth() + 1)}` : `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
 }
-// カードの情報: チャンネル名 / アップロード日(・日付・視聴回数)と、その隣にフォルダ名
+// 公開日(YYYY-MM-DD)から「3 週間前」などの表記を作る
+function relFromDate(d) {
+  const t = Date.now() - new Date(d + "T00:00:00").getTime(), day = 864e5;
+  if (!(t >= 0)) return "";
+  const [n, u] = t < day ? [0, "今日"] : t < 7 * day ? [Math.floor(t / day), "日"] : t < 30 * day ? [Math.floor(t / (7 * day)), "週間"] : t < 365 * day ? [Math.floor(t / (30 * day)), "か月"] : [Math.floor(t / (365 * day)), "年"];
+  return n ? `${n} ${u}前` : u;
+}
+// 表記を dateMode に合わせる(公開日が正確に分かっているとき)
+const dateTxtExact = (d) => { const a = d.replace(/-/g, "/"), r = relFromDate(d); return dateMode === "abs" ? a : dateMode === "both" ? a + " ・ " + r : r; };
+// カードの情報: チャンネル名 / アップロード日(〇日前・日付)と、その隣にフォルダ名
+// どの一覧でも「サムネイル(長さ) → タイトル → チャンネル → 公開日」の並びにそろえる(再生回数は出さない)
 const cn = (v) => {
   const pub = v.pub || (v.dummy ? `${(v.n * 5) % 28 + 1}日前` : ""), fl = folderLine(v), s = isSubV(v);
-  const left = [pub ? dateTxt(pub) : "", v.views].filter(Boolean).join(" ・ ");
-  return `<small class="cn${s ? " sub" : ""}"${s ? ' title="登録済みのチャンネル"' : ""}>${esc(v.channel)}</small>`
+  const left = v.pubDate ? dateTxtExact(v.pubDate) : pub ? dateTxt(pub) : "";
+  // チャンネル名を押すと、そのチャンネルのページを開く(リンク先は data-ch。分からなければチャンネル名から探す。plmenu.js)
+  const link = v.channel && !v.dummy ? ` data-ch="${esc(v.chUrl || "")}" data-chn="${esc(v.channel)}" role="link" tabindex="0"` : "";
+  return `<small class="cn${s ? " sub" : ""}${link ? " link" : ""}"${link} title="${s ? "登録済みのチャンネル ・ " : ""}${link ? "チャンネルを開く" : ""}">${esc(v.channel)}</small>`
     + (left || fl ? `<small class="cm">${left ? `<span class="cmd">${esc(left)}</span>` : ""}${fl ? `<span class="cf" title="フォルダ">📁 ${esc(fl)}</span>` : ""}</small>` : "");
 };
 const subCls = (v) => (isSubV(v) ? "subc" : "");

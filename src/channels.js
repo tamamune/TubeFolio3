@@ -60,13 +60,96 @@ $("fd-form").onsubmit = async (e) => {
 };
 $("fd-cancel").onclick = () => $("fd").close();
 async function deleteFolder(id) {
-  const ids = desc(id);
-  if (!confirm(`フォルダ「${folderName(id)}」を削除します。\nチャンネルは「未分類」に戻ります(チャンネル自体は削除されません)。`)) return;
+  const ids = desc(id), n = chIn(id).length, sub = ids.length - 1, name = folderName(id);
+  if (!confirm(`フォルダ「${folderName(id)}」を削除しますか?${sub ? `\n中のサブフォルダ(${sub}個)も削除されます。` : ""}${n ? `\n入っているチャンネル(${n})は「未分類」に戻ります(チャンネル自体は消えません)。` : ""}`)) return;
   data.folders = data.folders.filter((f) => !ids.includes(f.id));
   for (const c of Object.values(data.channels || {})) c.folders = (c.folders || []).filter((x) => !ids.includes(x));
   for (const v of Object.values(data.videos)) v.folders = (v.folders || []).filter((x) => !ids.includes(x));
-  tab = "channels"; await persist(); render();
+  if (ids.includes(tab)) tab = "channels"; // 見ていたフォルダを消したときだけ移動する
+  await persist(); render();
+  toast(`フォルダ「${name}」を削除しました`);
 }
+
+/* ---------- サイドバーでのフォルダ操作 ----------
+   ・「フォルダを追加」を押すと、その場に入力欄が出る(Enter で作成、Esc で取り消し)
+   ・各フォルダの「⋯」(または右クリック)でメニュー: 名前を変更 / サブフォルダを追加 / 上へ / 下へ / 入れ子を解除 / キーワード / 削除 */
+function startFolderEdit(st) {
+  closeFolderMenu();
+  if (st.mode === "sub") folded.delete(st.parent); // 追加先のフォルダを開いておく
+  if (document.body.classList.contains("rail")) document.body.classList.remove("rail"); // 細いサイドバーでは入力できないので広げる
+  fEdit = { value: st.mode === "rename" ? folderName(st.id) : "", selectAll: st.mode === "rename", ...st };
+  renderNav();
+}
+async function commitFolderEdit() {
+  const st = fEdit; if (!st) return;
+  fEdit = null;
+  const name = st.value.trim();
+  if (name) {
+    if (st.mode === "rename") { const f = data.folders.find((x) => x.id === st.id); if (f && f.name !== name) { f.name = name; await persist(); } }
+    else {
+      const f = { id: "f" + Date.now().toString(36), name, color: COLORS[data.folders.length % COLORS.length] };
+      if (st.mode === "sub") f.parent = st.parent;
+      data.folders.push(f); await persist();
+      toast(`フォルダ「${name}」を追加しました`);
+    }
+  }
+  render();
+}
+function cancelFolderEdit() { if (!fEdit) return; fEdit = null; renderNav(); }
+document.addEventListener("input", (e) => { if (e.target.id === "fe-in" && fEdit) fEdit.value = e.target.value; });
+document.addEventListener("keydown", (e) => {
+  if (e.target.id !== "fe-in") return;
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); commitFolderEdit(); } // 日本語変換の確定の Enter では作らない
+  else if (e.key === "Escape") { e.preventDefault(); cancelFolderEdit(); }
+});
+// 入力欄の外を押したら、名前が入っていれば確定、空なら取り消し(描き直しで欄が作り直されるときは何もしない)
+document.addEventListener("focusout", (e) => { if (e.target.id === "fe-in" && !navRendering) setTimeout(() => { if (fEdit && document.activeElement?.id !== "fe-in") fEdit.value.trim() ? commitFolderEdit() : cancelFolderEdit(); }, 0); });
+
+function closeFolderMenu() { $("fm")?.remove(); }
+function openFolderMenu(id, x, y) {
+  closeFolderMenu();
+  const f = data.folders.find((v) => v.id === id); if (!f) return;
+  const sib = data.folders.filter((v) => (v.parent || "") === (f.parent || "")), si = sib.indexOf(f);
+  const it = (act, label, dis = false, cls = "") => `<button type="button" class="fm-i ${cls}" data-fm="${act}" ${dis ? "disabled" : ""}>${label}</button>`;
+  const box = document.createElement("div");
+  box.id = "fm"; box.className = "pm fm"; box.setAttribute("role", "menu"); box.dataset.id = id;
+  box.innerHTML = `<div class="pm-h">${esc(f.name)}</div>`
+    + it("rename", "✏️ 名前を変更") + it("sub", "＋ サブフォルダを追加")
+    + it("up", "▲ 上へ", si <= 0) + it("down", "▼ 下へ", si >= sib.length - 1)
+    + (f.parent ? it("unnest", "↖ 入れ子を解除") : "")
+    + it("kw", `🔎 キーワード${f.keywords?.length ? `(${f.keywords.length})` : ""}`)
+    + `<div class="fm-sep"></div>` + it("del", "🗑 フォルダを削除", false, "danger");
+  document.body.append(box);
+  const w = box.offsetWidth, h = box.offsetHeight;
+  box.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px";
+  box.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fmenu]");
+  if (b) { e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect(); return $("fm")?.dataset.id === b.dataset.fmenu ? closeFolderMenu() : openFolderMenu(b.dataset.fmenu, r.right - 4, r.bottom + 4); }
+  const m = e.target.closest("[data-fm]");
+  if (m) {
+    e.preventDefault(); e.stopPropagation();
+    const id = $("fm")?.dataset.id, a = m.dataset.fm; closeFolderMenu(); if (!id) return;
+    if (a === "rename") startFolderEdit({ mode: "rename", id });
+    else if (a === "sub") startFolderEdit({ mode: "sub", parent: id });
+    else if (a === "up" || a === "down") moveFolder(id, a === "up" ? -1 : 1);
+    else if (a === "unnest") unnestFolder(id);
+    else if (a === "kw") openKeywords(id);
+    else if (a === "del") deleteFolder(id);
+    return;
+  }
+  if ($("fm") && !e.target.closest("#fm")) closeFolderMenu();
+}, true);
+// サイドバーのフォルダを右クリックしても同じメニューを出す
+document.addEventListener("contextmenu", (e) => {
+  const n = e.target.closest("#nav-list [data-t]");
+  if (!n || !data.folders.some((f) => f.id === n.dataset.t)) return;
+  e.preventDefault(); openFolderMenu(n.dataset.t, e.clientX, e.clientY);
+});
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeFolderMenu(); });
+addEventListener("resize", closeFolderMenu);
+addEventListener("scroll", (e) => { if (!$("fm")?.contains(e.target)) closeFolderMenu(); }, true);
 
 /* ---------- フォルダの並べ替え・入れ子の解除 ---------- */
 async function moveFolder(id, dir) { // 同じ階層の兄弟どうしで入れ替える
@@ -197,9 +280,9 @@ document.addEventListener("click", (e) => {
   if ((b = t("[data-act]"))) {
     const a = b.dataset.act;
     if (a === "sync") syncSubs(false);
-    else if (a === "addfolder") askFolder(null);
-    else if (a === "rename") askFolder(b.dataset.id);
-    else if (a === "addsub") askFolder(null, b.dataset.id);
+    else if (a === "addfolder") startFolderEdit({ mode: "add" });
+    else if (a === "rename") startFolderEdit({ mode: "rename", id: b.dataset.id }); // サイドバーのその場で入力
+    else if (a === "addsub") startFolderEdit({ mode: "sub", parent: b.dataset.id });
     else if (a === "kw") openKeywords(b.dataset.id);
     else if (a === "up" || a === "down") moveFolder(b.dataset.id, a === "up" ? -1 : 1);
     else if (a === "unnest") unnestFolder(b.dataset.id);

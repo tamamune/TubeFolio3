@@ -1,9 +1,8 @@
-// 初回インストール時にサンプルデータを投入する(既存データは上書きしない)
+// 初回インストール時に空のデータを用意する(既存データは上書きしない)
 chrome.runtime.onInstalled.addListener(async () => {
   const cur = await chrome.storage.local.get("tubefolio");
   if (cur.tubefolio) return;
-  const res = await fetch(chrome.runtime.getURL("src/data/sample.json"));
-  await chrome.storage.local.set({ tubefolio: await res.json() });
+  await chrome.storage.local.set({ tubefolio: { folders: [], videos: {}, bookmarks: [], samplesRemoved: true } });
 });
 
 // YouTube埋め込みの「エラー153」対策:
