@@ -5,90 +5,33 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TubeFolio3</title>
 <link rel="icon" href="icons/icon-32.png">
-<link rel="stylesheet" href="src/manager.css">
+<link rel="stylesheet" href="src/home.css">
 </head>
 <body>
-<div id="app">
-  <aside id="side" class="panel">
-    <div class="side-head">
-      <span class="brand">TubeFolio3</span>
-      <img class="logo" src="icons/icon-128.png" alt="">
-
-      <button id="collapse" class="icon-btn" title="サイドバーを閉じる/開く" aria-label="サイドバーを閉じる/開く">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
-      </button>
-    </div>
-    <nav id="folders"></nav>
-    <button id="add-folder" class="primary-btn" title="新規フォルダ">
-      <span class="plus">＋</span><span class="lbl">新規フォルダ</span>
-    </button>
-    <div class="resizer" id="rs-side" title="ドラッグで幅を変更"></div>
-  </aside>
-
-  <section id="center" class="panel">
-    <header>
-      <input id="q" type="search" placeholder="タイトル・チャンネル・タグで検索">
-      <button id="q-mode" class="chip" title="検索対象を切り替え(ライブラリ内 / YouTube)">ライブラリ</button>
-      <button id="add-video" class="chip accent" title="動画を登録">＋ 動画を追加</button>
-      <button id="theme" class="chip" title="テーマ切り替え"></button>
-    </header>
-    <div id="list"></div>
-  </section>
-
-  <aside id="detail" class="panel" hidden>
-    <div class="resizer left" id="rs-detail" title="ドラッグで幅を変更"></div>
-    <div class="d-bar"><button id="d-close" class="icon-btn" title="閉じる(再生も停止します)" aria-label="閉じる">✕</button></div>
-    <div class="player"><iframe id="player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-    <h2 id="d-title"></h2>
-    <p id="d-meta"></p>
-    <a id="d-open" target="_blank" rel="noopener">YouTubeで開く ↗</a>
-    <details id="d-cmts" hidden>
-      <summary>コメント<span id="d-cmts-n"></span></summary>
-      <div id="d-cmts-body"></div>
-    </details>
-    <label class="pl-only">分類
-      <select id="d-kind">
-        <option value="own">作成した</option>
-        <option value="saved">保存した</option>
-        <option value="manual">URLで追加</option>
-      </select>
-    </label>
-    <h3>しおり</h3>
-    <ul id="d-bms"></ul>
-    <form id="bm-form">
-      <input id="bm-time" placeholder="1:25" size="6" required>
-      <input id="bm-note" placeholder="メモ">
-      <button class="chip">追加</button>
-    </form>
-    <h3>フォルダ</h3>
-    <div id="d-folders"></div>
-    <button id="d-delete" class="chip danger">この動画を削除</button>
-  </aside>
-</div>
-<dialog id="add-dialog">
-  <form method="dialog" id="add-form">
-    <h3>動画を登録</h3>
-    <p class="hint">YouTubeの動画URL(または動画ID)を貼り付けてください。複数は1行に1件ずつ入力できます。</p>
-    <textarea id="add-urls" rows="5" placeholder="https://www.youtube.com/watch?v=...&#10;https://youtu.be/..." required></textarea>
-    <label class="row">保存先フォルダ <select id="add-folder-sel"></select></label>
-    <div class="actions">
-      <button type="button" id="add-cancel" class="chip">キャンセル</button>
-      <button type="submit" class="chip accent" id="add-submit">登録</button>
-    </div>
-  </form>
-</dialog>
-<dialog id="pl-dialog">
-  <form method="dialog" id="pl-form">
-    <h3>再生リストを追加</h3>
-    <p class="hint">再生リストのURL(<code>...playlist?list=…</code>)を貼り付けてください。複数は1行に1件ずつ入力できます。非公開のリストは再生できません。</p>
-    <textarea id="pl-urls" rows="4" placeholder="https://www.youtube.com/playlist?list=PL..." required></textarea>
-    <div class="actions">
-      <button type="button" id="pl-cancel" class="chip">キャンセル</button>
-      <button type="submit" class="chip accent" id="pl-submit">追加</button>
-    </div>
-  </form>
-</dialog>
+<aside id="nav">
+  <div class="nav-head">
+    <button id="menu" class="ib" aria-label="メニュー" title="メニュー"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <a class="brand" href="manager.html">TubeFolio3</a>
+  </div>
+  <div id="nav-scroll">
+  <nav id="nav-list"></nav>
+  <button class="ni" id="settings" title="設定"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">設定</span></button>
+  </div>
+  <div class="acct" id="acct" title="YouTubeアカウント"><img class="av" id="acct-img" alt="" hidden><span class="av ph" id="acct-ph"></span><div class="acct-t"><b id="acct-name">YouTube</b><small id="acct-sub">確認中…</small></div></div>
+</aside>
+<header id="top"><div id="tabs"></div></header>
+<main id="main"></main>
+<dialog id="pl"><button id="pl-x" class="ib" aria-label="閉じる">✕</button><div class="pl-box"><iframe id="pl-f" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pl-info"><h2 id="pl-t"></h2><p id="pl-m"></p><a id="pl-o" target="_blank" rel="noopener">YouTubeで開く ↗</a><button type="button" id="pl-bm" class="btn s" data-bm="">🔖 ブックマーク</button></div></dialog>
+<dialog id="set"><h2>設定</h2><p class="hint">ホームの行の表示・並び順や、再生リストごとの表示を選べます。</p><label class="set-row"><span>YouTube由来の動画・再生リストをダミー表示にする</span><input type="checkbox" id="set-dummy"></label><label class="set-row"><span>動画のアップロード日の表記</span><select id="set-date" class="sel"><option value="rel">〇日前</option><option value="abs">アップロード日(日付)</option><option value="both">日付と〇日前(2026/11/11 ・ 6日前)</option></select></label><label class="set-row"><span>一覧を自動で横スクロールする</span><input type="checkbox" id="set-auto"></label><div id="set-list"></div><div class="set-act"><button class="btn s" id="set-reload">一覧を再読み込み</button><button class="btn p" id="set-close">閉じる</button></div></dialog>
+<dialog id="fd"><form id="fd-form" method="dialog"><h2 id="fd-t">フォルダを追加</h2><input id="fd-name" class="in" maxlength="40" placeholder="フォルダ名" required><div class="set-act"><button type="button" class="btn s" id="fd-cancel">キャンセル</button><button class="btn p">保存</button></div></form></dialog>
+<dialog id="chd"><h2 id="chd-t"></h2><p class="hint">入れるフォルダを選びます(複数可)。</p><div id="chd-list"></div><div class="set-act"><button class="btn p" id="chd-close">閉じる</button></div></dialog>
 <div id="toast" role="status"></div>
-<script src="src/manager.js"></script>
+<dialog id="kwd"><h2 id="kwd-t">キーワード</h2><p class="hint">1行に1つ(またはカンマ区切り)。チャンネル名・ハンドル名・そのチャンネルの動画タイトルにキーワードが含まれると、このフォルダの候補として表示します(自動では入れません)。</p><textarea id="kwd-text" class="in" rows="6" placeholder="例:&#10;ゲーム&#10;実況&#10;game"></textarea><div class="set-act"><button type="button" class="btn s" id="kwd-reset" title="「候補から外した」チャンネルを、また候補に出します">無視を解除</button><button type="button" class="btn s" id="kwd-cancel">キャンセル</button><button class="btn p" id="kwd-save">保存</button></div></dialog>
+<script src="src/home.js"></script>
+<script src="src/channels.js"></script>
+<script src="src/bookmarks.js"></script>
+<script src="src/subtest.js"></script>
+<script src="src/viewmode.js"></script>
+<script src="src/search.js"></script>
 </body>
 </html>

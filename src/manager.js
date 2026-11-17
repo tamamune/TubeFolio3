@@ -129,7 +129,10 @@ $("folders").addEventListener("click", (e) => {
   // 子を持つフォルダは、押すたびにアコーディオンを開閉
   if (kids(cur).length) { expanded.has(cur) ? expanded.delete(cur) : expanded.add(cur); saveExpanded(); }
   hidePreview();
-  render();
+  renderFolders(); // 選択ピルを先に動かす
+  const L = $("list");
+  L.classList.add("page-out");
+  setTimeout(() => { render(); L.classList.remove("page-out"); L.classList.remove("page-in"); void L.offsetWidth; L.classList.add("page-in"); }, 200);
   if (cur === "playlists") autoSyncPlaylists();
   if (cur === "recs") autoLoadRecs();
 });
@@ -358,7 +361,7 @@ applyCollapsed(ls.get("tf-collapsed", "0") === "1");
 
 /* ---------- テーマ: auto → light → dark ---------- */
 const THEMES = ["auto", "light", "dark"], LABEL = { auto: "🌓 自動", light: "☀ ライト", dark: "🌙 ダーク" };
-let theme = ls.get("tf-theme", "auto");
+let theme = ls.get("tf-theme", "dark");
 function applyTheme() {
   if (theme === "auto") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.dataset.theme = theme;
@@ -368,7 +371,8 @@ $("theme").onclick = () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES
 applyTheme();
 
 /* ---------- 起動 ---------- */
-chrome.storage.local.get(KEY).then((r) => { if (r[KEY]) data = r[KEY]; render(); });
+{ const h = location.hash.slice(1); if (h === "recs" || h === "playlists" || h === "all") cur = h; }
+chrome.storage.local.get(KEY).then((r) => { if (r[KEY]) data = r[KEY]; render(); if (cur === "recs") autoLoadRecs(); if (cur === "playlists") autoSyncPlaylists(); const m = location.hash.match(/^#pl:(.+)$/); if (m && pls().some((p) => p.id === decodeURIComponent(m[1]))) { cur = "playlists"; renderFolders(); openPlaylist(decodeURIComponent(m[1])); } });
 chrome.storage.onChanged.addListener((c) => { if (c[KEY]) { data = c[KEY].newValue; render(); } });
 
 /* ---------- 再生リスト(APIを使わない方式) ---------- */

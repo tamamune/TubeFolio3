@@ -5,14 +5,15 @@
   --panel:rgba(255,255,255,.72); --fg:#14141a; --muted:#6b6f7b;
   --line:#e3e5ec; --hover:#f1f2f6; --active:#e8eaf2;
   --acc:#6366f1; --acc-fg:#fff;
-  --r:16px; --r-sm:10px; --gap:12px; --pad:14px;
+  --r:22px; --r-sm:14px; --gap:12px; --pad:14px;
   --side-w:240px; --detail-w:420px;
   --shadow:0 2px 14px rgba(20,20,40,.08);
+  --pill:#fff;--pill-fg:#14141a;
 }
 @media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){color-scheme:dark;--bg:#0a0e16;--bg-img:linear-gradient(160deg,#27425f 0%,#121c2c 50%,#0a0e16 100%);--panel:rgba(24,28,38,.68);--fg:#ececf1;--muted:#9aa0b0;--line:rgba(255,255,255,.09);--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.12);--shadow:0 4px 24px rgba(0,0,0,.45)}
+  :root:not([data-theme="light"]){color-scheme:dark;--bg:#050505;--bg-img:radial-gradient(1200px 700px at 30% 0%,#3b3d41 0%,#26272a 45%,#101112 100%);--panel:rgba(92,94,98,.34);--fg:#f1f1f2;--muted:#a3a5aa;--line:rgba(255,255,255,.10);--hover:rgba(255,255,255,.07);--active:rgba(255,255,255,.14);--acc:#f1f1f2;--acc-fg:#17181a;--pill:#f4f4f5;--pill-fg:#17181a;--shadow:0 10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08)}
 }
-:root[data-theme="dark"]{color-scheme:dark;--bg:#0a0e16;--bg-img:linear-gradient(160deg,#27425f 0%,#121c2c 50%,#0a0e16 100%);--panel:rgba(24,28,38,.68);--fg:#ececf1;--muted:#9aa0b0;--line:rgba(255,255,255,.09);--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.12);--shadow:0 4px 24px rgba(0,0,0,.45)}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#050505;--bg-img:radial-gradient(1200px 700px at 30% 0%,#3b3d41 0%,#26272a 45%,#101112 100%);--panel:rgba(92,94,98,.34);--fg:#f1f1f2;--muted:#a3a5aa;--line:rgba(255,255,255,.10);--hover:rgba(255,255,255,.07);--active:rgba(255,255,255,.14);--acc:#f1f1f2;--acc-fg:#17181a;--pill:#f4f4f5;--pill-fg:#17181a;--shadow:0 10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08)}
 
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -21,7 +22,7 @@ button,input{font:inherit;color:inherit}
 
 /* ===== レイアウト ===== */
 #app{display:flex;gap:var(--gap);height:100vh;padding:var(--gap)}
-.panel{background:var(--panel);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);position:relative;min-height:0}
+.panel{background:var(--panel);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(24px) saturate(1.2);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);position:relative;min-height:0}
 #side{width:var(--side-w);flex:none;display:flex;flex-direction:column;padding:var(--pad);transition:width .18s ease}
 #center{flex:1;min-width:0;display:flex;flex-direction:column}
 #detail{width:var(--detail-w);flex:none;padding:var(--pad);overflow:auto}
@@ -49,7 +50,8 @@ a.chip{text-decoration:none;color:inherit;display:inline-block}
 #folders{flex:1;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:4px}
 .nav-item{position:relative;display:flex;align-items:center;gap:12px;width:100%;height:40px;padding:0 10px;border:0;border-radius:var(--r-sm);background:none;cursor:pointer;text-align:left;color:var(--muted)}
 .nav-item:hover{background:var(--hover);color:var(--fg)}
-.nav-item.on{background:var(--active);color:var(--fg);font-weight:600}
+.nav-item.on{background:var(--pill);color:var(--pill-fg);font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.nav-item{transition:background .25s ease,color .25s ease}
 .nav-item svg{flex:none}
 .nav-item .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav-label{font-size:11px;letter-spacing:.06em;color:var(--muted);padding:16px 10px 6px}
@@ -60,7 +62,7 @@ body.collapsed .nav-label{font-size:0;height:1px;padding:0;margin:10px 8px;backg
 .nav-item .bullet{flex:none;width:20px;height:20px;position:relative}
 .nav-item .bullet::after{content:"";position:absolute;left:8px;top:8px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.6}
 .nav-item .n{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--hover);color:var(--muted)}
-.nav-item.on .n{background:var(--acc);color:var(--acc-fg)}
+.nav-item.on .n{background:rgba(0,0,0,.12);color:var(--pill-fg)}
 .nav-item[draggable=true]{cursor:grab}
 .nav-item.dragging{opacity:.35}
 .nav-item.drop-target{outline:2px solid var(--acc);background:var(--active)}
@@ -238,3 +240,11 @@ dialog .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 
 /* ===== YouTube検索結果の再生(右パネル) ===== */
 #detail.yt h3,#detail.yt #d-bms,#detail.yt #bm-form,#detail.yt #d-folders,#detail.yt #d-delete,#detail.yt .pl-only{display:none}
+
+/* ===== ページ切り替え: ぼかしながらフェード ===== */
+#list.page-in{animation:pageIn .5s cubic-bezier(.2,.7,.2,1)}
+#list.page-out{opacity:0;filter:blur(14px);transform:scale(.985);transition:opacity .2s ease,filter .2s ease,transform .2s ease}
+@keyframes pageIn{from{opacity:0;filter:blur(14px);transform:scale(.985)}to{opacity:1;filter:blur(0);transform:none}}
+.card,.ftile,.stat,.pl-row{transition:border-color .2s,background .2s,transform .2s}
+.card:hover{transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){#list.page-in,#list.page-out{animation:none;transition:none}}
