@@ -72,8 +72,6 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .ni svg{flex:none}
 #settings{margin-top:auto}
 /* テストは設定のすぐ上(下にまとめて置く) */
-#test-nav{margin-top:auto}
-#test-nav + #settings{margin-top:0}
 /* サイドバーのフォルダの「⋯」(マウスを乗せたときだけ出す) */
 .ni .fmore{flex:none;display:grid;place-items:center;width:24px;height:24px;margin-left:2px;border-radius:6px;color:var(--muted);font-weight:700;opacity:0;transition:opacity .15s}
 .ni:hover .fmore,.ni .fmore:focus-visible{opacity:1}
@@ -317,3 +315,460 @@ body[data-acc="gray"]{--acc:#d0d0d0;--acc-s:#9a9a9a;--acc-t:#cfcfcf;--acc-f:#9a9
 .vl .c .cn,.vl .c .cm,.vl .c small{grid-column:2;font-size:13px}
 @media (max-width:820px){.grid.vg:not(.vl){grid-template-columns:repeat(2,minmax(0,1fr))}.vl .c{grid-template-columns:140px minmax(0,1fr)}}
 .sel{height:34px;padding:0 10px;border:1px solid #3a3a3a;border-radius:6px;background:#0d0d0d;color:#fff}
+
+/* ===== フォルダ管理(2ペイン) ===== */
+.fm2{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;padding:6px 32px 40px;align-items:start}
+.fm2-side{position:sticky;top:70px;display:flex;flex-direction:column;gap:2px;padding:10px 8px;border:1px solid #1f1f1f;border-radius:12px;background:#111;max-height:calc(100vh - 90px);overflow:auto}
+.fm2-h{padding:4px 12px 8px;color:var(--muted);font-size:12px;font-weight:700}
+.fm2-i{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:0 12px;border:0;border-radius:8px;background:none;color:#ddd;font-weight:600;text-align:left}
+.fm2-i .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm2-i small{color:var(--muted);font-size:11px}
+.fm2-i:hover{background:#1c1c1c}
+.fm2-i.on{background:rgba(var(--acc-a),.16);color:var(--acc)}
+.fm2-i.drop{outline:2px dashed var(--acc);outline-offset:-2px;background:#2a2a2a}
+.fm2-add{margin-top:6px;height:34px;border:1px dashed #3a3a3a;border-radius:8px;background:none;color:var(--muted);font-weight:700}
+.fm2-add:hover{color:#fff;border-color:#666}
+.fm2-tip{margin:8px 6px 2px;color:var(--muted);font-size:11px;line-height:1.5}
+.fm2-main{min-width:0}
+.fm2-main .ch-bar,.fm2-main .crumb,.fm2-main .subs{margin-left:0;margin-right:0}
+.fm2-main .sg,.fm2-main .sg-none{margin-left:0;margin-right:0}
+.chr-list{display:flex;flex-direction:column;gap:8px}
+.chr{border:1px solid #1f1f1f;border-radius:12px;background:#111;transition:background .2s,border-color .2s}
+.chr:hover{background:#161616;border-color:#2c2c2c}
+.chr.gone{opacity:.55}.chr.dragging{opacity:.4}
+.chr-h{display:flex;align-items:center;gap:12px;padding:10px 12px;flex-wrap:wrap}
+.av-img.sm{width:44px;height:44px;font-size:18px;flex:none}
+.chr-t{display:flex;flex-direction:column;min-width:140px;flex:1 1 180px}
+.chr-t b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chr-t small{color:var(--muted);font-size:12px}
+.chr-n:hover b{text-decoration:underline}
+.chr-s{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chr-s small{color:var(--muted);font-size:11px}
+.cs-chip{padding:2px 9px;border-radius:999px;background:#1d1d1d;color:#ccc;font-size:12px}
+.cs-chip b{color:var(--acc);margin-left:2px}
+.chr-b{height:30px;padding:0 12px;border:1px solid #333;border-radius:999px;background:none;color:#ddd;font-size:12px;font-weight:700}
+.chr-b:hover{background:#2a2a2a}.chr-b:disabled{opacity:.5;cursor:default}
+.chr-x{width:26px;height:26px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:#aaa;font-size:12px}
+.chr-x:hover{background:#c33;color:#fff}
+.chr-d{padding:2px 14px 14px;overflow-x:auto}
+.cs-t{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.cs-t th,.cs-t td{padding:7px 10px;text-align:right;border-bottom:1px solid #1f1f1f;white-space:nowrap}
+.cs-t thead th{color:var(--muted);font-size:11px;font-weight:700}
+.cs-t tbody th{text-align:left;color:#ddd;font-weight:700}
+.cs-t td.z{color:#555}
+.cs-note{margin-top:8px;color:var(--muted);font-size:12px}
+@media (max-width:820px){.fm2{grid-template-columns:1fr;padding:6px 16px 40px}.fm2-side{position:static;max-height:260px}}
+
+/* ===== 設定のタブ / チャンネルのキーワード ===== */
+.set-tabs{display:flex;gap:8px;margin:12px 0 6px;flex-wrap:wrap}
+.set-tabs .tab{background:#1a1a1a;color:#ddd;height:34px}
+.set-tabs .tab.on{background:#fff;color:#000}
+.kw-r{padding:12px 0;border-bottom:1px solid var(--line)}
+.kw-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.kw-n small{color:var(--muted);font-size:12px}
+.kw-n .kw-s{color:var(--acc)}
+.kw-rs{margin-left:auto;height:26px;padding:0 10px;border:1px solid #333;border-radius:999px;background:none;color:#ccc;font-size:12px}
+.kw-c{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.kw-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 12px;border-radius:999px;background:#222;font-size:13px}
+.kw-chip button{width:20px;height:20px;border:0;border-radius:50%;background:none;color:#999;font-size:11px}
+.kw-chip button:hover{background:#c33;color:#fff}
+.kw-in{height:30px;min-width:200px;padding:0 10px;border:1px solid #3a3a3a;border-radius:6px;background:#0d0d0d;color:#fff;outline:0}
+.kw-in:focus{border-color:#888}
+.kw-add{height:30px;padding:0 12px;font-size:12px}
+
+/* フォルダ管理は1ペイン(フォルダの切り替えは左のサイドバー) */
+.fm2{grid-template-columns:minmax(0,1fr)}
+.cs-sw{display:inline-flex;gap:4px;padding:3px;border-radius:999px;background:#1a1a1a}
+.cs-sw .tab{height:32px;padding:0 14px}
+.cs-l td.hit{color:#000;background:var(--acc);font-weight:800;border-radius:6px}
+.cs-l td.z{color:var(--muted);text-align:left}
+
+/* サイドバーのフォルダ名を見やすく: ⋯ は触れたときだけ場所をとる / 入れ子の字下げを小さく / 幅を広げる */
+:root{--nav-w:248px}
+body.rail{--nav-w:68px}
+.ni .lbl:not(.fmore):not(.n){flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ni .n{flex:none}
+.ni .fmore{width:0;margin:0;overflow:hidden;opacity:0}
+.ni:hover .fmore,.ni .fmore:focus-visible{width:24px;margin-left:2px;opacity:1}
+.ni:hover .n + .fmore{margin-left:4px}
+.ni .chev{margin-left:0}
+.cs-l td.hit{text-align:center}
+
+/* ===== チャンネルの行: アイコンのボタン / クリックで開閉 / マウスオーバーのプレビュー ===== */
+.chr-h{cursor:pointer}
+.chr-i{position:relative;flex:none;display:grid;place-items:center;width:34px;height:34px;border:1px solid #333;border-radius:50%;background:none;color:#aaa}
+.chr-i:hover{background:#2a2a2a;color:#fff}
+.chr-i.on{color:var(--acc);border-color:rgba(var(--acc-a),.5)}
+.chr-i:disabled{opacity:.6;cursor:default}
+.chr-i i{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--acc);color:#000;font-size:10px;font-style:normal;font-weight:800;line-height:16px;text-align:center}
+.chr-i.spin svg{animation:chspin 1s linear infinite}
+@keyframes chspin{to{transform:rotate(360deg)}}
+#pv{position:fixed;z-index:60;width:min(940px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:12px 14px 14px;border:1px solid #333;border-radius:12px;background:#171717;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+.pv-h{margin-bottom:8px}
+.pv-h b{font-size:14px}
+.pv-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.pv-s h4{margin:0 0 6px;color:var(--muted);font-size:12px;font-weight:700}
+.pv-e{margin:0;color:var(--muted);font-size:12px}
+.pv-c{display:flex;flex-direction:column;gap:4px;width:100%;margin-bottom:10px;padding:0;border:0;background:none;color:#fff;text-align:left;cursor:pointer}
+.pv-th{position:relative;display:block;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#222}
+.pv-th img{width:100%;height:100%;object-fit:cover;display:block}
+.pv-c.sh .pv-th img{object-position:center}
+.pv-th em{position:absolute;right:4px;bottom:4px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.8);font-size:11px;font-style:normal;font-weight:700}
+.pv-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;font-weight:700;line-height:1.35}
+.pv-c small{color:var(--muted);font-size:11px}
+.pv-c:hover .pv-t{text-decoration:underline}
+@media (max-width:820px){.pv-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* マウスオーバーのプレビュー: 右端に縦に並べる */
+#pv{width:min(360px,calc(100vw - 28px))}
+.pv-g{display:flex;flex-direction:column;gap:6px}
+.pv-s h4{margin:6px 0 6px}
+.pv-c{flex-direction:row;align-items:flex-start;gap:10px;margin-bottom:8px}
+.pv-th{flex:none;width:128px}
+.pv-c .pv-t{flex:1;min-width:0}
+.pv-c small{display:block;margin-top:2px}
+.pv-c > .pv-t,.pv-c > small{align-self:flex-start}
+.chr-n{align-self:flex-start;max-width:100%}
+.pv-x{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+#pv.wide{width:min(720px,calc(100vw - 28px))}
+#pv.wide .pv-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px}
+#pv.tiny .pv-th{width:96px}
+#pv.tiny .pv-c{margin-bottom:5px}
+#pv.tiny .pv-s h4{margin:2px 0 4px}
+#pv.cols4{width:min(1000px,calc(100vw - 28px))}
+#pv.cols4 .pv-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 14px}
+#pv.cols4 .pv-th{width:88px}
+/* 登録済みのフォルダ名を表示(未登録はアイコンだけ) */
+.chr-i.named{width:auto;max-width:200px;gap:6px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center}
+.chr-i.named svg{flex:none}
+.chr-fn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700}
+.chr-i.named i{position:static;flex:none;min-width:0;height:auto;padding:0;background:none;color:var(--acc);font-size:11px;line-height:1}
+.set-rg{display:flex;align-items:center;gap:8px;color:var(--muted)}.set-rg input[type=range]{width:160px;accent-color:var(--acc)}.set-rg input[type=number]{width:64px;height:30px;text-align:right}
+#pv{transform-origin:top right}
+
+/* ===== サムネイルの上で動画を再生 ===== */
+.tp-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;pointer-events:none;opacity:0}
+.tp-f.play{opacity:1}
+.th .dur,.th .wl,.th .bm{z-index:1}
+/* サムネイル上の動画再生は、サムネイルいっぱいに表示する(設定の「プレビューの大きさ」は効かせない) */
+.tp-f{inset:0;left:0;top:0;border-radius:0;box-shadow:none;
+  /* プレーヤー内のUI(一時停止・ロゴ・タイトル)は YouTube 側のものなので、枠を 1/倍率 に広げて倍率で縮める。見える範囲はサムネイルいっぱいのまま */
+  width:calc(100% / var(--ui,1));height:calc(100% / var(--ui,1));transform:scale(var(--ui,1));transform-origin:0 0}
+
+/* ===== 視聴の進み具合: 途中 / 視聴済み ===== */
+.pg{height:5px}
+.pg.done i{background:#3ddc84}
+.wch{position:absolute;left:6px;top:6px;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:800;line-height:18px;pointer-events:none}
+.wch.part{background:#f00;color:#fff}
+.wch.done{background:rgba(0,0,0,.78);color:#3ddc84;border:1px solid rgba(61,220,132,.5)}
+.th:has(.wch.done) img{filter:brightness(.5) saturate(.6)}
+
+/* ===== 検索画面のレイアウト整理 / グリッド・リストの切り替えは右側 ===== */
+.s-form{max-width:760px;margin:24px 32px 14px;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+.s-filters{gap:10px;margin:0 32px;padding:14px 0 16px;border-bottom:1px solid #222}
+.s-chips{gap:8px}
+.s-cl{flex:none;width:48px}
+.s-chips .tab{height:34px;padding:0 16px;font-size:13px}
+.s-bar{display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;margin:18px 32px 12px}
+.s-bar .s-head{margin:0}
+.s-bar .vbar{margin:0;margin-left:auto}
+.vbar{justify-content:flex-end}
+@media (max-width:820px){.s-form{margin-left:16px;margin-right:16px}.s-bar{margin-left:16px;margin-right:16px}}
+
+
+/* ===== 検索画面の上部をすっきり: 検索ボックスの下に、対象と種類を1行のコンパクトな切り替えで並べる ===== */
+.s-form{max-width:680px;margin:20px 32px 12px;padding:4px 4px 4px 16px}
+.s-form input{height:36px}
+.s-form .btn{height:36px;padding:0 20px}
+.s-filters{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 24px;margin:0 32px;padding:0 0 14px}
+.s-chips{flex-wrap:nowrap;gap:2px;padding:3px;border-radius:999px;background:#141414}
+.s-cl{width:auto;padding:0 8px 0 12px;font-size:12px}
+.s-chips .tab{height:28px;padding:0 14px;background:none;color:#bbb;font-size:13px}
+.s-chips .tab:hover{color:#fff}
+.s-chips .tab.on{background:#fff;color:#000}
+@media (max-width:820px){.s-chips{flex-wrap:wrap;border-radius:16px}}
+
+.th.tp-on .wl{opacity:1;z-index:3} /* 🕒はプレビュー中も縮めず表示したままにする */
+
+/* 設定ボタン: ユーザー(アカウント)の右側に、アイコンだけで置く */
+.acct{justify-content:flex-start}
+.acct-t{flex:1 1 auto}
+.acct #settings,.acct #test-nav{flex:none;width:38px;height:38px;margin:0;padding:0;justify-content:center;gap:0;border-radius:50%;color:#bbb}
+.acct #settings .lbl{display:none}
+.acct #settings:hover,.acct #test-nav:hover{background:#2a2a2a;color:#fff}
+.acct #settings.on,.acct #test-nav.on{background:#2a2a2a;color:var(--acc)}
+body.rail .acct{flex-direction:column;gap:6px}
+
+/* ===== 設定の「同期(Google ドライブ)」 ===== */
+.ds-st{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.ds-st div{padding:12px 14px;border:1px solid #2a2a2a;border-radius:10px;background:#111}
+.ds-st span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.ds-st b{font-size:14px;word-break:break-all}
+.ds-msg{margin:8px 0;padding:10px 14px;border-radius:8px;background:#1a1a1a;color:#ddd;font-size:13px}
+.ds-b{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+
+/* ===== サイドバーのフォルダの行: [▸] [フォルダ] [タイトル] [新着の件数] [⋯] ===== */
+.ni.fd{gap:6px;position:relative}
+.ni.fd .chev{order:0;margin:0 -2px 0 0;width:20px;height:24px}
+.ni.fd .chev-sp{flex:none;width:18px}
+.ni .n.nw{min-width:22px;text-align:center;color:#666}
+.ni .n.nw.has{background:rgba(var(--acc-a),.2);color:var(--acc);font-weight:800}
+.ni.fd.dragging{opacity:.4}
+.ni.drop-before::before,.ni.drop-after::after{content:"";position:absolute;left:8px;right:8px;height:2px;border-radius:2px;background:var(--acc)}
+.ni.drop-before::before{top:0}
+.ni.drop-after::after{bottom:0}
+.ni.drop-into{outline:2px dashed var(--acc);outline-offset:-2px;background:#2a2a2a}
+body.rail .ni.fd .chev,body.rail .ni.fd .chev-sp{display:none}
+
+/* サイドバーの数字: 幅をそろえて、右端にきれいに並べる */
+.ni .n{flex:none;min-width:36px;padding:2px 8px;text-align:center;font-variant-numeric:tabular-nums;line-height:18px}
+.ni .n.nw{min-width:36px}
+.ni.fd .lbl:not(.fmore):not(.n){margin-right:auto}
+/* 「⋯」は、マウスを乗せるまで場所を取らない(数字の右端を「すべて」「未分類」とそろえる) */
+.ni.fd .fmore{margin-left:-6px}
+.ni.fd:hover .fmore,.ni.fd .fmore:focus-visible{margin-left:0}
+
+/* フォルダ行の ▲▼(上へ・下へ): マウスを乗せたときだけ、「⋯」の左に出る */
+.ni .fmv{flex:none;display:grid;place-items:center;width:0;height:24px;overflow:hidden;opacity:0;border-radius:6px;color:var(--muted);font-size:10px;transition:opacity .15s}
+.ni.fd:hover .fmv{width:22px;opacity:1}
+.ni.fd:hover .fmv.dis{opacity:.25;pointer-events:none}
+.ni .fmv:hover{background:rgba(255,255,255,.14);color:#fff}
+.ni.fd .fmv{margin-left:-6px}
+.ni.fd:hover .fmv{margin-left:0}
+body.rail .ni .fmv{display:none}
+/* マウスを乗せている間は、数字の代わりに ▲▼ と「⋯」を出す(タイトルを切りすぎないため) */
+.ni.fd:hover .n{display:none}
+
+/* チャンネルのフォルダ選択: フォルダが多いときは、一覧だけを縦にスクロールできるようにする(閉じるボタンは下に固定) */
+#chd[open]{display:flex;flex-direction:column;max-height:88vh}
+#chd #chd-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#chd .set-act{flex:none}
+
+/* フォルダの画像 */
+.fimg{width:22px;height:22px;flex:none;border-radius:6px;object-fit:cover}
+
+/* フォルダ選択の一覧: 細い暗色のスクロールバー、行を見やすく */
+#chd #chd-list{scrollbar-width:thin;scrollbar-color:#3a3a3a transparent;margin:6px -8px 8px 0;padding-right:8px}
+#chd #chd-list::-webkit-scrollbar{width:6px}
+#chd #chd-list::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:3px}
+#chd #chd-list::-webkit-scrollbar-thumb:hover{background:#555}
+#chd #chd-list .set-row{cursor:pointer;border-radius:6px}
+#chd #chd-list .set-row:hover{background:#1e1e1e}
+#chd #chd-list .set-row input{accent-color:var(--acc)}
+
+/* フォルダアイコンの背景色(設定した色が、アイコン(または画像)の後ろに角丸で敷かれる) */
+.fbg{display:inline-flex;align-items:center;justify-content:center;flex:none;width:30px;height:30px;border-radius:8px}
+.fbg svg,.fbg .fimg{flex:none}
+
+/* 「フォルダ」の見出しの右横に、＋だけを置く */
+.nav-hh{display:flex;align-items:center;justify-content:space-between}
+.nav-hh .fadd{width:26px;height:26px;border:0;border-radius:6px;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer}
+.nav-hh .fadd:hover{background:#2a2a2a;color:#fff}
+
+/* フォルダの編集ダイアログ */
+#fed{width:min(440px,92vw);padding:20px 22px}
+#fed h2{margin:0 0 12px;font-size:18px}
+.fed-pv{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;border-radius:10px;background:#0e0e0e}
+.fed-pv .fbg{width:40px;height:40px;border-radius:10px}
+.fed-pv .fimg{width:34px;height:34px}
+.fed-r{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:6px 10px;padding:8px 0;border-top:1px solid #262626}
+.fed-r > span{color:var(--muted);font-size:13px}
+.fed-r .hint{grid-column:2;margin:0}
+.fed-r input[type=color]{width:44px;height:30px;padding:0;border:1px solid #333;border-radius:6px;background:none;cursor:pointer}
+.fed-sw{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.fed-sw button{width:26px;height:26px;border-radius:7px;border:2px solid transparent;cursor:pointer;background:#222}
+.fed-sw button.none{background:repeating-linear-gradient(45deg,#222 0 4px,#333 4px 8px)}
+.fed-sw button.on{border-color:#fff}
+#fed .set-act{margin-top:12px}
+
+/* チャンネルのキーワード: フォルダごとのカードを2列に並べる(入れ子は「親 /」の表記で示す) */
+.kw-hint{max-width:760px;margin:0 0 14px;line-height:1.6}
+.kw-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:12px}
+.kw-r,.kw-r.sub{padding:14px 16px;border:1px solid #262626;border-radius:12px;background:#111;display:flex;flex-direction:column;gap:10px}
+.kw-r.sub{margin-left:0}
+.kw-n{margin:0;flex-wrap:nowrap}
+.kw-n .fbg{width:34px;height:34px}
+.kw-t{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.kw-t b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kw-up{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kw-n .kw-cnt{margin-left:auto;padding:2px 9px;border-radius:999px;background:#1e1e1e}
+.kw-n .kw-s{margin-left:0}
+.kw-rs{margin-left:0}
+.kw-c{gap:6px}
+.kw-in{flex:1 1 140px;min-width:0}
+
+/* ===== フォルダのメニュー(新デザイン): 見出し + 目立つ「編集」+ 小さな操作のタイル ===== */
+.fm{width:268px;padding:10px;border:1px solid #2c2c2c}
+.fm-hd{display:flex;align-items:center;gap:10px;padding:4px 4px 10px}
+.fm-hd .fbg{width:34px;height:34px}
+.fm-hd b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm-edit{display:block;width:100%;height:38px;border:0;border-radius:10px;background:var(--acc);color:#111;font:inherit;font-weight:800;cursor:pointer}
+.fm-edit:hover{filter:brightness(1.1)}
+.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.fm-t{display:flex;align-items:center;gap:8px;height:40px;padding:0 10px;border:0;border-radius:10px;background:#1b1b1b;color:#ddd;font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+.fm-t:hover{background:#2a2a2a;color:#fff}
+.fm-ic{display:grid;place-items:center;width:22px;flex:none;color:var(--muted);font-size:13px;font-weight:800}
+.fm-t.danger{color:#ff7b7b}.fm-t.danger .fm-ic{color:#ff7b7b}
+.fm-t.danger:hover{background:#3a1717}
+
+/* ===== フォルダの編集ダイアログ(新デザイン) ===== */
+#fed{width:min(520px,94vw);padding:24px;background:#151515;border:1px solid #2a2a2a;border-radius:18px}
+#fed::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(2px)}
+.fed-top{display:flex;gap:18px;align-items:center;margin-bottom:20px}
+.fed-big{position:relative;flex:none;width:104px;height:104px;border:2px dashed #3a3a3a;border-radius:24px;background:#0e0e0e;cursor:pointer;display:grid;place-items:center;overflow:hidden;padding:0;color:#fff}
+.fed-big:hover,.fed-big.drag{border-color:var(--acc)}
+.fed-pv .fbg{width:76px;height:76px;border-radius:20px}
+.fed-pv .fimg{width:76px;height:76px;border-radius:20px}
+.fed-pv svg{width:40px;height:40px}
+.fed-cam{position:absolute;inset:auto 0 0 0;padding:5px 0;background:rgba(0,0,0,.7);font-size:11px;font-weight:700;opacity:0;transition:opacity .15s}
+.fed-big:hover .fed-cam,.fed-big.drag .fed-cam{opacity:1}
+.fed-nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.fed-nm label{color:var(--muted);font-size:12px;font-weight:700}
+.fed-in{height:46px;padding:0 14px;border:1px solid #333;border-radius:12px;background:#0e0e0e;color:#fff;font:inherit;font-size:17px;font-weight:700;outline:0}
+.fed-in:focus{border-color:var(--acc)}
+.fed-link{align-self:flex-start;border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+.fed-link:hover{color:#fff}
+.fed-sec{margin-bottom:18px}
+.fed-sec h3{margin:0 0 10px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.04em}
+.fed-th{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.fed-t{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0 8px;border:2px solid transparent;border-radius:12px;background:#1c1c1c;color:#bbb;cursor:pointer}
+.fed-t small{font-size:11px;font-weight:600}
+.fed-t:hover{background:#262626}
+.fed-t.on{border-color:var(--acc);color:#fff}
+.fed-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.fed-sws{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+.fed-s{position:relative;width:100%;aspect-ratio:1;max-width:34px;border:2px solid #2a2a2a;border-radius:50%;background:#222;cursor:pointer;display:grid;place-items:center;color:#aaa;font-size:15px;font-weight:700;padding:0}
+.fed-s:hover{transform:scale(1.1)}
+.fed-s.on{border-color:#fff;box-shadow:0 0 0 2px #151515 inset}
+.fed-s.none{background:repeating-linear-gradient(45deg,#222 0 4px,#333 4px 8px)}
+.fed-c input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.fed-act{display:flex;justify-content:flex-end;gap:10px;padding-top:6px}
+.fed-act .btn{height:40px;padding:0 22px;border-radius:999px}
+@media (max-width:480px){.fed-two{grid-template-columns:1fr}.fed-th{grid-template-columns:repeat(4,1fr)}}
+
+.fed-act .fed-l{margin-right:auto;background:none;color:var(--muted)}
+.fed-act .fed-l + .fed-l{margin-left:-6px}
+.fed-act .fed-l:hover{color:#fff}
+.fed-act .fed-del{color:#ff7b7b}
+.fed-act .fed-del:hover{color:#ff9b9b;background:#3a1717}
+.fed-act .fed-l ~ .fed-l{margin-right:auto}
+.ni .fmv.fplus{font-size:15px;font-weight:700}
+
+.fed-ib{display:flex;align-items:center;gap:14px}
+.fed-ib .btn{height:34px;padding:0 14px;border-radius:999px}
+.fed-sws{grid-template-columns:repeat(auto-fill,minmax(34px,1fr))}
+
+/* チャンネルのキーワード(すっきり版): 1フォルダ1行の一覧。左に[アイコン・名前・個数]、右にキーワードと追加欄 */
+.kw-hint{margin:0 0 12px;color:var(--muted);font-size:13px}
+.kw-g{display:block;border:1px solid #222;border-radius:14px;background:#101010;overflow:hidden}
+.kw-r,.kw-r.sub{display:grid;grid-template-columns:minmax(180px,250px) minmax(0,1fr);align-items:center;gap:8px 18px;padding:10px 16px;border:0;border-bottom:1px solid #1c1c1c;border-radius:0;background:none}
+.kw-r:last-child{border-bottom:0}
+.kw-r:hover{background:#141414}
+.kw-n .fbg{width:30px;height:30px;border-radius:8px}
+.kw-n .fimg{width:26px;height:26px}
+.kw-t b{font-size:14px}
+.kw-up{font-size:10.5px}
+.kw-n .kw-cnt{margin-left:auto;padding:0;background:none;color:#666;font-size:12px;font-variant-numeric:tabular-nums}
+.kw-n .kw-s{white-space:nowrap}
+.kw-c{gap:6px}
+.kw-chip{height:26px;background:#1f1f1f;border:1px solid #2c2c2c;font-size:12.5px}
+.kw-in{flex:0 1 190px;min-width:120px;height:28px;border-radius:999px;border:1px solid #2c2c2c;background:#0b0b0b;padding:0 12px;font-size:13px}
+.kw-add{height:28px;min-width:28px;padding:0 10px;border-radius:999px;font-size:12px}
+@media (max-width:760px){.kw-r,.kw-r.sub{grid-template-columns:minmax(0,1fr)}}
+
+/* 画像アイコン: 透明な部分に背景色が見えるよう、画像は全体を収めて表示する */
+.fbg{overflow:hidden}
+.fbg .fimg{width:100%;height:100%;border-radius:0;object-fit:contain}
+.fed-pv .fbg .fimg{width:100%;height:100%}
+.kw-n .fbg .fimg{width:100%;height:100%}
+
+/* テストのページ */
+.tp{max-width:760px;margin:0 auto;padding:28px 32px 60px}
+.tp-h h2{margin:0 0 6px;font-size:26px}
+.tp-h p{margin:0 0 22px;color:var(--muted);font-size:14px}
+.tp-card{border:1px solid #232323;border-radius:14px;background:#111;overflow:hidden}
+.tp-r{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;cursor:pointer;border-bottom:1px solid #1d1d1d}
+.tp-r:last-child{border-bottom:0}
+.tp-r:hover{background:#151515}
+.tp-t{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tp-t b{font-size:15px}
+.tp-t small{color:var(--muted);font-size:12.5px;line-height:1.5}
+.tp-sw{position:relative;flex:none;width:46px;height:26px}
+.tp-sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:1}
+.tp-sw i{position:absolute;inset:0;border-radius:999px;background:#333;transition:background .15s}
+.tp-sw i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.tp-sw input:checked + i{background:var(--acc)}
+.tp-sw input:checked + i::after{transform:translateX(20px)}
+@media (max-width:600px){.tp{padding:20px 16px 40px}}
+
+/* 色の変更: 設定の他の行と同じく、右側に丸い色のチップを並べる */
+.set-row small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:2px}
+.acc-dots{display:flex;gap:10px}
+.acc-d{width:28px;height:28px;border:2px solid transparent;border-radius:50%;cursor:pointer;padding:0;box-shadow:0 0 0 2px #1a1a1a inset}
+.acc-d:hover{transform:scale(1.1)}
+.acc-d.on{border-color:#fff}
+
+/* 設定の行: 左のラベルを優先して広げ、右のプルダウンは長くなりすぎないようにする */
+.set-row > span:first-child{flex:1 1 0;min-width:0}
+.set-row > select.sel{flex:none;width:auto;max-width:min(360px,55%)}
+
+/* 同期(Google ログイン) */
+.ds-cid{width:min(380px,100%);height:34px;font-size:13px}
+.ds-how{margin:8px 0 4px;padding:10px 14px;border:1px solid #232323;border-radius:10px;background:#101010}
+.ds-how summary{cursor:pointer;font-weight:700;font-size:13px}
+.ds-how ol{margin:10px 0 10px 20px;padding:0;line-height:1.9;font-size:13px;color:#ccc}
+.ds-how a{color:var(--acc)}
+.ds-ru{display:flex;align-items:center;gap:8px}
+.ds-ru code{flex:1;min-width:0;padding:6px 10px;border-radius:6px;background:#0a0a0a;color:#ddd;font-size:12px;overflow-x:auto;white-space:nowrap}
+
+/* クライアントID の入力欄(設定の行の「18px の小さな入力」の指定に負けないようにする) */
+.set-row.ds-idr{display:block;cursor:default}
+.set-row.ds-idr > span{display:block;margin-bottom:8px}
+.set-row.ds-idr input.ds-cid{display:block;width:100%;max-width:none;height:40px;padding:0 12px;font-size:14px;accent-color:initial;font-family:ui-monospace,Consolas,monospace}
+.ds-how{margin-top:10px}
+
+/* 同期の内容の一覧 */
+#ds-view h4{margin:18px 0 8px;font-size:14px}
+#ds-view h4 small{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
+.ds-t{width:100%;border-collapse:collapse;font-size:13px;border:1px solid #222;border-radius:10px;overflow:hidden}
+.ds-t th{padding:8px 12px;text-align:left;color:var(--muted);font-size:12px;font-weight:700;background:#121212}
+.ds-t td{padding:8px 12px;border-top:1px solid #1c1c1c;vertical-align:top}
+.ds-t td small{display:block;color:#666;font-size:11px;margin-top:1px}
+.ds-t tr.ds-diff td{background:rgba(var(--acc-a),.1)}
+
+/* 同期タブ(新デザイン) */
+.ds-hero{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 20px;padding:20px 22px;border:1px solid #262626;border-radius:16px;background:#111}
+.ds-hero.on{border-color:rgba(var(--acc-a),.45);background:linear-gradient(135deg,rgba(var(--acc-a),.1),#111 60%)}
+.ds-hi{display:flex;align-items:center;gap:14px;min-width:0}
+.ds-hi b{display:block;font-size:17px}
+.ds-hi small{display:block;margin-top:3px;color:var(--muted);font-size:12.5px}
+.ds-dot{flex:none;width:12px;height:12px;border-radius:50%;background:#555}
+.ds-hero.on .ds-dot{background:var(--acc);box-shadow:0 0 0 5px rgba(var(--acc-a),.2)}
+.ds-hb{display:flex;gap:8px}
+.ds-hb .btn{height:38px;padding:0 18px;border-radius:999px}
+.ds-dl{display:flex;gap:28px;width:100%;margin:2px 0 0;padding-top:14px;border-top:1px solid #222}
+.ds-dl dt{color:var(--muted);font-size:12px}
+.ds-dl dd{margin:3px 0 0;font-size:15px;font-weight:700}
+.ds-card{margin-top:14px;padding:18px 22px;border:1px solid #222;border-radius:14px;background:#0f0f0f}
+.ds-card h3{margin:0 0 10px;font-size:14px}
+.ds-card p{margin:0 0 8px;font-size:13.5px;line-height:1.7;color:#ddd}
+.ds-card p b{color:#fff}
+.ds-card .ds-sm,.ds-how .ds-sm{color:var(--muted);font-size:12.5px}
+.ds-card .ds-b{margin:4px 0 0}
+
+/* チャンネルをフォルダに入れる(サイドバーのフォルダ行と同じ見た目) */
+#chd{width:min(440px,92vw)}
+#chd #chd-list{display:flex;flex-direction:column;gap:2px;margin:8px -6px 10px 0;padding-right:6px}
+.asg{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px 0 8px;border-radius:10px;cursor:pointer;color:#e6e6e6;font-weight:600;transition:background .12s}
+.asg:hover{background:rgba(255,255,255,.07)}
+.asg.on{background:rgba(var(--acc-a),.14);color:#fff}
+.asg .fbg{width:32px;height:32px;border-radius:8px}
+.asg.sub .asg-n{font-weight:500;color:#cfcfcf}
+.asg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asg input{position:absolute;opacity:0;pointer-events:none}
+.asg-c{flex:none;width:22px;height:22px;border:2px solid #4a4a4a;border-radius:50%;display:grid;place-items:center;transition:all .12s}
+.asg.on .asg-c{background:var(--acc);border-color:var(--acc)}
+.asg.on .asg-c::after{content:"";width:5px;height:10px;margin-top:-2px;border:solid #111;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+
+/* フォルダが多くても、枠がすぐ表示されるよう、画面外の行は描画を後回しにする */
+.asg{content-visibility:auto;contain-intrinsic-size:auto 44px}

@@ -13,3 +13,82 @@ html[dark] .tf-pop{background:#282828;color:#f1f1f1}
 .tf-pop label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer}
 .tf-pop label:hover{background:rgba(128,128,128,.2)}
 .tf-dot{width:10px;height:10px;border-radius:50%}
+
+/* ⋯ の代わりに出す TubeFolio3 のメニュー(タブで切り替え。画面に収まる高さにして、中だけスクロール) */
+.tf-menu{position:fixed;z-index:99999;width:340px;display:flex;flex-direction:column;padding:12px;border-radius:16px;background:#212121;color:#f1f1f1;border:1px solid #3a3a3a;box-shadow:0 10px 36px rgba(0,0,0,.6);font:14px Roboto,Arial,sans-serif}
+html:not([dark]) .tf-menu{background:#fff;color:#0f0f0f;border-color:#ddd}
+.tf-mh{flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 4px 10px;font-size:15px}
+.tf-lnk{border:0;background:none;color:#3ea6ff;font:inherit;font-size:12px;cursor:pointer}
+.tf-tabs{flex:none;display:flex;gap:4px;padding:4px;border-radius:999px;background:rgba(128,128,128,.18)}
+.tf-tab{flex:1;height:32px;border:0;border-radius:999px;background:none;color:inherit;font:500 13px Roboto,Arial,sans-serif;cursor:pointer;opacity:.75}
+.tf-tab:hover{opacity:1}
+.tf-tab.on{background:#f1f1f1;color:#0f0f0f;opacity:1}
+html:not([dark]) .tf-tab.on{background:#0f0f0f;color:#fff}
+.tf-pane{flex:1 1 auto;min-height:120px;margin-top:10px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#555 transparent}
+.tf-row{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 10px;border-radius:10px;cursor:pointer}
+.tf-row:hover{background:rgba(128,128,128,.2)}
+.tf-row input{width:18px;height:18px;accent-color:#3ea6ff;flex:none}
+.tf-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf-dot{flex:none;width:10px;height:10px;border-radius:50%}
+.tf-em{padding:14px 10px;color:#aaa;font-size:13px}
+.tf-em.bad,.tf-st.bad{color:#ff7b7b}
+.tf-chn{padding:6px 10px 12px;font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf-sub{width:100%;height:44px;border:0;border-radius:999px;background:#f1f1f1;color:#0f0f0f;font:500 14px Roboto,Arial,sans-serif;cursor:pointer}
+.tf-sub.on{background:rgba(128,128,128,.3);color:inherit}
+.tf-sub:disabled{opacity:.6}
+.tf-st{flex:none;min-height:18px;padding:8px 6px 0;color:#9be39b;font-size:12.5px}
+
+/* コメント流し: 映像の上に、背景なしで下から上へ流す */
+.tf-cm{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:59}
+.tf-cmi{position:absolute;top:0;right:2%;width:max-content;max-width:24%;text-align:left;white-space:normal;overflow-wrap:anywhere;color:#fff;font:700 clamp(14px,2.4vh,28px)/1.3 "Yu Gothic UI",Meiryo,Roboto,Arial,sans-serif;
+  text-shadow:-1px -1px 2px #000,1px -1px 2px #000,-1px 1px 2px #000,1px 1px 2px #000,0 0 6px rgba(0,0,0,.7);opacity:.92;
+  will-change:transform}
+/* プレーヤーの操作ボタン */
+.tf-ytp{display:inline-flex;align-items:center;justify-content:center;opacity:.65}
+.tf-ytp:hover,.tf-ytp.tf-on{opacity:1}
+.tf-ytp.tf-on{color:#3ea6ff}
+.tf-ytp svg{display:block}
+/* コメント欄を隠す(表示の負荷を減らす) */
+html.tf-hide-cm ytd-comments#comments,html.tf-hide-cm #comments.ytd-watch-flexy{display:none!important}
+/* 翻訳したコメントの印 */
+/* 翻訳したコメントの印(文の最後に、少し空けて翻訳アイコン) */
+.tf-trb{display:inline-block;margin-left:.4em;vertical-align:-.12em;line-height:1;font-size:.95em;opacity:.9;filter:drop-shadow(0 0 2px #000)}
+.tf-trb svg{display:block}
+
+/* コメントの背景をほんの少しだけぼかし、コメントの間にうっすら線を引く */
+.tf-cmi{padding:6px 10px 8px;border-radius:8px;border-bottom:1px solid rgba(255,255,255,.2);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);background:rgba(0,0,0,.06)}
+
+/* コメントは、YouTube の操作バーの上までで消える(バーの前を通らない)。表示場所は右・左 */
+.tf-cm{inset:0 0 64px 0}
+.tf-cm.left .tf-cmi{left:2%;right:auto}
+.tf-cmi{font-size:calc(clamp(14px,2.4vh,28px) * var(--tf-fs,1))}
+/* 「コメント表示」のメニュー */
+.tf-cmenu{position:absolute;right:12px;bottom:62px;z-index:70;width:290px;padding:10px 14px;border-radius:12px;background:rgba(28,28,28,.96);color:#fff;font:14px Roboto,Arial,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.6);cursor:default}
+.tf-cmr{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px}
+.tf-cmr + .tf-cmr{border-top:1px solid rgba(255,255,255,.12)}
+.tf-cml{flex:none;font-weight:500}
+.tf-sw{position:relative;width:42px;height:24px;border:0;border-radius:999px;background:#555;cursor:pointer;padding:0;transition:background .15s}
+.tf-sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.tf-sw.on{background:#3ea6ff}
+.tf-sw.on i{transform:translateX(18px)}
+.tf-seg{display:flex;gap:3px;padding:3px;border-radius:999px;background:rgba(255,255,255,.12)}
+.tf-seg button{height:28px;padding:0 14px;border:0;border-radius:999px;background:none;color:#fff;font:500 13px Roboto,Arial,sans-serif;cursor:pointer;opacity:.75}
+.tf-seg button.on{background:#fff;color:#0f0f0f;opacity:1}
+.tf-szr{display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end}
+.tf-szr input{width:110px;accent-color:#3ea6ff}
+.tf-szv{width:40px;text-align:right;font-size:13px;color:#ccc}
+
+/* コメント表示(新): 1件は「名前・♥評価・投稿日」の行と、本文。幅・文字の大きさは、メニューで変えられる */
+.tf-cmi{width:max-content;max-width:var(--tf-w,24%);padding:5px 10px 8px}
+.tf-ch{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .6em;margin-bottom:1px;font-size:.62em;font-weight:500;color:rgba(255,255,255,.72);line-height:1.5}
+.tf-cn{color:rgba(255,255,255,.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.tf-clk{color:#ff7c8a}
+.tf-cb{line-height:1.35}
+/* メニューが長いので、プレーヤーに収まる高さで中だけスクロールする */
+.tf-cmenu{max-height:calc(100% - 84px);overflow-y:auto;width:330px;scrollbar-width:thin}
+.tf-cml small{display:block;color:#aaa;font-weight:400;font-size:11px}
+
+/* 名前・日付の行: 大きさは本文とは別に変えられる。ユーザー名は水色 */
+.tf-ch{font-size:calc(.62em * var(--tf-hs,1));align-items:center}
+.tf-av{flex:none;width:1.9em;height:1.9em;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.15)}
+.tf-cn{color:#7fd4ff}

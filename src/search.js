@@ -29,7 +29,7 @@ const S = {
 const LIVE_RE = /ライブ|LIVE|配信予定|配信中|プレミア|Premier|UPCOMING|Upcoming|視聴中|watching/i;
 function collectVideos(root) {
   const out = [], seen = new Set(); let token = "";
-  const add = (o) => { if (o.id && !seen.has(o.id)) { seen.add(o.id); out.push(o); } };
+  const add = (o) => { if (o.id && !seen.has(o.id)) { seen.add(o.id); if (o.pct) noteWatched(o.id, o.pct); out.push(o); } };
   (function walk(n) {
     if (!n || typeof n !== "object") return;
     if (Array.isArray(n)) return n.forEach(walk);
@@ -39,7 +39,7 @@ function collectVideos(root) {
       const badges = JSON.stringify([r.badges, r.thumbnailOverlays, r.upcomingEventData ? "UPCOMING" : ""]);
       const pub = txt(r.publishedTimeText);
       const kind = url.startsWith("/shorts/") ? "short" : /LIVE|UPCOMING/.test(badges) || /配信|Streamed/i.test(pub) || r.upcomingEventData ? "live" : "video";
-      add({ id: r.videoId, title: txt(r.title), channel: txt(r.ownerText) || txt(r.shortBylineText) || txt(r.longBylineText), chUrl: chUrlOf(r.ownerText || r.shortBylineText || r.longBylineText), duration: txt(r.lengthText), pub, views: txt(r.viewCountText) || txt(r.shortViewCountText), kind, badge: liveBadge(badges, pub, r.upcomingEventData) });
+      add({ id: r.videoId, pct: watchedPct(r), title: txt(r.title), channel: txt(r.ownerText) || txt(r.shortBylineText) || txt(r.longBylineText), chUrl: chUrlOf(r.ownerText || r.shortBylineText || r.longBylineText), duration: txt(r.lengthText), pub, views: txt(r.viewCountText) || txt(r.shortViewCountText), kind, badge: liveBadge(badges, pub, r.upcomingEventData) });
       return;
     }
     const lv = n.lockupViewModel;
@@ -192,7 +192,7 @@ const shown = (list) => withDet(list.map((v) => [v.id, v])).map(([, v]) => v).fi
 function sCard(v) {
   vmap.set(v.id, v);
   const dur = v.badge ? `<span class="dur ${v.badge === "配信済み" ? "" : "live"}">${esc(v.badge)}</span>` : v.kind === "short" ? `<span class="dur">ショート</span>` : v.duration ? `<span class="dur">${esc(v.duration)}</span>` : "";
-  return `<button class="c ${subCls(v)}" data-v="${esc(v.id)}"><div class="th"><img loading="lazy" src="${thumb(v.id)}" alt="">${dur}${bmBtn(v.id)}${wlBtn(v.id)}</div>${titleHtml(v.id, v.title)}${cn(v)}</button>`; // 🕒・⋮ は plmenu.js
+  return `<button class="c ${subCls(v)}" data-v="${esc(v.id)}"><div class="th"><img loading="lazy" src="${thumb(v.id)}" alt="">${dur}${progHtml(v.id, v)}${bmBtn(v.id)}${wlBtn(v.id)}</div>${titleHtml(v.id, v.title)}${cn(v)}</button>`; // 🕒・⋮ は plmenu.js
 }
 // ショートの縦長カード(ホームのショートの棚と同じ見た目)
 function shCard(v) {
@@ -210,6 +210,13 @@ function mixedGrid(list, label = "ショート") {
 const chipRow =(label, list, cur, attr) => `<div class="s-chips"><span class="s-cl">${label}</span>${list.map(([k, n]) => `<button type="button" class="tab ${cur === k ? "on" : ""}" ${attr}="${k}" aria-pressed="${cur === k}">${n}</button>`).join("")}</div>`;
 const sMode = () => sq ? "kw" : sTarget === "sub" ? "sub" : "rec";
 
+// 「もっと見る」が画面の近くまで来たら、自動で続きを読み込む(ボタンを押さなくてよい)
+const searchMoreNow = () => (sMode() === "kw" ? loadKw(true) : loadRec(false, true));
+const moreIO = typeof IntersectionObserver === "function" ? new IntersectionObserver((es) => {
+  if (!es.some((e) => e.isIntersecting)) return;
+  const st = S[sMode()]; if (!st || st.busy || st.err || st.done) return;
+  searchMoreNow();
+}, { rootMargin: "900px 0px" }) : null;
 function paintSearch() { // 結果の部分だけ描き直す(入力欄は触らない)
   const box = $("s-out"); if (!box) return;
   const mode = sMode(), st = S[mode];
@@ -220,7 +227,7 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
     // 日付ごと。読み込み中の日は「読み込み中…」、そろった日から表示する
     const list = shown(st.list), days = lastDays();
     const reached = st.reached ?? Infinity; // ここより新しい日はそろっている(loadSub で求める)
-    h += vbar();
+    h += `<div class="s-bar"><div class="s-head">登録チャンネルの新着<small>日付ごと</small></div>${vbar()}</div>`;
     // 新しい日から順に。新着は新しい順に届くので、まだそろっていない日が出たら、そこで「読み込み中…」を出して止める
     for (const [i, d] of days.entries()) {
       const k = dayKey(d), items = list.filter((v) => { const x = vDate(v); return x && dayKey(x) === k; });
@@ -235,13 +242,15 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
   } else {
     const list = shown(st.list);
     const head = mode === "kw" ? `「${esc(sq)}」の検索結果` : sTarget === "all" ? "YouTubeのおすすめ" : "おすすめ(登録していないチャンネル)";
-    if (list.length) h += `<div class="s-head">${head}<small>${list.length}本</small></div>${vbar()}${mixedGrid(list)}`;
+    if (list.length) h += `<div class="s-bar"><div class="s-head">${head}<small>${list.length}本</small></div>${vbar()}</div>${mixedGrid(list)}`;
     else if (!st.busy && !st.err && (mode === "kw" || st.started)) h += `<div class="empty">${mode === "kw" ? `「${esc(sq)}」に一致する${tn}は見つかりませんでした。` : `表示できる${tn}がありません。`}</div>`;
     if (st.busy) h += `<div class="s-load">${mode === "kw" ? "検索中…" : "読み込み中…"}</div>`;
     else if (!st.done && (list.length || st.list.length)) h += `<div class="s-more"><button class="btn s" data-act="s-more">もっと見る</button></div>`;
     else if (mode === "rec" && st.started) h += `<div class="s-more"><button class="btn s" data-act="s-reload">⟳ 読み込み直す</button></div>`;
   }
-  box.innerHTML = h;
+  if (box._h === h) return; // 中身が同じなら描き直さない(ちらつき防止)
+  box._h = h; box.innerHTML = h;
+  if (moreIO) { moreIO.disconnect(); const b = box.querySelector('[data-act="s-more"]'); if (b) moreIO.observe(b); } // 描き直すたびに、新しい「もっと見る」を見張り直す
 }
 
 // いまの条件で一覧を出す(必要なら読み込む)

@@ -27,21 +27,7 @@ function chRows() {
   return h || note("フォルダ", "登録チャンネルがありません。サイドバーの「登録チャンネル」から同期してください。");
 }
 
-/* ---------- チャンネル一覧(登録チャンネル / フォルダ / 未分類) ---------- */
-function channelsView(t) {
-  const list = chIn(t), f = data.folders.find((x) => x.id === t);
-  const last = +ls.get("tf-ch-sync", "0");
-  const sync = t === "channels" ? `<button class="btn s" data-act="sync" ${syncing ? "disabled" : ""}>${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span>` : "";
-  const sib = f ? data.folders.filter((x) => (x.parent || "") === (f.parent || "")) : [], si = f ? sib.indexOf(f) : -1;
-  const mv = f ? `<button class="btn s" data-act="up" data-id="${esc(f.id)}" ${si <= 0 ? "disabled" : ""} title="フォルダを上へ">▲ 上へ</button><button class="btn s" data-act="down" data-id="${esc(f.id)}" ${si >= sib.length - 1 ? "disabled" : ""} title="フォルダを下へ">▼ 下へ</button>${f.parent ? `<button class="btn s" data-act="unnest" data-id="${esc(f.id)}" title="親フォルダの外(ひとつ上の階層)へ出します">入れ子を解除</button>` : ""}` : "";
-  const fa = f ? mv + `<button class="btn s" data-act="kw" data-id="${esc(f.id)}">🔎 キーワード${f.keywords?.length ? `(${f.keywords.length})` : ""}</button><button class="btn s" data-act="addsub" data-id="${esc(f.id)}">＋ サブフォルダ</button><button class="btn s" data-act="rename" data-id="${esc(f.id)}">名前を変更</button><button class="btn s" data-act="delfolder" data-id="${esc(f.id)}">フォルダを削除</button>` : "";
-  const subs = f && kids(f.id).length ? `<div class="subs">${kids(f.id).map((k) => `<button class="tab" data-t="${esc(k.id)}" data-drop="${esc(k.id)}">📁 ${esc(k.name)} <small>${chIn(k.id).length}</small></button>`).join("")}</div>` : "";
-  const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
-  const empty = t === "channels"
-    ? (useDummy ? "ダミーのチャンネルを準備しています…" : "登録チャンネルがありません。「YouTubeと同期」を押すと、YouTubeの登録チャンネルを取り込みます。")
-    : "このフォルダにはチャンネルがありません。チャンネルの📁ボタンか、ドラッグで追加できます。";
-  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2>${crumb}<div class="ch-bar">${sync}${fa}</div>${subs}${sgPanel(t)}${list.length ? `<div class="ch-grid">${list.map((c) => chCard(c, f ? f.id : "")).join("")}</div>` : `<div class="empty" style="margin-top:0">${empty}</div>`}</section>`;
-}
+/* チャンネル一覧(フォルダ管理の画面)は chstats.js の channelsView */
 
 /* ---------- フォルダの追加・名前変更・削除 ---------- */
 let fdMode = null; // { id?, parent? }
@@ -113,20 +99,23 @@ function openFolderMenu(id, x, y) {
   const it = (act, label, dis = false, cls = "") => `<button type="button" class="fm-i ${cls}" data-fm="${act}" ${dis ? "disabled" : ""}>${label}</button>`;
   const box = document.createElement("div");
   box.id = "fm"; box.className = "pm fm"; box.setAttribute("role", "menu"); box.dataset.id = id;
-  box.innerHTML = `<div class="pm-h">${esc(f.name)}</div>`
-    + it("rename", "✏️ 名前を変更") + it("sub", "＋ サブフォルダを追加")
-    + it("up", "▲ 上へ", si <= 0) + it("down", "▼ 下へ", si >= sib.length - 1)
-    + (f.parent ? it("unnest", "↖ 入れ子を解除") : "")
-    + it("kw", `🔎 キーワード${f.keywords?.length ? `(${f.keywords.length})` : ""}`)
-    + `<div class="fm-sep"></div>` + it("del", "🗑 フォルダを削除", false, "danger");
+  const ico = f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${esc(f.color || "#ccc")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+  const tl = (act, ic, label, cls = "") => `<button type="button" class="fm-t ${cls}" data-fm="${act}"><span class="fm-ic">${ic}</span><span>${label}</span></button>`;
+  box.innerHTML = `<div class="fm-hd"><span class="fbg" ${f.bg ? `style="background:${esc(f.bg)}"` : ""}>${ico}</span><b>${esc(f.name)}</b></div>`
+    + `<button type="button" class="fm-edit" data-fm="edit">✎ 名前・色・画像を編集</button>`
+    + `<div class="fm-grid">` + tl("sub", "＋", "サブフォルダ") + tl("rename", "Aa", "名前だけ変更") + (f.parent ? tl("unnest", "↖", "入れ子を解除") : "") + tl("del", "🗑", "削除", "danger") + `</div>`;
   document.body.append(box);
   const w = box.offsetWidth, h = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px";
   box.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
 }
 document.addEventListener("click", (e) => {
+  const mvb = e.target.closest("[data-fmove]"); // サイドバーのフォルダ行の ▲▼
+  if (mvb) { e.preventDefault(); e.stopPropagation(); const [d, fid] = mvb.dataset.fmove.split("|"); closeFolderMenu(); return void moveFolder(fid, d === "up" ? -1 : 1); }
+  const sbtn = e.target.closest("[data-fsub]"); // 行の「＋」: サブフォルダを追加
+  if (sbtn) { e.preventDefault(); e.stopPropagation(); return startFolderEdit({ mode: "sub", parent: sbtn.dataset.fsub }); }
   const b = e.target.closest("[data-fmenu]");
-  if (b) { e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect(); return $("fm")?.dataset.id === b.dataset.fmenu ? closeFolderMenu() : openFolderMenu(b.dataset.fmenu, r.right - 4, r.bottom + 4); }
+  if (b) { e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect(); return openFolderEditor(b.dataset.fmenu); }
   const m = e.target.closest("[data-fm]");
   if (m) {
     e.preventDefault(); e.stopPropagation();
@@ -134,6 +123,7 @@ document.addEventListener("click", (e) => {
     if (a === "rename") startFolderEdit({ mode: "rename", id });
     else if (a === "sub") startFolderEdit({ mode: "sub", parent: id });
     else if (a === "up" || a === "down") moveFolder(id, a === "up" ? -1 : 1);
+    else if (a === "edit") openFolderEditor(id);
     else if (a === "unnest") unnestFolder(id);
     else if (a === "kw") openKeywords(id);
     else if (a === "del") deleteFolder(id);
@@ -145,11 +135,12 @@ document.addEventListener("click", (e) => {
 document.addEventListener("contextmenu", (e) => {
   const n = e.target.closest("#nav-list [data-t]");
   if (!n || !data.folders.some((f) => f.id === n.dataset.t)) return;
-  e.preventDefault(); openFolderMenu(n.dataset.t, e.clientX, e.clientY);
+  e.preventDefault(); openFolderEditor(n.dataset.t);
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape") closeFolderMenu(); });
 addEventListener("resize", closeFolderMenu);
-addEventListener("scroll", (e) => { if (!$("fm")?.contains(e.target)) closeFolderMenu(); }, true);
+// ページ全体や、サイドバーのスクロールで閉じる(ホームの行の自動スクロールなど、ほかの場所のスクロールでは閉じない)
+addEventListener("scroll", (e) => { const t = e.target; if (!$("fm")?.contains(t) && (t === document || t === document.scrollingElement || t.id === "nav-scroll")) closeFolderMenu(); }, true);
 
 /* ---------- フォルダの並べ替え・入れ子の解除 ---------- */
 async function moveFolder(id, dir) { // 同じ階層の兄弟どうしで入れ替える
@@ -171,18 +162,28 @@ async function unnestFolder(id) { // 親フォルダの外(ひとつ上の階層
 
 /* ---------- チャンネルをフォルダに割り当てる ---------- */
 let assignId = null;
+function folderTree() { // 親 → 子の順(入れ子は字下げ)に並べる
+  const out = [], seen = new Set();
+  const walk = (parent, depth) => data.folders.filter((x) => (x.parent || "") === parent).forEach((f) => { if (seen.has(f.id)) return; seen.add(f.id); out.push({ f, depth }); walk(f.id, depth + 1); });
+  walk("", 0); data.folders.forEach((f) => { if (!seen.has(f.id)) out.push({ f, depth: 0 }); });
+  return out;
+}
 function openAssign(id) {
   const c = data.channels?.[id]; if (!c) return;
   assignId = id;
   $("chd-t").textContent = c.name;
+  $("chd-list").innerHTML = ""; $("chd").showModal(); // 先に枠を出してから、一覧を描く(画像の多いフォルダで、枠まで遅れて出るのを防ぐ)
+  setTimeout(() => { if (assignId !== id) return;
   $("chd-list").innerHTML = data.folders.length
-    ? data.folders.map((f) => `<label class="set-row"><span>${esc(folderPath(f.id))}</span><input type="checkbox" data-fid="${esc(f.id)}" ${(c.folders || []).includes(f.id) ? "checked" : ""}></label>`).join("")
+    ? folderTree().map(({ f, depth }) => { const on = (c.folders || []).includes(f.id), ico = f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${esc(f.color || "#ccc")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+      return `<label class="asg ${on ? "on" : ""} ${depth ? "sub" : ""}" style="padding-left:${8 + depth * 14}px"><span class="fbg" ${f.bg ? `style="background:${esc(f.bg)}"` : ""}>${ico}</span><span class="asg-n">${esc(f.name)}</span><input type="checkbox" data-fid="${esc(f.id)}" ${on ? "checked" : ""}><i class="asg-c"></i></label>`; }).join("")
     : `<p class="hint">フォルダがありません。サイドバーの「フォルダを追加」で作成してください。</p>`;
-  $("chd").showModal();
+  }, 0);
 }
 $("chd-list").addEventListener("change", async (e) => {
   const fid = e.target.dataset.fid, c = data.channels?.[assignId]; if (!fid || !c) return;
   const s = new Set(c.folders || []); e.target.checked ? s.add(fid) : s.delete(fid);
+  e.target.closest(".asg")?.classList.toggle("on", e.target.checked);
   c.folders = [...s]; await persist(); render();
 });
 $("chd-close").onclick = () => $("chd").close();
@@ -266,7 +267,7 @@ async function ensureDummy() {
   await persist(); render();
 }
 chrome.storage.local.get(KEY).then(() => setTimeout(() => { ensureDummy(); if (!useDummy && Date.now() - +ls.get("tf-ch-sync", "0") > 60 * 60 * 1000) syncSubs(true); }, 0));
-$("set-dummy").addEventListener("change", () => { ensureDummy(); if (!useDummy && !chAll().length) syncSubs(true); });
+document.addEventListener("change", (e) => { if (e.target.id !== "set-dummy") return; ensureDummy(); if (!useDummy && !chAll().length) syncSubs(true); });
 
 /* ---------- クリック・ドラッグ ---------- */
 document.addEventListener("click", (e) => {
@@ -294,7 +295,7 @@ function toast(msg) {
   clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 2600);
 }
 let dragCh = null;
-document.addEventListener("dragstart", (e) => { const c = e.target.closest?.(".ch"); if (c) { dragCh = c.dataset.chid; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragCh); c.classList.add("dragging"); } });
+document.addEventListener("dragstart", (e) => { const c = e.target.closest?.(".ch,.chr"); if (c) { dragCh = c.dataset.chid; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragCh); c.classList.add("dragging"); } });
 document.addEventListener("dragend", () => { dragCh = null; document.querySelectorAll(".dragging,.drop").forEach((x) => x.classList.remove("dragging", "drop")); });
 document.addEventListener("dragover", (e) => { const n = e.target.closest?.("[data-drop]"); if (dragCh && n) { e.preventDefault(); document.querySelectorAll(".drop").forEach((x) => x !== n && x.classList.remove("drop")); n.classList.add("drop"); } });
 document.addEventListener("drop", (e) => { const n = e.target.closest?.("[data-drop]"); if (dragCh && n) { e.preventDefault(); const id = dragCh; dragCh = null; moveChannel(id, n.dataset.drop); } });
@@ -362,3 +363,182 @@ $("kwd-save").onclick = async () => {
   $("kwd").close(); await persist(); render();
 };
 $("kwd-reset").onclick = async () => { const f = data.folders.find((x) => x.id === kwId); if (f) { delete f.ignored; await persist(); render(); toast("候補から外した分を元に戻しました"); } };
+
+/* ===== 設定の「チャンネルのキーワード」タブ: すべてのフォルダのキーワードを一覧で管理 ===== */
+function paintKw() {
+  const box = $("set-kw"); if (!box) return;
+  const rows = []; (function walk(pid, d) { data.folders.filter((f) => (f.parent || "") === pid).forEach((f) => { rows.push([f, d]); walk(f.id, d + 1); }); })("", 0);
+  if (!rows.length) { box.innerHTML = `<p class="hint">フォルダがありません。フォルダ管理の画面で作成してください。</p>`; return; }
+  const tmap = titlesByChannel();
+  box.innerHTML = `<p class="hint kw-hint">フォルダごとのキーワードです。チャンネル名・ハンドル名・そのチャンネルの動画タイトルに含まれると、そのフォルダの候補として表示します(自動では入れません)。</p><div class="kw-g">`
+    + rows.map(([f, d]) => {
+      const n = suggestions(f, tmap).length, kws = f.keywords || [];
+      const ic = `<span class="fbg"${f.bg ? ` style="background:${esc(f.bg)}"` : ""}>${f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${esc(f.color || "#ccc")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`}</span>`, up = f.parent ? folderPath(f.parent) : "";
+      return `<div class="kw-r ${d ? "sub" : ""}" data-kwf="${esc(f.id)}"><div class="kw-n">${ic}<div class="kw-t">${up ? `<small class="kw-up">${esc(up)} /</small>` : ""}<b>${esc(f.name)}</b></div><small class="kw-cnt">${kws.length}個</small>${n ? `<small class="kw-s">候補 ${n}件</small>` : ""}${f.ignored?.length ? `<button type="button" class="kw-rs" data-kwreset="${esc(f.id)}" title="候補から外したチャンネルを、また候補に出します">無視を解除(${f.ignored.length})</button>` : ""}</div>
+        <div class="kw-c">${kws.map((k, i) => `<span class="kw-chip">${esc(k)}<button type="button" data-kwdel="${esc(f.id)}|${i}" aria-label="「${esc(k)}」を削除">✕</button></span>`).join("")}<input class="kw-in" data-kwin="${esc(f.id)}" maxlength="40" placeholder="キーワードを追加(Enter)"><button type="button" class="btn s kw-add" data-kwadd="${esc(f.id)}">＋ 追加</button></div></div>`;
+    }).join("") + `</div>`;
+}
+async function kwAdd(fid, text) {
+  const f = data.folders.find((x) => x.id === fid); if (!f) return;
+  const add = text.split(/[\n,、,]+/).map((x) => x.trim()).filter(Boolean); if (!add.length) return;
+  f.keywords = [...new Set([...(f.keywords || []), ...add])];
+  await persist(); paintKw(); render();
+  document.querySelector(`[data-kwin="${CSS.escape(fid)}"]`)?.focus();
+}
+$("set-kw").addEventListener("click", async (e) => {
+  const t = (s) => e.target.closest(s); let b;
+  if ((b = t("[data-kwadd]"))) { const i = document.querySelector(`[data-kwin="${CSS.escape(b.dataset.kwadd)}"]`); return kwAdd(b.dataset.kwadd, i?.value || ""); }
+  if ((b = t("[data-kwdel]"))) { const [fid, i] = b.dataset.kwdel.split("|"), f = data.folders.find((x) => x.id === fid); if (!f) return; f.keywords.splice(+i, 1); if (!f.keywords.length) delete f.keywords; await persist(); paintKw(); return render(); }
+  if ((b = t("[data-kwreset]"))) { const f = data.folders.find((x) => x.id === b.dataset.kwreset); if (f) { delete f.ignored; await persist(); paintKw(); render(); toast("候補から外した分を元に戻しました"); } }
+});
+$("set-kw").addEventListener("keydown", (e) => { const i = e.target.closest?.("[data-kwin]"); if (i && e.key === "Enter" && !e.isComposing) { e.preventDefault(); kwAdd(i.dataset.kwin, i.value); } });
+// 設定のタブ(一般 / チャンネルのキーワード)
+function setSetTab(k) {
+  $("set-gen").hidden = k !== "gen"; $("set-kw").hidden = k !== "kw"; $("set-home").hidden = k !== "home"; $("set-sync").hidden = k !== "sync";
+  document.querySelectorAll("[data-settab]").forEach((b) => { const on = b.dataset.settab === k; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  if (k === "gen" && typeof paintLook === "function") paintLook();
+  if (k === "kw") paintKw();
+  if (k === "sync" && typeof paintSync === "function") paintSync();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-settab]"); if (b) setSetTab(b.dataset.settab); });
+
+/* ===== サイドバーのフォルダをドラッグで並べ替え・入れ子にする =====
+   行の上のほうに落とす = その前へ / 下のほうに落とす = その後ろへ / 真ん中に落とす = そのフォルダの中(サブフォルダ)へ
+   「未分類」の行に落とす = 一番上の階層の最後へ */
+let dragFd = null;
+const clearFdMarks = () => document.querySelectorAll(".drop-before,.drop-after,.drop-into").forEach((x) => x.classList.remove("drop-before", "drop-after", "drop-into"));
+const fdPos = (e, el) => { const r = el.getBoundingClientRect(), y = (e.clientY - r.top) / r.height; return y < 0.28 ? "before" : y > 0.72 ? "after" : "into"; };
+async function moveFolderTo(id, targetId, pos) {
+  const f = data.folders.find((x) => x.id === id); if (!f) return;
+  if (pos === "root") {
+    data.folders = data.folders.filter((x) => x !== f); delete f.parent; data.folders.push(f);
+  } else {
+    const t = data.folders.find((x) => x.id === targetId); if (!t || t === f) return;
+    if (desc(id).includes(targetId)) return toast("フォルダを、その中のフォルダへは移動できません");
+    const lastOf = (fid) => Math.max(...desc(fid).map((i) => data.folders.findIndex((x) => x.id === i))); // そのフォルダと子孫の最後の位置
+    data.folders = data.folders.filter((x) => x !== f);
+    if (pos === "into") { f.parent = t.id; folded.delete(t.id); ls.set("tf-home-folded", JSON.stringify([...folded])); data.folders.splice(lastOf(t.id) + 1, 0, f); }
+    else { if (t.parent) f.parent = t.parent; else delete f.parent; data.folders.splice(pos === "after" ? lastOf(t.id) + 1 : data.folders.indexOf(t), 0, f); }
+  }
+  await persist(); render();
+}
+document.addEventListener("dragstart", (e) => {
+  const r = e.target.closest?.("[data-fdrag]"); if (!r) return;
+  dragFd = r.dataset.fdrag; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragFd); r.classList.add("dragging"); closeFolderMenu();
+});
+document.addEventListener("dragend", () => { dragFd = null; clearFdMarks(); document.querySelectorAll("[data-fdrag].dragging").forEach((x) => x.classList.remove("dragging")); });
+document.addEventListener("dragover", (e) => {
+  if (!dragFd) return;
+  const r = e.target.closest?.("[data-fdrag]"), u = e.target.closest?.('#nav-list [data-t="uncat"]');
+  if (r && r.dataset.fdrag !== dragFd) { e.preventDefault(); clearFdMarks(); r.classList.add("drop-" + fdPos(e, r)); }
+  else if (u) { e.preventDefault(); clearFdMarks(); u.classList.add("drop-before"); }
+});
+document.addEventListener("drop", (e) => {
+  if (!dragFd) return;
+  const r = e.target.closest?.("[data-fdrag]"), u = e.target.closest?.('#nav-list [data-t="uncat"]'), id = dragFd;
+  if (r && r.dataset.fdrag !== id) { e.preventDefault(); const pos = fdPos(e, r); dragFd = null; clearFdMarks(); moveFolderTo(id, r.dataset.fdrag, pos); }
+  else if (u) { e.preventDefault(); dragFd = null; clearFdMarks(); moveFolderTo(id, null, "root"); }
+});
+
+/* ---------- フォルダの編集ダイアログ(左に大きなプレビュー、右に名前。おすすめの配色をワンクリックで選び、細かい調整は下で。「保存」で反映) ---------- */
+// [名前, アイコンの色, 背景色]
+const FED_THEMES = [
+  ["標準", "#ccc", ""], ["オレンジ", "#ffb74d", "#4a2a0a"], ["レッド", "#ff6b6b", "#4a1414"], ["ピンク", "#f472b6", "#4a1430"],
+  ["パープル", "#c4a1ff", "#2e1a52"], ["ブルー", "#6cb6ff", "#112a52"], ["ティール", "#4fd1c5", "#0d3b38"], ["グリーン", "#6ee7a0", "#12381f"],
+  ["ゴールド", "#fde047", "#3d3408"], ["モノクロ", "#ffffff", "#2b2b2b"],
+];
+const FED_ICONS = ["#ccc", "#ffb74d", "#ff6b6b", "#f472b6", "#c4a1ff", "#6cb6ff", "#4fd1c5", "#6ee7a0", "#fde047", "#ffffff"];
+const FED_BGS = ["", "#ffffff", "#2b2b2b", "#4a2a0a", "#4a1414", "#4a1430", "#2e1a52", "#112a52", "#0d3b38", "#12381f", "#3d3408"];
+function openFolderEditor(id) {
+  const f = data.folders.find((x) => x.id === id); if (!f) return;
+  const st = { name: f.name, color: f.color || "#ccc", bg: f.bg || "", img: f.img || "" };
+  $("fed")?.remove();
+  const dlg = document.createElement("dialog"); dlg.id = "fed";
+  const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
+  const folderSvg = (c, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="${esc(c)}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+  const tile = (c, bg, img, s = 22) => `<span class="fbg" ${bg ? `style="background:${esc(bg)}"` : ""}>${img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(img)}" alt="">` : folderSvg(c, s)}</span>`;
+  const sw = (kind, list, cur) => list.map((c) => `<button type="button" class="fed-s ${c === cur ? "on" : ""} ${c ? "" : "none"}" data-${kind}="${c}" title="${c || "なし"}" ${c ? `style="background:${c}"` : ""}></button>`).join("");
+  dlg.innerHTML = `<div class="fed-top">
+      <button type="button" class="fed-big" data-fed="img" title="クリックまたは画像をドラッグして変更"><span class="fed-pv"></span><span class="fed-cam">🖼 画像を変更</span></button>
+      <div class="fed-nm"><label>フォルダの名前</label><input class="fed-in" data-fed="name" maxlength="40" placeholder="フォルダ名"><div class="fed-ib"><button type="button" class="btn s" data-fed="img">🖼 画像を取り込む</button><button type="button" class="btn s" data-fed="imgclear" title="画像の四隅の色(黒など)を背景とみなして透明にします。背景色が見えるようになります">✂ 元の背景を透明に</button><button type="button" class="fed-link" data-fed="imgdel">画像を外す</button></div></div>
+    </div>
+    <div class="fed-sec"><h3>アイコンの背景色</h3><div class="fed-sws" data-row="bg"></div></div>
+    <div class="fed-act">${f.parent ? `<button type="button" class="btn s fed-l" data-fed="unnest">入れ子を解除</button>` : ""}<button type="button" class="btn s fed-l fed-del" data-fed="del">削除</button><button type="button" class="btn s" data-fed="cancel">キャンセル</button><button type="button" class="btn p" data-fed="save">保存</button></div>`;
+  document.body.append(dlg);
+  const custom = (k) => `<label class="fed-s fed-c" title="好きな色を選ぶ">＋<input type="color" data-fed="${k}"></label>`;
+  const paint = (full = true) => {
+    dlg.querySelector(".fed-pv").innerHTML = tile(st.color, st.bg, st.img, 40);
+    dlg.querySelector("[data-fed=imgdel]").hidden = dlg.querySelector("[data-fed=imgclear]").hidden = !st.img;
+    dlg.querySelector(".fed-big").classList.toggle("has", !!st.img);
+    dlg.querySelector("[data-row=bg]").innerHTML = sw("bg", FED_BGS, st.bg) + custom("bg");
+    dlg.querySelector("input[data-fed=bg]").value = hex(st.bg, "#333333");
+  };
+  dlg.querySelector("[data-fed=name]").value = st.name;
+  dlg.addEventListener("input", (e) => {
+    const k = e.target.dataset.fed; if (!k) return;
+    if (k === "name") st.name = e.target.value; else if (k === "color") st.color = e.target.value; else if (k === "bg") st.bg = e.target.value;
+    if (k !== "name") paint();
+  });
+  dlg.addEventListener("click", (e) => {
+        const sb = e.target.closest("button[data-bg]"); if (sb) { st.bg = sb.dataset.bg; return paint(); }
+    const k = e.target.closest("button[data-fed]")?.dataset.fed;
+    if (k === "cancel") dlg.close();
+    else if (k === "unnest") { dlg.close(); unnestFolder(id); }
+    else if (k === "del") { dlg.close(); deleteFolder(id); }
+    else if (k === "imgclear") clearImgBg(st.img, (u) => { st.img = u; paint(); });
+    else if (k === "imgdel") { st.img = ""; paint(); }
+    else if (k === "img") imageToData((u) => { st.img = u; paint(); });
+    else if (k === "save") {
+      const name = st.name.trim() || f.name;
+      f.name = name; f.color = st.color;
+      st.bg ? (f.bg = st.bg) : delete f.bg; st.img ? (f.img = st.img) : delete f.img;
+      persist().then(() => { render(); toast(`「${name}」を保存しました`); }); dlg.close();
+    }
+  });
+  // 画像をプレビューへドラッグして変更
+  const big = dlg.querySelector(".fed-big");
+  big.addEventListener("dragover", (e) => { e.preventDefault(); big.classList.add("drag"); });
+  big.addEventListener("dragleave", () => big.classList.remove("drag"));
+  big.addEventListener("drop", (e) => { e.preventDefault(); big.classList.remove("drag"); const fl = e.dataTransfer.files?.[0]; if (fl?.type.startsWith("image/")) imageToData((u) => { st.img = u; paint(); }, fl); });
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset?.fed === "name" && !e.isComposing) { e.preventDefault(); dlg.querySelector("[data-fed=save]").click(); } });
+  paint(); dlg.showModal(); dlg.querySelector("[data-fed=name]").select();
+}
+function imageToData(cb, dropped) { // 画像(選ぶ・ドロップ)を、64×64 に中央で切り抜いた data URL にして返す
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+  inp.style.display = "none"; document.body.append(inp); // 画面に付けておく(付けないと、選ぶ前に破棄されて、反応しないことがある)
+  inp.addEventListener("cancel", () => inp.remove());
+  inp.onchange = () => {
+    const file = dropped || inp.files?.[0]; inp.remove(); if (!file) return;
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const S = 64, cv = document.createElement("canvas"); cv.width = cv.height = S; const k = Math.min(S / im.width, S / im.height); const w = im.width * k, h = im.height * k; // 全体を収める(余白は透明のまま。背景色が透けて見える)
+      cv.getContext("2d").drawImage(im, (S - w) / 2, (S - h) / 2, w, h); URL.revokeObjectURL(url);
+      cb(cv.toDataURL("image/webp", 0.85));
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); };
+    im.src = url;
+  };
+  dropped ? inp.onchange() : inp.click();
+}
+function clearImgBg(src, cb) { // 画像の四隅の色に近い、外側からつながる部分を透明にする(黒い背景の画像などを、背景色が透けるように)
+  const im = new Image();
+  im.onload = () => {
+    const W = im.width, H = im.height, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const cx = cv.getContext("2d"); cx.drawImage(im, 0, 0);
+    const d = cx.getImageData(0, 0, W, H), p = d.data, idx = (x, y) => (y * W + x) * 4;
+    const c = idx(0, 0), ref = [p[c], p[c + 1], p[c + 2]];
+    if (p[c + 3] < 250) return cb(src); // 最初から透明なら何もしない
+    const near = (i) => p[i + 3] > 0 && Math.abs(p[i] - ref[0]) + Math.abs(p[i + 1] - ref[1]) + Math.abs(p[i + 2] - ref[2]) < 90;
+    const seen = new Uint8Array(W * H), st = [];
+    for (let x = 0; x < W; x++) st.push([x, 0], [x, H - 1]);
+    for (let y = 0; y < H; y++) st.push([0, y], [W - 1, y]);
+    while (st.length) {
+      const [x, y] = st.pop(); if (x < 0 || y < 0 || x >= W || y >= H || seen[y * W + x]) continue;
+      seen[y * W + x] = 1; const i = idx(x, y); if (!near(i)) continue;
+      p[i + 3] = 0; st.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    cx.putImageData(d, 0, 0); cb(cv.toDataURL("image/webp", 0.85));
+  };
+  im.src = src;
+}

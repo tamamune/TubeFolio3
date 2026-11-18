@@ -25,7 +25,7 @@ function subMap() { // 登録チャンネル(同期済み)の 名前 -> チャ�
   return subMemo.map;
 }
 // ダミー動画は、見え方の確認用に偶数番号を「登録済み」として扱う
-const isSubV = (v) => !!v && (v.dummy ? v.n % 2 === 0 : !!v.channel && subMap().has(subNorm(v.channel)));
+const isSubV = (v) => !!v && (v.dummy ? v.n % 2 === 0 : v.sub === true || (!!v.channel && subMap().has(subNorm(v.channel))));
 // 動画のフォルダ名: 保存した動画はそのフォルダ、それ以外はチャンネルが入っているフォルダ
 function folderLine(v) {
   let names = [];
@@ -73,22 +73,23 @@ const cn = (v) => {
 };
 const subCls = (v) => (isSubV(v) ? "subc" : "");
 
-function testView() {
-  const mk = (i, name, sub) => `<div class="c ${sub ? "subc" : ""}"><div class="th">${dummyTh(i + 40)}<span class="dur">12:34</span></div><b>【サンプル】動画タイトル ${i}</b><small class="cn${sub ? " sub" : ""}"${sub ? ' title="登録済みのチャンネル"' : ""}>${name}</small><small class="cm"><span class="cmd">${dateTxt(i + "日前")}</span><span class="cf">📁 音楽</span></small></div>`;
-  const accHtml = `<h2>テスト: 差し色</h2><p class="hint tst-h">ボタン・選択中の項目・進捗バーなどの色を切り替えます。</p><div class="acc-g" role="radiogroup">${ACCS.map(([k, n, col]) => `<button class="acc-c ${accent === k ? "on" : ""}" data-accent="${k}" role="radio" aria-checked="${accent === k}"><span class="acc-pv" style="--p:${col}"><i></i><em></em><u></u><s></s></span><span class="n">${n}</span></button>`).join("")}</div>`;
-  return `<section class="row">${accHtml}<h2>テスト: 登録済みチャンネルの見分け方</h2>
-    <p class="hint tst-h">方式を切り替えて見え方を比べます。選んだ方式は、ホーム・検索・ブックマークなど、すべての動画一覧に反映されます。</p>
-    <div class="tst-sw" role="radiogroup">${SUB_STYLES.map(([k, n]) => `<button class="tab ${subStyle === k ? "on" : ""}" data-substyle="${k}" role="radio" aria-checked="${subStyle === k}">${n}</button>`).join("")}</div>
-    <p class="hint tst-h">${esc(SUB_STYLES.find(([k]) => k === subStyle)[2])}</p>
-    <div class="grid">${mk(1, "登録済みチャンネル", true)}${mk(2, "未登録チャンネル", false)}${mk(3, "登録済みチャンネル", true)}${mk(4, "未登録チャンネル", false)}</div></section>`;
+function paintLook() { const el = $("set-appear"); if (el) el.innerHTML = appearHtml(); } // 設定「一般」の先頭: 差し色・登録済みチャンネルの見分け方
+function appearHtml() { // 設定の他の項目と同じ「ラベル + 右に操作」の行
+  return `<div class="set-row"><span>色の変更 <small>ボタン・選択中の項目・進捗バーなどの色</small></span><span class="acc-dots" role="radiogroup">${ACCS.map(([k, n, col]) => `<button type="button" class="acc-d ${accent === k ? "on" : ""}" data-accent="${k}" role="radio" aria-checked="${accent === k}" title="${n}" style="background:${col}"></button>`).join("")}</span></div>
+    <label class="set-row"><span>登録済みチャンネルの見分け方</span><select class="sel" id="set-substyle">${SUB_STYLES.map(([k, n]) => `<option value="${k}" ${subStyle === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>`;
 }
-document.addEventListener("click", (e) => {
-  const b = e.target.closest("[data-substyle]"); if (!b) return;
-  subStyle = b.dataset.substyle; ls.set("tf-sub-style", subStyle); document.body.dataset.sub = subStyle; render();
+// テストのページ(サイドバー下のテストボタン)。今後のテスト項目をここに置く
+function testView() {
+  return `<section class="tp"><header class="tp-h"><h2>テスト</h2><p>テスト中の項目を置くページです。</p></header>
+    <div class="tp-card"><label class="tp-r"><span class="tp-t"><b>ダミー表示</b><small>YouTube由来の動画・再生リストを、ダミーのデータで表示します</small></span><span class="tp-sw"><input type="checkbox" id="set-dummy" ${useDummy ? "checked" : ""}><i></i></span></label></div></section>`;
+}
+document.addEventListener("change", (e) => {
+  if (e.target.id !== "set-substyle") return;
+  subStyle = e.target.value; ls.set("tf-sub-style", subStyle); document.body.dataset.sub = subStyle; render(); paintLook();
 });
 
 $("set-date").onchange = () => { dateMode = $("set-date").value; ls.set("tf-date-mode", dateMode); render(); };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-accent]"); if (!b) return;
-  accent = b.dataset.accent; ls.set("tf-accent", accent); document.body.dataset.acc = accent; render();
+  accent = b.dataset.accent; ls.set("tf-accent", accent); document.body.dataset.acc = accent; render(); paintLook();
 });

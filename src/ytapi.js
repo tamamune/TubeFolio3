@@ -76,5 +76,50 @@ const YTA = (() => {
     // すでに入っている動画は重ねて追加しない(DEDUPE_OPTION_SKIP)
     addVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_ADD_VIDEO", addedVideoId: videoId, dedupeOption: "DEDUPE_OPTION_SKIP" }]),
     removeVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_REMOVE_VIDEO_BY_VIDEO_ID", removedVideoId: videoId }]),
+    // 動画を入れられる自分の再生リスト一覧(YouTube の「保存」メニューと同じ。containsSelectedVideos が ALL なら、その動画は入っている)
+    ownPlaylists: async (videoId) => {
+      const j = await post("playlist/get_add_to_playlist", { videoIds: [videoId], excludeWatchLater: false });
+      const list = j.contents?.[0]?.addToPlaylistRenderer?.playlists || [];
+      return list.map((x) => x.playlistAddToOptionRenderer).filter(Boolean).map((r) => ({ id: r.playlistId, title: r.title?.simpleText || r.title?.runs?.map((t) => t.text).join("") || r.playlistId, has: r.containsSelectedVideos === "ALL" }));
+    },
+    // 動画のコメント(最大 limit 件)。再生画面のコメント流し用。コメント欄を開かなくても取れる
+    // sort: "top"(評価順) / "new"(新着順)。返すのは { text 本文, name 名前, likes 評価の数, time 投稿日 } の配列
+    comments: async (videoId, limit = 150, sort = "top") => {
+      const walk = (n, fn) => { if (!n || typeof n !== "object") return; fn(n); (Array.isArray(n) ? n : Object.values(n)).forEach((x) => walk(x, fn)); };
+      let token = ""; // 動画の情報から、コメント欄を読み込むための続きのトークンを探す
+      walk(await post("next", { videoId }), (n) => { if (!token && n.sectionIdentifier === "comment-item-section") walk(n, (m) => { if (!token && m.continuationItemRenderer) token = m.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || ""; }); });
+      const out = [], seen = new Set();
+      let wantNew = sort === "new";
+      for (let page = 0; token && out.length < limit && page < 10; page++) {
+        const j = await post("next", { continuation: token }); token = "";
+        if (wantNew) { // 並び替えメニューの「新しい順」(2つ目)のトークンに切り替えて、取り直す
+          wantNew = false; let nt = "";
+          walk(j, (n) => { const it = n.sortFilterSubMenuRenderer?.subMenuItems; if (it?.[1]?.serviceEndpoint?.continuationCommand?.token) nt = it[1].serviceEndpoint.continuationCommand.token; });
+          if (nt) { token = nt; continue; }
+        }
+        const ent = new Map(), order = [], legacy = [];
+        walk(j, (n) => {
+          const p = n.commentEntityPayload;
+          if (p) ent.set(p.key, { text: p.properties?.content?.content || "", name: p.author?.displayName || "", icon: p.avatar?.image?.sources?.[0]?.url || p.author?.avatarThumbnailUrl || "", likes: p.toolbar?.likeCountNotliked || p.toolbar?.likeCountLiked || "", time: p.properties?.publishedTime || "" });
+          const k = n.commentThreadRenderer?.commentViewModel?.commentViewModel?.commentKey; if (k) order.push(k);
+          const r = n.commentRenderer;
+          if (r?.contentText) legacy.push({ text: r.contentText.runs ? r.contentText.runs.map((x) => x.text).join("") : r.contentText.simpleText || "", name: r.authorText?.simpleText || "", icon: r.authorThumbnail?.thumbnails?.[0]?.url || "", likes: r.voteCount?.simpleText || "", time: r.publishedTimeText?.runs?.[0]?.text || "" });
+          if (n.continuationItemRenderer) token = n.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || token; // 最後のものが「次のページ」
+        });
+        const items = order.length ? order.map((k) => ent.get(k)).filter(Boolean) : [...ent.values(), ...legacy];
+        for (const c of items) { const s = (c.text || "").replace(/\s+/g, " ").trim(); if (s && !seen.has(s)) { seen.add(s); out.push({ text: s.slice(0, 140), name: c.name, icon: c.icon || "", likes: String(c.likes || ""), time: c.time }); } }
+      }
+      return out;
+    },
+    // コメントの翻訳(日本語へ)。公開コメントの文だけを、Google 翻訳の無料の窓口に送る。返すのは { text: 翻訳, src: 元の言語 }
+    translate: async (text) => {
+      const j = await (await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=" + encodeURIComponent(String(text).slice(0, 400)))).json();
+      return { text: (j[0] || []).map((x) => x[0]).join(""), src: j[2] || "" };
+    },
+    // チャンネル登録・解除(params は YouTube の登録ボタンが使っている固定の値)
+    subscribe: (channelId) => post("subscription/subscribe", { channelIds: [channelId], params: "EgIIAhgA" }),
+    unsubscribe: (channelId) => post("subscription/unsubscribe", { channelIds: [channelId], params: "CgIIAhgA" }),
+    // @ハンドルや動画のURLから、チャンネルID を調べる(ページのHTMLを読む)
+    channelIdOf: async (url) => { const h = await (await fetch(url, { credentials: "include" })).text(); return (h.match(/"channelId":"(UC[\w-]{22})"/) || h.match(/"externalId":"(UC[\w-]{22})"/) || [])[1] || ""; },
   };
 })();

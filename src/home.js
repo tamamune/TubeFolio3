@@ -19,13 +19,32 @@ let hpl = new Set((() => { try { return JSON.parse(ls.get("tf-home-hpl", "[]"));
 const plId = (p) => p.id || "dummy" + p.n;
 let folded = new Set((() => { try { return JSON.parse(ls.get("tf-home-folded", "[]")); } catch { return []; } })()); // サイドバーで閉じているフォルダ
 const vmap = new Map(); // 再生ダイアログ用: 動画ID -> {title, channel}
+// 視聴の進み具合(0〜100)。YouTube の一覧に出てきた動画の「視聴済みの割合」を覚えておき、どの画面のカードにも出す
+const watched = new Map(Object.entries((() => { try { return JSON.parse(ls.get("tf-watched", "{}")); } catch { return {}; } })()));
+let watchedSave = 0;
+const noteWatched = (id, p) => {
+  if (!id || !(p > 0) || watched.get(id) === p) return;
+  watched.set(id, p);
+  clearTimeout(watchedSave); watchedSave = setTimeout(() => { const e = [...watched.entries()]; ls.set("tf-watched", JSON.stringify(Object.fromEntries(e.slice(-3000)))); }, 1500);
+};
+function watchedPct(n) { // YouTube のサムネイルに付いている進捗バー(視聴済みの割合)を探す
+  let v = 0;
+  (function w(x) { if (v || !x || typeof x !== "object") return; if (x.thumbnailOverlayResumePlaybackRenderer) { v = x.thumbnailOverlayResumePlaybackRenderer.percentDurationWatched || 0; return; } if (x.thumbnailOverlayProgressBarViewModel) { v = x.thumbnailOverlayProgressBarViewModel.startPercent || 0; return; } Object.values(x).forEach(w); })(n);
+  return v;
+}
+// 途中まで見た動画は赤いバーと「▶ 45%」、最後まで見た動画は緑のバーと「✓ 視聴済み」(サムネイルも暗くする)
+function progHtml(id, v) {
+  const p = watched.get(id) ?? v?.pct ?? 0; if (!(p > 0)) return "";
+  const done = p >= 96;
+  return `<span class="pg ${done ? "done" : ""}"><i style="width:${done ? 100 : Math.max(3, Math.min(100, p))}%"></i></span><span class="wch ${done ? "done" : "part"}" title="${done ? "最後まで再生済み" : "途中まで再生済み"}">${done ? "✓ 視聴済み" : "▶ " + Math.round(p) + "%"}</span>`;
+}
 const dummyTh = (i) => `<div class="dm" style="--h:${(i * 47 + 200) % 360}"></div>`;
 const card = (e) => cardWith(e, "");
 // extra: サムネイルの上に重ねるボタンなど(再生リストから外す×)
 const cardWith = ([id, v], extra) => {
   if (v.dummy) { const pg = v.pct ? `<span class="pg"><i style="width:${v.pct}%"></i></span>` : ""; return `<div class="c ${subCls(v)}"><div class="th">${dummyTh(v.n)}${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}${pg}${extra}</div><b>${esc(v.title)}</b>${cn(v)}</div>`; }
   vmap.set(id, v);
-  const pct = v.pct ? `<span class="pg"><i style="width:${Math.min(100, v.pct)}%"></i></span>` : "";
+  const pct = progHtml(id, v);
   return `<button class="c ${subCls(v)}" data-v="${esc(id)}"><div class="th"><img loading="lazy" src="${thumb(id)}" alt="">${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}${pct}${bmBtn(id)}${extra}</div>${titleHtml(id, v.title)}${cn(v)}</button>`; // ⋮ は plmenu.js
 };
 // 再生リストのカード: 押すと「視聴を再開」などと同じ一覧画面で中の動画を表示する
@@ -44,34 +63,36 @@ function renderNav() {
   const people = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg>`;
   const fico = (c) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
   const cnt = (id) => `<span class="n lbl">${chIn(id).length}</span>`;
+  // 新着動画の件数(登録チャンネルの新着のうち、このフォルダのチャンネルのもの。newvids.js)
+  const nw = (id) => { const k = typeof newCnt === "function" ? newCnt(id) : 0; return `<span class="n nw lbl ${k ? "has" : ""}" title="新着動画(直近${typeof NEW_DAYS === "number" ? NEW_DAYS : 3}日): ${k}本">${k}</span>`; };
   const item = (id, ico, name, extra = "") => `<button class="ni ${tab === id ? "on" : ""}" data-t="${id}" data-drop="${id === "channels" ? "" : id}" title="${esc(name)}">${ico}<span class="lbl">${esc(name)}</span>${extra}</button>`;
   let h = `<button class="ni ${tab === "all" || tab.startsWith("list:") ? "on" : ""}" data-t="all" title="ホーム">${home}<span class="lbl">ホーム</span></button>`;
   h += `<button class="ni ${tab === "search" ? "on" : ""}" data-t="search" title="検索"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">検索</span></button>`;
   h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
-  h += `<div class="nav-h">フォルダ</div>`;
+  h += `<div class="nav-h nav-hh"><span>フォルダ</span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
   h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
-  const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : "";
+  const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
   // フォルダの「⋯」(名前の変更・サブフォルダ・並べ替え・削除のメニュー。右クリックでも開く。channels.js)
   const fmore = (f) => `<span class="fmore lbl" data-fmenu="${esc(f.id)}" role="button" title="フォルダの操作" aria-label="フォルダの操作">⋯</span>`;
   // その場で名前を入力する欄(フォルダの追加・サブフォルダの追加・名前の変更)
-  const editRow = (depth, ico) => `<div class="ni ni-edit" style="padding-left:${12 + depth * 18}px">${ico}<input id="fe-in" class="fe-in" maxlength="40" placeholder="${fEdit.mode === "rename" ? "フォルダ名" : "新しいフォルダ名"}" value="${esc(fEdit.value)}" aria-label="フォルダ名"></div>`;
+  const editRow = (depth, ico) => `<div class="ni ni-edit" style="padding-left:${12 + depth * 12}px">${ico}<input id="fe-in" class="fe-in" maxlength="40" placeholder="${fEdit.mode === "rename" ? "フォルダ名" : "新しいフォルダ名"}" value="${esc(fEdit.value)}" aria-label="フォルダ名"></div>`;
+  // フォルダの行: [▸ 開閉] [フォルダ] [タイトル] [新着の件数] [⋯]。ドラッグで並べ替え・入れ子にできる(channels.js)
+  // 上へ・下へ(同じ階層の中で入れ替え。マウスを乗せたときだけ出る。channels.js)
+  const fmv = (f) => { const sib = data.folders.filter((x) => (x.parent || "") === (f.parent || "")), i = sib.indexOf(f); return `<span class="fmv fplus" data-fsub="${esc(f.id)}" role="button" title="サブフォルダを追加" aria-label="サブフォルダを追加">＋</span><span class="fmv ${i <= 0 ? "dis" : ""}" data-fmove="up|${esc(f.id)}" role="button" title="上へ" aria-label="上へ">▲</span><span class="fmv ${i >= sib.length - 1 ? "dis" : ""}" data-fmove="down|${esc(f.id)}" role="button" title="下へ" aria-label="下へ">▼</span>`; };
+  const fRow = (f, depth) => `<button class="ni fd ${depth ? "sub" : ""} ${tab === f.id ? "on" : ""}" style="padding-left:${8 + depth * 12}px" draggable="true" data-fdrag="${esc(f.id)}" data-t="${esc(f.id)}" data-drop="${esc(f.id)}" title="${esc(f.name)}">${chev(f)}<span class="fbg" ${f.bg ? `style="background:${esc(f.bg)}"` : ""}>${f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : fico(f.color || "#ccc")}</span><span class="lbl">${esc(f.name)}</span>${nw(f.id)}${fmv(f)}${fmore(f)}</button>`;
   const tree = (parent, depth) => data.folders.filter((x) => (x.parent || "") === parent && (parent || !x.parent)).map((f) => (fEdit?.mode === "rename" && fEdit.id === f.id
     ? editRow(depth, fico(f.color || "#ccc"))
-    : depth === 0
-    ? item(f.id, fico(f.color || "#ccc"), f.name, cnt(f.id) + fmore(f) + chev(f))
-    : `<button class="ni sub ${tab === f.id ? "on" : ""}" style="padding-left:${12 + depth * 18}px" data-t="${f.id}" data-drop="${f.id}" title="${esc(f.name)}">${fico(f.color || "#ccc")}<span class="lbl">${esc(f.name)}</span>${cnt(f.id)}${fmore(f)}${chev(f)}</button>`)
+    : fRow(f, depth))
     + (folded.has(f.id) && !document.body.classList.contains("rail") ? "" : tree(f.id, depth + 1))
     + (fEdit?.mode === "sub" && fEdit.parent === f.id ? editRow(depth + 1, fico("#888")) : "")).join("");
   h += tree("", 0);
-  h += item("uncat", fico("#777"), "未分類", cnt("uncat"));
-  h += fEdit?.mode === "add" ? editRow(0, fico("#888"))
-    : `<button class="ni add" data-act="addfolder" title="フォルダを追加"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">フォルダを追加</span></button>`;
+  h += item("uncat", fico("#777"), "未分類", nw("uncat"));
+  h += fEdit?.mode === "add" ? editRow(0, fico("#888")) : "";
   navRendering = true; $("nav-list").innerHTML = h; navRendering = false;
   // 入力欄があれば、そこにカーソルを置く(名前の変更は最初だけ全体を選択)
   const fe = $("fe-in");
   if (fe) { fe.focus(); if (fEdit.selectAll) { fe.select(); fEdit.selectAll = false; } else fe.setSelectionRange(fe.value.length, fe.value.length); }
-  // テストは設定のすぐ上に置く(manager.html の #test-nav)
-  $("test-nav").classList.toggle("on", tab === "test" && $("set").hidden);
+  $("test-nav").classList.toggle("on", tab === "test" && $("set").hidden); // テストの印(アカウント欄の設定の左)
   if (!$("set").hidden) $("nav-list").querySelectorAll(".on").forEach((x) => x.classList.remove("on")); // 設定を開いている間は設定だけを選択中にする
   // 上部のタブバーは廃止(サイドバーで切り替える)
 }
@@ -81,6 +102,15 @@ function renderNav() {
 function heroList() {
   const real = (l) => (l || []).filter(([, v]) => v && !v.dummy);
   const later = laterPl(), own = plsOf("pl");
+  const pick = ls.get("tf-hero-src", "auto"); // 設定で選んだ再生リスト(auto = 下の順に自動で選ぶ)
+  if (pick !== "auto") {
+    const p = pls().find((x) => plId(x) === pick);
+    if (p) {
+      const l = real(p.dummy ? dummyPlItems(p) : (later && p.id === later.id ? cache.later?.[p.id] : cache.pl?.[p.id]) || cache.pl?.[p.id] || cache.later?.[p.id]);
+      if (!l.length && !p.dummy && !plFetched.has(p.id)) fetchPl(p).then(() => { saveCache(); swapHero(); });
+      return [l, plTitle(p)];
+    }
+  }
   const srcs = [
     [all(), "最近保存"],
     [resumeItems(), "視聴を再開"],
@@ -111,6 +141,8 @@ function swapHero() { // ヒーローだけ差し替える(横スクロール中
 }
 function render() {
   renderNav();
+  // 検索画面を表示中の描き直し(保存データの更新など)は、結果の部分だけ更新する。画面全体を作り直すと、結果が一度消えてちらつく
+  if (tab === "search" && $("s-form") && $("main").contains($("s-form")) && typeof paintSearch === "function") return paintSearch();
   let h = "";
   if (tab === "all") {
     h += renderHero();
@@ -268,9 +300,9 @@ function lockupInfo(lv) {
   const parts = (i) => (rows[i]?.metadataParts || []).map((x) => x.text?.content || "").filter(Boolean);
   // 視聴履歴などでは1行目に「チャンネル名」と「22万 回視聴」が並ぶことがあるので、チャンネル名だけを取り出す
   const all = [...parts(0), ...parts(1)];
-  const isViews = (t) => /視聴|views?|^[\d.,]+\s*(万|億|千|[KMB])/i.test(t);
+  const isViews = (t) => /視聴|views?|^[\d.,]+\s*(万|億|千|[KMB])?(\s*回)?$/i.test(t); // 「636」のように数字だけの場合も再生回数として扱う
   let dur = ""; (function w(x) { if (dur || !x || typeof x !== "object") return; if (x.thumbnailBadgeViewModel?.text) { dur = x.thumbnailBadgeViewModel.text; return; } Object.values(x).forEach(w); })(lv.contentImage);
-  return { title: lv.metadata?.lockupMetadataViewModel?.title?.content || lv.contentId, channel: parts(0).filter((t) => !isViews(t) && !PUB_RE.test(t)).join(" "), chUrl: chUrlOf(lv.metadata), duration: dur, pub: all.find((t) => PUB_RE.test(t)) || "", views: all.find(isViews) || "" };
+  return { title: lv.metadata?.lockupMetadataViewModel?.title?.content || lv.contentId, channel: parts(0).filter((t) => !isViews(t) && !PUB_RE.test(t)).join(" "), chUrl: chUrlOf(lv.metadata), duration: dur, pub: all.find((t) => PUB_RE.test(t)) || "", views: all.find(isViews) || "", pct: watchedPct(lv.contentImage) };
 }
 // チャンネルへのリンク先(/@ハンドル か /channel/UC…)。チャンネル名やアイコンに付いているリンクから探す
 function chUrlOf(o) {
@@ -286,7 +318,7 @@ function chUrlOf(o) {
 // 視聴履歴ページから、途中まで見た動画(進捗バー付き)を集める
 function collectResume(root) {
   const out = new Map();
-  const prog = (n) => { let v = 0; (function w(x) { if (v || !x || typeof x !== "object") return; if (x.thumbnailOverlayResumePlaybackRenderer) { v = x.thumbnailOverlayResumePlaybackRenderer.percentDurationWatched || 0; return; } if (x.thumbnailOverlayProgressBarViewModel) { v = x.thumbnailOverlayProgressBarViewModel.startPercent || 0; return; } Object.values(x).forEach(w); })(n); return v; };
+  const prog = watchedPct;
   (function walk(n) {
     if (!n || typeof n !== "object") return;
     if (Array.isArray(n)) return n.forEach(walk);
@@ -541,18 +573,23 @@ function paintSettings() {
   // 再生リストの項目は、表示切り替えを下の「再生リストの表示」と同じ hpl で持つ(data-p)
   const chk = (k) => k.startsWith("pl:") ? `data-p="${esc(k.slice(3))}" ${hpl.has(k.slice(3)) ? "" : "checked"}` : `data-k="${esc(k)}" ${on(k) ? "checked" : ""}`;
   const name = (k) => k.startsWith("pl:") ? plTitle(plByKey(k)) : T[k];
-  let h = `<div class="set-h">ホームの並び順と表示</div>` + fo.map((k, i) => `<div class="set-row"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label><span class="mv"><button type="button" class="btn s" data-mv="${esc(k)}|-1" ${i === 0 ? "disabled" : ""} aria-label="上へ">▲</button><button type="button" class="btn s" data-mv="${esc(k)}|1" ${i === fo.length - 1 ? "disabled" : ""} aria-label="下へ">▼</button></span></div>`).join("");
+  const hs = ls.get("tf-hero-src", "auto");
+  let h = `<div class="set-h">ホームのピックアップ動画</div><label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 視聴を再開 → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
+    + `<option value="auto">自動(おまかせ)</option>`
+    + pls().map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`
+    + `<div class="set-h">ホームの並び順と表示</div>` + fo.map((k, i) => `<div class="set-row"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label><span class="mv"><button type="button" class="btn s" data-mv="${esc(k)}|-1" ${i === 0 ? "disabled" : ""} aria-label="上へ">▲</button><button type="button" class="btn s" data-mv="${esc(k)}|1" ${i === fo.length - 1 ? "disabled" : ""} aria-label="下へ">▼</button></span></div>`).join("");
   const ps = pls().filter((p) => !LATER(p) && kindOf(p) !== "own"); // 自分の再生リストは上の並び順で切り替える
   if (ps.length) h += `<div class="set-h">再生リストの表示(ホーム・一覧)</div>` + ps.map((p) => `<label class="set-row"><span>${esc(p.title)} <small>${kindOf(p) === "own" ? "作成" : "保存"}</small></span><input type="checkbox" data-p="${esc(plId(p))}" ${hpl.has(plId(p)) ? "" : "checked"}></label>`).join("");
   $("set-list").innerHTML = h;
 }
 function openSettings() {
   paintSettings();
-  $("set-dummy").checked = useDummy;
+  chrome.storage.local.get("tf-cm-hidemode").then((r) => { const s = $("set-cmhide"); if (s) s.value = r["tf-cm-hidemode"] === "onplay" ? "onplay" : "show"; }); // YouTube の再生画面のコメント欄(content.js が読む)
   $("set-auto").checked = autoScroll;
   $("set-date").value = dateMode;
   $("set-play").value = playOnYt() ? "yt" : "embed";
   fillWlSelect(); // 🕒ボタンの追加先(plmenu.js)
+  if (typeof setSetTab === "function") setSetTab(document.querySelector("[data-settab].on")?.dataset.settab || "gen"); // channels.js
   showSettings(true);
 }
 // 設定はメイン画面の代わりに表示する(サイドバーの項目を押すか「ホームへ戻る」で閉じる)
@@ -563,10 +600,13 @@ function showSettings(on) {
   if (on && innerWidth <= 820) document.body.classList.remove("nav-on");
   renderNav(); scrollTo(0, 0);
 }
-$("settings").onclick = openSettings;
+$("test-nav").onclick = (e) => { e.stopPropagation(); showSettings(false); tab = "test"; render(); scrollTo(0, 0); }; // テストのページ(今後のテスト用)
+$("settings").onclick =(e) => { e.stopPropagation(); openSettings(); }; // アカウント欄の中にあるので、アカウント欄のクリックにしない
+document.addEventListener("change", (e) => { if (e.target.id === "set-cmhide") chrome.storage.local.set({ "tf-cm-hidemode": e.target.value }); });
 $("set-close").onclick = () => { showSettings(false); if (tab !== "all") { tab = "all"; render(); } };
 $("set-list").addEventListener("change", (e) => {
   const k = e.target.dataset.k, p = e.target.dataset.p;
+  if (e.target.dataset.hero !== undefined) { ls.set("tf-hero-src", e.target.value); heroI = 0; return render(); }
   if (k) { e.target.checked ? hidden.delete(k) : hidden.add(k); ls.set("tf-home-hidden", JSON.stringify([...hidden])); }
   else if (p) { e.target.checked ? hpl.delete(p) : hpl.add(p); ls.set("tf-home-hpl", JSON.stringify([...hpl])); }
   else return;
@@ -582,7 +622,7 @@ $("set-list").addEventListener("click", (e) => {
 });
 $("set-play").onchange = () => ls.set("tf-play-mode", $("set-play").value);
 $("set-reload").onclick = () => { showSettings(false); refreshHome(true); };
-$("set-dummy").onchange = () => { useDummy = $("set-dummy").checked; ls.set("tf-home-dummy", useDummy ? "1" : "0"); render(); if (!useDummy) refreshHome(true); };
+document.addEventListener("change", (e) => { if (e.target.id !== "set-dummy") return; useDummy = e.target.checked; ls.set("tf-home-dummy", useDummy ? "1" : "0"); render(); if (!useDummy) refreshHome(true); });
 
 /* ---------- 一覧(横スクロールの行)を自動でゆっくり動かす ---------- */
 let autoScroll = ls.get("tf-home-auto", "1") === "1";

@@ -141,5 +141,5 @@ document.addEventListener("click", async (e) => {
   if ($("pm") && !t("#pm")) closeMenu(); // メニューの外を押したら閉じる
 }, true);
 addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
-addEventListener("scroll", (e) => { if (!$("pm")?.contains(e.target)) closeMenu(); }, true); // メニューの中のスクロールでは閉じない
+addEventListener("scroll", (e) => { const t = e.target; if (!$("pm")?.contains(t) && (t === document || t === document.scrollingElement || t.id === "nav-scroll")) closeMenu(); }, true); // ページ全体のスクロールで閉じる(メニューの中や、ホームの行の自動スクロールでは閉じない)
 addEventListener("resize", closeMenu);

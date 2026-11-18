@@ -1,3 +1,4 @@
+importScripts("ytapi.js"); // YouTube への書き込み(YTA)。YouTube のページの拡張機能から、メッセージで呼び出される
 // 初回インストール時に空のデータを用意する(既存データは上書きしない)
 chrome.runtime.onInstalled.addListener(async () => {
   const cur = await chrome.storage.local.get("tubefolio");
@@ -52,10 +53,34 @@ async function setupInnertubeOrigin() {
 chrome.runtime.onInstalled.addListener(setupInnertubeOrigin);
 chrome.runtime.onStartup.addListener(setupInnertubeOrigin);
 
-// ブラウザのツールバーのアイコンから管理ページを開く
-chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") }));
+// ブラウザのツールバーのアイコン: 拡張機能を再読み込みして、TubeFolio3 を開く(すでに開いていれば、そのページを再読み込みする)
+// 再読み込みするとこの処理も止まるので、開き直す内容を先に保存しておき、再起動後に実行する
+const MANAGER_URL = chrome.runtime.getURL("manager.html");
+chrome.action.onClicked.addListener(async () => {
+  const tabs = await chrome.tabs.query({ url: MANAGER_URL + "*" }).catch(() => []);
+  await chrome.storage.local.set({ "tf-reopen": { tabs: tabs.map((t) => t.id), at: Date.now() } });
+  chrome.runtime.reload();
+});
+(async function resumeAfterReload() { // 再読み込みの直後に、保存しておいた内容を実行する
+  const got = (await chrome.storage.local.get("tf-reopen"))["tf-reopen"];
+  if (!got) return;
+  await chrome.storage.local.remove("tf-reopen");
+  if (Date.now() - got.at > 30000) return; // 古い指示は無視する
+  let first = null;
+  for (const id of got.tabs || []) {
+    try { await chrome.tabs.get(id); await chrome.tabs.reload(id); first ??= id; } catch {}
+  }
+  if (first != null) {
+    const t = await chrome.tabs.update(first, { active: true }).catch(() => null);
+    if (t) chrome.windows.update(t.windowId, { focused: true }).catch(() => {});
+  } else chrome.tabs.create({ url: MANAGER_URL }); // 開いていなかった(または再読み込みで閉じられた)ときは、新しく開く
+})();
 
-// ヘッダーのボタンから管理ページを開く
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg === "tf-open-manager") chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") });
+// ヘッダーのボタンから管理ページを開く / YouTube のページから、再生リスト・チャンネル登録の操作を受け付ける
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg === "tf-open-manager") { chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") }); return; }
+  if (msg?.tf === "yta" && typeof YTA?.[msg.op] === "function") {
+    YTA[msg.op](...(msg.args || [])).then((r) => reply({ ok: true, r }), (e) => reply({ ok: false, error: e?.message || String(e) }));
+    return true; // 非同期で返事をする
+  }
 });
