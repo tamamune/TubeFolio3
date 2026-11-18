@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApbiP7+7R1xOFvrWRgtAZTkYgbWjK332yhih9g1V+BZj/AjhBhX2bVG4SQmj+2o8bU5xb6EumJOChwA1AKD3TcXMoqNq9n7buzwq6NyqdyBSv3Hq8nxs1FpwqNDVAqXrHNlD6gWlNupgkvk4UKh5SIKqbI6NrQz3fjPL5QxW7IxsCsO0PO9gICDj68S67XuLO2MelBzhehm9ObfjN6R4CVWXN3INymJIUbJx2q8hA+zg60iRXT/Zv64iHYszFOV470Xp78e4k1AcBatNrdBPETzyYeIMSSivwkdzeG2JuMk8qTaj9Yd6vr9fllhKNZTM2fDpRozMoxzSthkR8Y/Gz5QIDAQAB",
   "name": "TubeFolio3",
   "version": "0.1.0",
   "description": "YouTube動画をフォルダで整理する",
