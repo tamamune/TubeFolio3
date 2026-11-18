@@ -124,7 +124,7 @@ function paintStatBar() {
 
 // フォルダ管理の画面(登録チャンネル / フォルダ / 未分類): フォルダの切り替えは左のサイドバーで行い、ここにはチャンネルの表を出す
 function channelsView(t) {
-  const list = chIn(t), f = data.folders.find((x) => x.id === t);
+  const all = chIn(t), list = chPer >= 0 || chKind !== "all" ? all.filter(chPassPer) : all, f = data.folders.find((x) => x.id === t), miss = all.filter((c) => !c.stats).length;
   curFolderForRow = f ? f.id : "";
   const last = +ls.get("tf-ch-sync", "0");
   const sync = t === "channels" ? `<button class="btn s" data-act="sync" ${syncing ? "disabled" : ""}>${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span>` : "";
@@ -132,14 +132,14 @@ function channelsView(t) {
   const mv = f ? `<button class="btn s" data-act="up" data-id="${esc(f.id)}" ${si <= 0 ? "disabled" : ""} title="フォルダを上へ">▲ 上へ</button><button class="btn s" data-act="down" data-id="${esc(f.id)}" ${si >= sib.length - 1 ? "disabled" : ""} title="フォルダを下へ">▼ 下へ</button>${f.parent ? `<button class="btn s" data-act="unnest" data-id="${esc(f.id)}" title="親フォルダの外(ひとつ上の階層)へ出します">入れ子を解除</button>` : ""}` : "";
   const fa = ""; // フォルダの操作(上へ・下へ・名前の変更・削除など)は、サイドバーのフォルダ行の ▲▼ と「⋯」メニューで行う
   const modeSw = `<span class="cs-sw" role="radiogroup" aria-label="表示の切り替え"><button type="button" class="tab ${statMode === "count" ? "on" : ""}" data-statmode="count" role="radio" aria-checked="${statMode === "count"}">投稿数</button><button type="button" class="tab ${statMode === "last" ? "on" : ""}" data-statmode="last" role="radio" aria-checked="${statMode === "last"}">最新の投稿</button></span>`;
-  const stat = list.length ? modeSw + `<button class="btn s" data-act="statsall" ${statBusy.size ? "disabled" : ""} title="表示中のチャンネルの、動画・ライブ配信・ショートの投稿数を期間ごとに調べます">📊 期間別に調べる(${list.length}件)</button><button class="btn s" data-act="statsopen">${list.every((c) => chOpen.has(c.id)) ? "すべて閉じる" : "すべて開く"}</button><span class="sync-i" id="cs-bar">${statBusy.size ? `調査中 ${statRun.done} / ${statRun.total}` : ""}</span>` : "";
+  const stat = all.length ? modeSw + `<button class="btn s" data-act="statsall" ${statBusy.size ? "disabled" : ""} title="表示中のチャンネルの、動画・ライブ配信・ショートの投稿数を期間ごとに調べます">📊 期間別に調べる(${all.length}件)</button><button class="btn s" data-act="statsmiss" ${statBusy.size || !miss ? "disabled" : ""} title="まだ調べていないチャンネルだけを、調べます">未取得を取得(${miss}件)</button><button class="btn s" data-act="statsopen">${list.every((c) => chOpen.has(c.id)) ? "すべて閉じる" : "すべて開く"}</button><span class="sync-i" id="cs-bar">${statBusy.size ? `調査中 ${statRun.done} / ${statRun.total}` : ""}</span>` : "";
   const empty = t === "channels"
     ? (useDummy ? "ダミーのチャンネルを準備しています…" : "登録チャンネルがありません。「YouTubeと同期」を押すと、YouTubeの登録チャンネルを取り込みます。")
     : "このフォルダにはチャンネルがありません。チャンネルの📁ボタンか、ドラッグで追加できます。";
   const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
-  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2>
+  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length !== all.length ? `${list.length} / ${all.length}` : list.length}チャンネル</small></h2>
     <div class="fm2">
-    <div class="fm2-main">${crumb}<div class="ch-bar">${sync}${fa}</div><div class="ch-bar">${stat}</div>${sgPanel(t)}
+    <div class="fm2-main">${crumb}<div class="ch-bar">${sync}${fa}</div><div class="ch-bar">${stat}</div>${all.length ? chPerBar(all, list) : ""}${sgPanel(t)}
     ${list.length ? `<div class="chr-list">${list.map((c) => chRow(c, f ? f.id : "")).join("")}</div>` : `<div class="empty" style="margin:0">${empty}</div>`}</div></div></section>`;
 }
 
@@ -151,6 +151,7 @@ document.addEventListener("click", (e) => {
   if ((b = t("[data-act]"))) {
     const list = chIn(tab);
     if (b.dataset.act === "statsall") return runStats(list.map((c) => c.id));
+    if (b.dataset.act === "statsmiss") return runStats(list.filter((c) => !c.stats).map((c) => c.id));
     if (b.dataset.act === "statsopen") { const all = list.every((c) => chOpen.has(c.id)); list.forEach((c) => all ? chOpen.delete(c.id) : chOpen.add(c.id)); return render(); }
   }
 });
@@ -269,3 +270,74 @@ document.addEventListener("dragstart", hidePv);
 document.addEventListener("click", (e) => { if (e.target.closest("[data-v]")) setTimeout(hidePv, 0); });
 // ページ全体のスクロールで閉じる(ホームの行の自動スクロールなど、要素内のスクロールでは閉じない)
 addEventListener("scroll", (e) => { if ($("pv") && (e.target === document || e.target === document.scrollingElement)) hidePv(); }, true);
+
+/* フォルダを押したときの「一覧」表示: そのフォルダに登録されているチャンネルの動画を、新しい順に並べる(チャンネルの管理は「設定」側の画面)
+   動画は YouTube の「登録チャンネルの新着」から読み(search.js の S.sub)、そのフォルダ(サブフォルダを含む)のチャンネルのものだけを出す */
+function folderListView(t) {
+  const f = data.folders.find((x) => x.id === t), list = chIn(t);
+  curFolderForRow = f ? f.id : "";
+  const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
+  if (!useDummy && !S.sub.started) loadSub(true); // 新着をまだ読んでいなければ、読み始める(読むたびに paintFolderList で描き直す)
+  setTimeout(paintFolderList, 0);
+  const bar = `<div class="ch-bar cs-per"><span class="cs-pl">投稿が</span><span class="cs-sw" role="group" aria-label="期間で絞り込む">${perButtons(flPer, "flper")}</span></div>`;
+  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2>${crumb}${bar}<div id="fl-out"></div></section>`;
+}
+function paintFolderList() {
+  const box = $("fl-out"); if (!box || folderMode !== "list") return;
+  const t = tab, ids = new Set(chIn(t).map((c) => c.id)), st = S.sub;
+  let h = "";
+  if (useDummy) h = `<div class="empty" style="margin:0">ダミー表示中は、動画の一覧は表示されません(設定で切り替えられます)。</div>`;
+  else if (!ids.size) h = `<div class="empty" style="margin:0">このフォルダにはチャンネルがありません。「設定」にして、📁ボタンかドラッグで追加できます。</div>`;
+  else {
+    const items = shown(st.list).filter((v) => { const c = v.channel ? subMap().get(subNorm(v.channel)) : null; return c && ids.has(c.id) && (flPer < 0 || (ageOf(v) ?? Infinity) <= PERIODS[flPer][1] * DAY); }).sort((a, b) => (vDate(b)?.getTime() || 0) - (vDate(a)?.getTime() || 0));
+    if (st.err) h += `<div class="empty" style="margin:12px 0">${esc(st.err)}</div>`;
+    if (items.length) h += mixedGrid(items);
+    if (st.busy) h += `<div class="s-load">読み込み中…${items.length ? `(${items.length}本)` : ""}</div>`;
+    else {
+      if (!items.length && !st.err) h += `<div class="empty" style="margin:0">最近の動画が見つかりません。下の「さらに過去を読む」で、もっと前の動画まで読み込めます。</div>`;
+      h += `<div class="s-more"><button class="btn s" data-act="fl-more">さらに過去を読む(+7日)</button>${st.started ? `<button class="btn s" data-act="fl-reload">⟳ 読み込み直す</button>` : ""}</div>`;
+    }
+  }
+  if (box._h === h) return; // 中身が同じなら描き直さない(ちらつき防止)
+  box._h = h; box.innerHTML = h;
+}
+document.addEventListener("click", (e) => {
+  const m = e.target.closest('[data-act="fl-more"],[data-act="fl-reload"]'); if (!m) return;
+  e.preventDefault(); e.stopPropagation();
+  const st = S.sub;
+  if (m.dataset.act === "fl-more") { st.extra = (st.extra || 0) + 7; st.done = false; loadSub(false); }
+  else { st.extra = 0; loadSub(true); }
+}, true);
+document.addEventListener("click", (e) => { // サイドバーの「設定 / 一覧」の切り替え
+  const b = e.target.closest("[data-fmode]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  folderMode = b.dataset.fmode === "manage" ? "manage" : "list"; ls.set("tf-folder-mode", folderMode); render();
+}, true);
+
+/* ---------- 期間で絞り込む(「3日以内」など) ----------
+   ・設定モードのチャンネル一覧: 「最新の投稿が 〇〇 以内」のチャンネルだけを出す(調べ済みのチャンネルが対象。動画・ライブ・ショートのどれかが期間内)
+   ・一覧モードの動画: 投稿から 〇〇 以内の動画だけを出す(期間が長いときは、新着をさかのぼって読み込む) */
+let chPer = +ls.get("tf-ch-per", "-1"); if (!(chPer >= 0 && chPer < PERIODS.length)) chPer = -1;
+let chKind = ls.get("tf-ch-kind", "all"); if (!["all", "video", "live", "short"].includes(chKind)) chKind = "all"; // 絞り込みで見る投稿の種類
+let flPer = +ls.get("tf-fl-per", "-1"); if (!(flPer >= 0 && flPer < PERIODS.length)) flPer = -1;
+const chPassPer = (c) => !!c.stats && STAT_KINDS.filter(([k]) => chKind === "all" || chKind === k).some(([k]) => { const li = lastInfo(c.stats, k); return li.idx >= 0 && (chPer < 0 || li.idx <= chPer); });
+const perButtons = (cur, attr) => `<button type="button" class="tab ${cur < 0 ? "on" : ""}" data-${attr}="-1">すべて</button>` + PERIODS.map(([n], i) => `<button type="button" class="tab ${cur === i ? "on" : ""}" data-${attr}="${i}">${n}</button>`).join("");
+function chPerBar(all, list) {
+  const miss = all.filter((c) => !c.stats).length;
+  return `<div class="ch-bar cs-per"><span class="cs-pl">最新の投稿が</span><span class="cs-sw" role="group" aria-label="投稿の種類">${[["all", "すべて"], ...STAT_KINDS].map(([k, n]) => `<button type="button" class="tab ${chKind === k ? "on" : ""}" data-chkind="${k}">${k === "all" ? "すべて" : n}</button>`).join("")}</span><span class="cs-pl">の</span><span class="cs-sw" role="group" aria-label="期間で絞り込む">${perButtons(chPer, "chper")}</span>${chPer >= 0 || chKind !== "all" ? `<span class="sync-i">${list.length}件${miss ? ` ・ 未調査の${miss}件は対象外(「未取得を取得」で調べられます)` : ""}</span>` : ""}</div>`;
+}
+document.addEventListener("click", (e) => { // 投稿の種類(すべて / 動画 / ライブ配信 / ショート)
+  const b = e.target.closest("[data-chkind]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); chKind = b.dataset.chkind; ls.set("tf-ch-kind", chKind); render();
+}, true);
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-chper],[data-flper]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (b.dataset.chper !== undefined) { chPer = +b.dataset.chper; ls.set("tf-ch-per", String(chPer)); return render(); }
+  flPer = +b.dataset.flper; ls.set("tf-fl-per", String(flPer));
+  if (flPer >= 0 && !useDummy) { // 選んだ期間まで新着が読み込まれていなければ、さかのぼって読む
+    const need = Math.max(0, PERIODS[flPer][1] - S_DAYS), st = S.sub;
+    if ((st.extra || 0) < need) { st.extra = need; if (st.started) { st.done = false; loadSub(false); } }
+  }
+  render();
+}, true);

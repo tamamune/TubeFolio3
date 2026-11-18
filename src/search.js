@@ -123,7 +123,7 @@ async function loadSub(reset) {
   if (reset) Object.assign(st, { list: [], token: "", done: false, err: "", at: Date.now(), started: true, reached: Infinity });
   if (st.done) return paintSearch();
   st.busy = true; paintSearch();
-  const oldest = lastDays()[S_DAYS - 1].getTime();
+  const oldest = lastDays()[S_DAYS - 1].getTime() - (st.extra || 0) * 864e5; // st.extra: フォルダの一覧で「さらに過去を読む」を押した分の日数
   try {
     for (let n = 0; n < 60; n++) {
       const page = st.token ? await ytMore(st.token) : await ytPage("https://www.youtube.com/feed/subscriptions");
@@ -218,6 +218,7 @@ const moreIO = typeof IntersectionObserver === "function" ? new IntersectionObse
   searchMoreNow();
 }, { rootMargin: "900px 0px" }) : null;
 function paintSearch() { // 結果の部分だけ描き直す(入力欄は触らない)
+  if (typeof paintFolderList === "function") paintFolderList(); // フォルダの一覧(chstats.js)も、新着の読み込みに合わせて描き直す
   const box = $("s-out"); if (!box) return;
   const mode = sMode(), st = S[mode];
   const tn = S_TYPES.find(([k]) => k === sType)[1];

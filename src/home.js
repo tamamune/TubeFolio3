@@ -4,6 +4,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const ls = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 let data = { folders: [], videos: {}, bookmarks: [] };
 let tab = "all", heroI = 0, heroT = null;
+let folderMode = ls.get("tf-folder-mode", "list") === "manage" ? "manage" : "list"; // フォルダを押したときの表示: list = 登録されているチャンネルの一覧 / manage = チャンネルを管理する画面(設定)
 const thumb = (id, k = "mqdefault") => `https://i.ytimg.com/vi/${id}/${k}.jpg`;
 const all = () => Object.entries(data.videos).sort((a, b) => (b[1].savedAt || "").localeCompare(a[1].savedAt || ""));
 const kids = (id) => data.folders.filter((f) => f.parent === id);
@@ -69,7 +70,7 @@ function renderNav() {
   let h = `<button class="ni ${tab === "all" || tab.startsWith("list:") ? "on" : ""}" data-t="all" title="ホーム">${home}<span class="lbl">ホーム</span></button>`;
   h += `<button class="ni ${tab === "search" ? "on" : ""}" data-t="search" title="検索"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">検索</span></button>`;
   h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
-  h += `<div class="nav-h nav-hh"><span>フォルダ</span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
+  h += `<div class="nav-h nav-hh"><span>フォルダ</span><span class="fmode" role="group" aria-label="フォルダを押したときの表示"><button type="button" class="${folderMode === "manage" ? "on" : ""}" data-fmode="manage" title="チャンネルを管理する画面を開く">設定</button><button type="button" class="${folderMode === "list" ? "on" : ""}" data-fmode="list" title="登録されているチャンネルの一覧を開く">一覧</button></span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
   h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
   const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
   // フォルダの「⋯」(名前の変更・サブフォルダ・並べ替え・削除のメニュー。右クリックでも開く。channels.js)
@@ -128,7 +129,7 @@ function renderHero() {
   const [id, v] = picks[heroI];
   picks.forEach(([i, x]) => vmap.set(i, x)); // 「再生する」で開けるように
   const fn = data.folders.find((f) => v.folders?.includes(f.id));
-  return `<section class="hero"><div class="hero-bg" style="background-image:url(${thumb(id, "maxresdefault")}),url(${thumb(id, "hqdefault")})"></div>
+  return `<section class="hero"><div class="hero-bg" data-hv="${id}" style="background-image:url(${thumb(id, "hqdefault")})"></div>
     <div class="hero-in"><span class="badge">${heroI === 0 ? label : "ピックアップ"}</span><h1>${esc(v.title)}</h1><p>${esc(v.channel)}${fn ? " ・ " + esc(fn.name) : ""}</p>
     <div class="btns"><button class="btn p" data-v="${id}">▶ 再生する</button></div></div>
     <div class="dots">${picks.map(([i], n) => `<button class="${n === heroI ? "on" : ""}" data-h="${n}" style="background-image:url(${thumb(i)})" aria-label="${n + 1}"></button>`).join("")}</div></section>`;
@@ -138,6 +139,15 @@ function swapHero() { // ヒーローだけ差し替える(横スクロール中
   const el = $("main").querySelector(".hero"); if (!el) return;
   const t = document.createElement("div"); t.innerHTML = renderHero();
   if (t.firstElementChild) el.replaceWith(t.firstElementChild);
+  fixHeroBg();
+}
+// ヒーローの背景: まず必ずある hqdefault を出し、maxresdefault が本物(幅320px以上)のときだけ差し替える。
+// maxresdefault がない動画は、YouTube が 120x90 の灰色の画像を返し(エラーにならない)、CSSの代わりの指定が効かないため
+function fixHeroBg() {
+  const bg = $("main").querySelector(".hero-bg[data-hv]"); if (!bg) return;
+  const id = bg.dataset.hv, im = new Image();
+  im.onload = () => { if (im.naturalWidth >= 320 && bg.isConnected && bg.dataset.hv === id) bg.style.backgroundImage = `url(${im.src})`; }; // 本物の大きな画像があるときだけ、差し替える(まず hqdefault を出しておく)
+  im.src = thumb(id, "maxresdefault");
 }
 function render() {
   renderNav();
@@ -148,12 +158,13 @@ function render() {
     h += renderHero();
     for (const k of fullOrder()) if (k.startsWith("pl:") ? !hpl.has(k.slice(3)) : on(k)) h += secHtml(k);
   } else {
-    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "bookmarks" ? bookmarksView() : tab === "test" ? testView() : channelsView(tab);
+    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "bookmarks" ? bookmarksView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
   }
   // 描き直しても、横スクロールの行の位置はそのままにする(×で外したときなど)。行は見出しの名前で見分ける(件数は変わるので含めない)
   const rowKey = (r) => (r.querySelector("h2 .h2l") || r.querySelector("h2"))?.firstChild?.textContent || "";
   const pos = new Map([...$("main").querySelectorAll(".row")].map((r) => [rowKey(r), r.querySelector(".track")?.scrollLeft || 0]));
   $("main").innerHTML = h;
+  fixHeroBg();
   for (const r of $("main").querySelectorAll(".row")) { const x = pos.get(rowKey(r)), tr = r.querySelector(".track"); if (x && tr) tr.scrollLeft = x; }
   clearInterval(heroT);
   if ($("main").querySelector(".hero")) heroT = setInterval(() => { if (!$("pl").open) { heroI++; swapHero(); } }, 8000);
