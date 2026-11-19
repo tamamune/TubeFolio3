@@ -47,7 +47,7 @@ $("fd-form").onsubmit = async (e) => {
 $("fd-cancel").onclick = () => $("fd").close();
 async function deleteFolder(id) {
   const ids = desc(id), n = chIn(id).length, sub = ids.length - 1, name = folderName(id);
-  if (!confirm(`フォルダ「${folderName(id)}」を削除しますか?${sub ? `\n中のサブフォルダ(${sub}個)も削除されます。` : ""}${n ? `\n入っているチャンネル(${n})は「未分類」に戻ります(チャンネル自体は消えません)。` : ""}`)) return;
+  if (!await uiConfirm(`フォルダ「${folderName(id)}」を削除しますか?${sub ? `\n中のサブフォルダ(${sub}個)も削除されます。` : ""}${n ? `\n入っているチャンネル(${n})は「未分類」に戻ります(チャンネル自体は消えません)。` : ""}`)) return;
   data.folders = data.folders.filter((f) => !ids.includes(f.id));
   for (const c of Object.values(data.channels || {})) c.folders = (c.folders || []).filter((x) => !ids.includes(x));
   for (const v of Object.values(data.videos)) v.folders = (v.folders || []).filter((x) => !ids.includes(x));
@@ -345,7 +345,7 @@ async function sgAddAll(fid) {
   const f = data.folders.find((x) => x.id === fid); if (!f) return;
   const list = suggestions(f, titlesByChannel());
   if (!list.length) return;
-  if (list.length > 20 && !confirm(`${list.length}件を「${folderName(fid)}」に追加します。よろしいですか?`)) return;
+  if (list.length > 20 && !await uiConfirm(`${list.length}件を「${folderName(fid)}」に追加します。よろしいですか?`)) return;
   for (const { c } of list) c.folders = [...new Set([...(c.folders || []), fid])];
   await persist(); render(); toast(`${list.length}件を「${folderName(fid)}」に追加しました`);
 }

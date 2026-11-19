@@ -934,3 +934,12 @@ kbd{display:inline-block;min-width:1.4em;padding:0 5px;border:1px solid #444;bor
 .vbar .pord{margin-right:auto}
 .vbar .pord{display:inline-flex;align-items:center;gap:8px}
 .pord-l{color:var(--muted);font-size:13px}
+
+/* 確認の画面(askDlg) */
+dialog.ask{box-sizing:border-box;width:min(460px,calc(100vw - 32px));padding:20px;border:1px solid #333;border-radius:14px;background:#161616;color:#eee}
+dialog.ask::backdrop{background:rgba(0,0,0,.6)}
+dialog.ask h3{margin:0 0 10px;font-size:16px}
+dialog.ask p{margin:0 0 16px;font-size:14px;line-height:1.6;white-space:pre-wrap}
+.ask-b{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.ask-b .btn{min-height:38px;padding:0 16px;border-radius:999px}
+@media (max-width:520px){.ask-b{flex-direction:column}.ask-b .btn{width:100%}}

@@ -87,7 +87,7 @@ const tgCopy = (text, what) => navigator.clipboard.writeText(text).then(() => to
 // 選んだタグ(tg.sel)を、取り置き・取り置き解除・削除にする。保存の直前に読み直して、再生画面の側で増えた記録を消さない
 async function tgApplySel(act) {
   const keys = new Set(tg.sel), picked = tgAgg().filter((e) => keys.has(tgKey(e))); if (!picked.length) return;
-  if (act === "del" && !confirm(`${picked.length}件のタグを削除しますか?\n記録から消し、今後も記録しません(下の「記録しないタグ」から元に戻せます)。\n\n${picked.slice(0, 12).map(tgLabel).join("、")}${picked.length > 12 ? " ほか" : ""}`)) return;
+  if (act === "del" && !await uiConfirm(`${picked.length}件のタグを削除しますか?\n記録から消し、今後も記録しません(下の「記録しないタグ」から元に戻せます)。\n\n${picked.slice(0, 12).map(tgLabel).join("、")}${picked.length > 12 ? " ほか" : ""}`)) return;
   await tgLoad();
   const L = tg.log;
   if (act === "keep") { const have = tgSet(L.keep); for (const e of picked) if (!have.has(tgKey(e))) L.keep.push(tgId(e)); }
@@ -117,7 +117,7 @@ $("set-tags").addEventListener("click", async (ev) => {
   if (t("[data-tgmore]")) { tg.limit += 300; return paintTags(); }
   if (t("[data-tgcopyall]")) { const l = tg.view.map(tgLabel); return l.length ? tgCopy(l.join(tg.kind === "hash" ? " " : ", "), `${l.length}件`) : toast("コピーするものがありません"); }
   if (t("[data-tgclear]")) {
-    if (!confirm("記録したタグ・ハッシュタグを、すべて消しますか?(元に戻せません)\n取り置き・記録しないタグ・最大保存数の設定は残ります。")) return;
+    if (!await uiConfirm("記録したタグ・ハッシュタグを、すべて消しますか?(元に戻せません)\n取り置き・記録しないタグ・最大保存数の設定は残ります。")) return;
     await tgLoad(); tg.log.v = {}; await tgSave(); tg.open = ""; toast("記録をすべて消しました"); paintTags();
   }
 });
@@ -126,7 +126,7 @@ $("set-tags").addEventListener("change", async (ev) => {
   if (ev.target.id !== "tg-max") return;
   await tgLoad(); tg.log.max = +ev.target.value || 0;
   const all = tgAgg().length, nKeep = tgAgg().filter((e) => e.kept).length;
-  if (tg.log.max && all > tg.log.max && !confirm(`いま ${all}種類あります。最大を ${tg.log.max}種類にすると、取り置き以外で最後に見たのが古い ${Math.min(all - tg.log.max, all - nKeep)}種類を消します。よろしいですか?`)) { tg.log = null; return paintTags(); }
+  if (tg.log.max && all > tg.log.max && !await uiConfirm(`いま ${all}種類あります。最大を ${tg.log.max}種類にすると、取り置き以外で最後に見たのが古い ${Math.min(all - tg.log.max, all - nKeep)}種類を消します。よろしいですか?`)) { tg.log = null; return paintTags(); }
   const n = tgPrune(tg.log); await tgSave();
   toast(n ? `${n}種類を自動で消しました` : tg.log.max ? `最大保存数を ${tg.log.max}種類にしました` : "最大保存数を無制限にしました");
   paintTags();

@@ -53,7 +53,7 @@ document.addEventListener("click", async (e) => {
   }
   if ((b = t("[data-bmrm]"))) {
     e.preventDefault(); e.stopPropagation(); const id = b.dataset.bmrm, m = data.marks?.[id]; if (!m) return;
-    if (m.notes?.length && !confirm(`「${m.title || id}」をブックマークから外します。メモ ${m.notes.length}件も消えます。よろしいですか?`)) return;
+    if (m.notes?.length && !await uiConfirm(`「${m.title || id}」をブックマークから外します。メモ ${m.notes.length}件も消えます。よろしいですか?`)) return;
     delete data.marks[id]; return chrome.storage.local.set({ [KEY]: data });
   }
 }, true);

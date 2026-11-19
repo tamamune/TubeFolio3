@@ -720,3 +720,20 @@ let plOrd = ls.get("tf-pl-ord", "old") === "new" ? "new" : "old";
 const plOrdered = (items) => (plOrd === "new" ? [...items].reverse() : items);
 const ordSeg = () => `<span class="pord"><span class="pord-l">登録順</span><div class="vseg" role="radiogroup" aria-label="登録順の並び">${[["new", "新しい順"], ["old", "古い順"]].map(([v, l]) => `<button type="button" class="${plOrd === v ? "on" : ""}" data-plord="${v}" role="radio" aria-checked="${plOrd === v}" title="登録した順で${l}に並べる">${l}</button>`).join("")}</div></span>`;
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-plord]"); if (!b || b.dataset.plord === plOrd) return; plOrd = b.dataset.plord; ls.set("tf-pl-ord", plOrd); render(); });
+
+/* ページの中に出す確認の画面(confirm() の代わり)。モバイル版のブラウザでは、拡張機能のページで confirm() が表示されないことがあるため
+   askDlg(題, 本文, [[値, ボタンの文字, "p"(強調) | "s"], ...]) → 押したボタンの値(閉じたときは "") */
+function askDlg(title, msg, btns) {
+  return new Promise((res) => {
+    const d = document.createElement("dialog"); d.className = "ask";
+    d.innerHTML = `<h3></h3><p></p><div class="ask-b"></div>`;
+    d.querySelector("h3").textContent = title; d.querySelector("h3").hidden = !title; d.querySelector("p").textContent = msg;
+    let val = "";
+    for (const [v, label, cls] of btns) { const b = document.createElement("button"); b.type = "button"; b.className = "btn " + (cls || "s"); b.textContent = label; b.onclick = () => { val = v; d.close(); }; d.querySelector(".ask-b").append(b); }
+    d.addEventListener("close", () => { d.remove(); res(val); });
+    d.addEventListener("click", (e) => { if (e.target === d) d.close(); }); // 外側を押したら閉じる(やめる)
+    document.body.append(d); d.showModal();
+    d.querySelector(".btn.p")?.focus();
+  });
+}
+const uiConfirm = async (msg, ok = "OK") => (await askDlg("", msg, [["ok", ok, "p"], ["", "キャンセル", "s"]])) === "ok";

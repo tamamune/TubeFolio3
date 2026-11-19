@@ -144,7 +144,8 @@ async function dsSync(mode = "auto", user = false) {
       if (!remote) act = "push";
       else if ((remote.rev || 0) > base && dirty) {
         if (!user) { dsMsg = "ドライブとこのパソコンの両方が変更されています(「今すぐ同期」で選べます)"; if (!dsWarned) { dsWarned = true; toast("ドライブとこのパソコンの両方が変更されています。設定の「同期」で「今すぐ同期」を押してください"); } return; }
-        act = confirm("ドライブの内容と、このパソコンの内容の両方が変更されています。\n\nOK: ドライブの内容を使う(このパソコンの変更は、書き換える前の内容として残りません)\nキャンセル: このパソコンの内容でドライブを上書きする(ドライブの前の内容は tubefolio-sync.prev.json に残ります)") ? "pull" : "push";
+        act = await askDlg("ドライブとこのパソコンの両方が変更されています", "どちらの内容を使いますか?\n・ドライブの内容を使う: このパソコンの変更は消えます\n・このパソコンの内容を使う: ドライブを上書きします(前の内容は tubefolio-sync.prev.json に残ります)", [["pull", "ドライブの内容を使う", "p"], ["push", "このパソコンの内容を使う", "s"], ["", "やめる", "s"]]);
+        if (!act) { dsMsg = "同期をやめました"; return; }
       } else if ((remote.rev || 0) > base) act = "pull";
       else if (dirty) act = "push";
       else act = "none";
@@ -227,8 +228,8 @@ document.addEventListener("click", async (e) => {
   if (a === "copy") { try { await navigator.clipboard.writeText(dsRedirect()); toast("リダイレクト URI をコピーしました"); } catch { toast("コピーできませんでした"); } return; }
   if (a === "login") return dsSync("auto", true);
   if (a === "logout") { dsToken = null; ls.set("tf-sync-tok", "null"); ls.set("tf-sync-conn", "0"); dsMsg = "ログアウトしました(自動同期を止めました)"; return paintSync(); }
-  if (a === "push") { if (!confirm("このパソコンの内容で、ドライブのデータを上書きします。よろしいですか?\n(上書き前の内容は tubefolio-sync.prev.json に残ります)")) return; return dsSync("push", true); }
-  if (a === "pull") { if (!confirm("ドライブの内容で、このパソコンのフォルダ・動画・設定を上書きします。よろしいですか?")) return; return dsSync("pull", true); }
+  if (a === "push") { if (!await uiConfirm("このパソコンの内容で、ドライブのデータを上書きします。よろしいですか?\n(上書き前の内容は tubefolio-sync.prev.json に残ります)")) return; return dsSync("push", true); }
+  if (a === "pull") { if (!await uiConfirm("ドライブの内容で、このパソコンのフォルダ・動画・設定を上書きします。よろしいですか?")) return; return dsSync("pull", true); }
 });
 
 /* ---------- 起動時と定期的な自動同期 ---------- */
