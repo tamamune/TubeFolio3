@@ -50,6 +50,8 @@ html:not([dark]) .tf-tab.on{background:#0f0f0f;color:#fff}
 .tf-ytp svg{display:block}
 /* コメント欄を隠す(表示の負荷を減らす) */
 html.tf-hide-cm ytd-comments#comments,html.tf-hide-cm #comments.ytd-watch-flexy{display:none!important}
+/* おすすめ一覧(右側・または動画の下)を隠す。再生リストやチャットは残す */
+html.tf-hide-rel ytd-watch-flexy #related{display:none!important}
 /* 翻訳したコメントの印 */
 /* 翻訳したコメントの印(文の最後に、少し空けて翻訳アイコン) */
 .tf-trb{display:inline-block;margin-left:.4em;vertical-align:-.12em;line-height:1;font-size:.95em;opacity:.9;filter:drop-shadow(0 0 2px #000)}
@@ -116,6 +118,10 @@ html.tf-hide-cm ytd-comments#comments,html.tf-hide-cm #comments.ytd-watch-flexy{
 .tf-tags{display:flex;flex-wrap:wrap;gap:6px;padding:2px 4px 8px}
 .tf-tag{padding:4px 10px;border-radius:999px;background:rgba(128,128,128,.22);color:inherit;font-size:13px;text-decoration:none}
 .tf-tag:hover{background:rgba(128,128,128,.4)}
+.tf-tag.hash{color:#3ea6ff}
+.tf-tgh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 6px 4px;font-size:13px}
+.tf-tgh + .tf-em{padding-top:2px}
+.tf-tags + .tf-tgh,.tf-em + .tf-tgh{border-top:1px solid rgba(128,128,128,.25);margin-top:4px}
 
 /* 一覧を小さめに */
 .tf-tsp{width:300px;padding:6px 10px 8px;font-size:12.5px}
@@ -137,3 +143,109 @@ html[data-tf-acc=gray]{--tf-acc:#d0d0d0;--tf-acc-t:#cfcfcf;--tf-acc-a:208,208,20
 .tf-tsx{display:flex;align-items:baseline;gap:8px;overflow:hidden;white-space:nowrap}
 .tf-tsx span{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .tf-tsx small{display:inline;flex:none;max-width:35%;overflow:hidden;text-overflow:ellipsis}
+
+/* プレーヤーの「⋯」(設定)メニュー: 上のタブで「コメント表示」と「SponsorBlock」を切り替える */
+.tf-mtabs{display:flex;gap:3px;padding:3px;margin:2px 0 4px;border-radius:999px;background:rgba(255,255,255,.12)}
+.tf-mtabs button{flex:1;height:30px;border:0;border-radius:999px;background:none;color:#fff;font:500 13px Roboto,Arial,sans-serif;cursor:pointer;opacity:.75}
+.tf-mtabs button:hover{opacity:1}
+.tf-mtabs button.on{background:#fff;color:#0f0f0f;opacity:1}
+.tf-mpane[hidden]{display:none}
+
+/* SponsorBlock */
+.tf-sbbar{position:absolute;inset:0;pointer-events:none;z-index:40}
+.tf-sbm{position:absolute;top:0;bottom:0;opacity:.75;min-width:2px}
+.tf-sbm.poi{width:4px;margin-left:-2px;border-radius:1px;opacity:1}
+#movie_player.ad-showing .tf-sbbar{display:none}
+.tf-sbd{flex:none;display:inline-block;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.tf-sbn{position:absolute;left:12px;bottom:66px;z-index:71;display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;border-radius:999px;background:rgba(28,28,28,.92);color:#fff;font:13px Roboto,Arial,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.5);cursor:default}
+.tf-sbt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf-sbu{flex:none;height:26px;padding:0 12px;border:0;border-radius:999px;background:rgba(var(--tf-acc-a,255,180,0),.22);color:var(--tf-acc-t,#e0b84c);font:500 12.5px Roboto,Arial,sans-serif;cursor:pointer}
+.tf-sbu:hover{background:rgba(var(--tf-acc-a,255,180,0),.35)}
+.tf-sbx{flex:none;width:26px;height:26px;border:0;border-radius:50%;background:none;color:#ccc;font:16px/1 Roboto,Arial,sans-serif;cursor:pointer}
+.tf-sbx:hover{background:rgba(255,255,255,.12);color:#fff}
+.tf-sbk{position:absolute;right:12px;bottom:66px;z-index:71;display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(28,28,28,.9);color:#fff;font:500 14px Roboto,Arial,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:opacity .2s}
+.tf-sbk:hover{background:rgba(60,60,60,.95)}
+.tf-sbi{opacity:.85}
+#movie_player.ytp-autohide .tf-sbk.hl{opacity:0;pointer-events:none}
+.tf-sbh{padding:12px 0 4px;font-size:12px;font-weight:500;color:#aaa;border-top:1px solid rgba(255,255,255,.12);margin-top:4px}
+.tf-sbe{padding:4px 0 6px;color:#aaa;font-size:12.5px}
+.tf-sbe.bad{color:#ff7b7b}
+.tf-cmenu .tf-tsx{align-items:center}
+.tf-cmenu .tf-tsx .tf-sbd{margin-right:-2px}
+.tf-sbr{min-height:40px}
+.tf-sbr .tf-cml{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;font-weight:400;font-size:13px}
+.tf-sbsel{flex:none;height:28px;padding:0 6px;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:#2b2b2b;color:#fff;font:13px Roboto,Arial,sans-serif;cursor:pointer}
+.tf-sbsel option{background:#2b2b2b;color:#fff}
+.tf-sbf{display:flex;flex-direction:column;gap:4px;padding:10px 0 4px;border-top:1px solid rgba(255,255,255,.12);margin-top:4px;color:#aaa;font-size:12px}
+.tf-sbf a{color:var(--tf-acc-t,#e0b84c);text-decoration:none}
+.tf-sbf a:hover{text-decoration:underline}
+/* 動画全体がスポンサーなどのとき、題名の前に付ける印 */
+.tf-sbfull{display:inline-block;margin-right:8px;padding:2px 10px;border-radius:999px;background:var(--c);color:#fff;font:500 12px/1.6 Roboto,Arial,sans-serif;vertical-align:middle;text-shadow:0 0 2px #000,0 0 1px #000}
+
+/* 字幕(subtitles.js): YouTube 自身の字幕は隠し、自分で描く */
+#movie_player.tf-subon .ytp-caption-window-container{opacity:0!important;pointer-events:none!important}
+.tf-dsub{position:absolute;left:50%;bottom:11%;transform:translateX(-50%);z-index:60;width:max-content;max-width:82%;text-align:center;pointer-events:none;font-family:Roboto,"Noto Sans JP",Arial,sans-serif;line-height:1.35}
+.tf-dsub:empty{display:none}
+.tf-dsub > div{display:block;margin:2px auto 0;padding:.1em .45em;border-radius:4px;background:rgba(8,8,8,.78);color:#fff;text-shadow:0 1px 2px #000;width:fit-content;max-width:100%}
+.tf-dsub .tf-dsub-o{font-size:.78em;color:#d8d8d8}
+.tf-dsub .tf-dsub-j{font-weight:600}
+.tf-subh{margin:6px 0 2px;font-size:12px;line-height:1.5;opacity:.7}
+.tf-subs{margin:6px 0 2px;font-size:12px;color:var(--tf-acc,#ffb400)}
+.tf-subs:empty{display:none}
+.tf-subs{white-space:pre-line}
+
+/* ブックマークのメモ(再生中に B キー) */
+.tf-memo{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:80;width:min(460px,calc(100% - 32px));max-height:calc(100% - 100px);overflow:auto;padding:12px 14px;border-radius:12px;background:rgba(18,18,18,.94);border:1px solid #333;box-shadow:0 8px 30px rgba(0,0,0,.6);color:#eee;font:13px/1.5 Roboto,"Noto Sans JP",sans-serif;text-align:left}
+.tf-memo-h{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:14px}
+.tf-memo-t{padding:1px 8px;border-radius:999px;background:#ffb400;color:#000;font-weight:700;font-variant-numeric:tabular-nums}
+.tf-memo-x{margin-left:auto;width:26px;height:26px;border:0;border-radius:50%;background:none;color:#aaa;cursor:pointer;font-size:13px}
+.tf-memo-x:hover{background:#333;color:#fff}
+.tf-memo-in{display:block;box-sizing:border-box;width:100%;resize:vertical;padding:8px 10px;border:1px solid #3a3a3a;border-radius:8px;background:#0b0b0b;color:#fff;font:inherit;font-size:14px;outline:0}
+.tf-memo-in:focus{border-color:#888}
+.tf-memo-f{display:flex;align-items:center;gap:10px;margin-top:8px}
+.tf-memo-f small{color:#888;font-size:11.5px}
+.tf-memo-ok{margin-left:auto;height:30px;padding:0 16px;border:0;border-radius:999px;background:#ffb400;color:#000;font-weight:700;cursor:pointer}
+.tf-memo-l{margin-top:10px}
+.tf-memo-l:empty{display:none}
+.tf-memo-lh{margin-bottom:4px;padding-top:8px;border-top:1px solid #2c2c2c;color:#999;font-size:12px}
+.tf-memo-r{display:flex;align-items:flex-start;gap:8px;padding:4px 0}
+.tf-memo-tb{flex:none;min-width:42px;text-align:left;border:0;background:none;color:#6cb6ff;font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;padding:0}
+.tf-memo-tb:hover{text-decoration:underline}
+.tf-memo-tx{flex:1;white-space:pre-wrap;word-break:break-word}
+.tf-memo-del{flex:none;width:22px;height:22px;border:0;border-radius:50%;background:none;color:#777;cursor:pointer;font-size:11px}
+.tf-memo-del:hover{background:#c33;color:#fff}
+.tf-memo-toast{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:80;padding:8px 16px;border-radius:999px;background:rgba(0,0,0,.85);color:#fff;font:14px Roboto,"Noto Sans JP",sans-serif;pointer-events:none}
+.tf-memo-im{width:64px;height:36px;object-fit:cover;border-radius:5px;background:#000}
+.tf-memo-tx{cursor:text;border-radius:5px;padding:0 4px;margin:0 -4px}
+.tf-memo-tx:hover{background:#262626}
+.tf-memo-ed{font-size:13px;padding:5px 8px;border-color:#ffb400}
+.tf-memo-eb{flex:none;width:22px;height:22px;border:0;border-radius:50%;background:none;color:#aaa;cursor:pointer;font-size:13px}
+.tf-memo-eb:hover{background:#333;color:#fff}
+
+/* 動画の終わりの YouTube のおすすめ(設定の一般) */
+html.tf-hide-end .html5-endscreen,html.tf-hide-end .ytp-endscreen-content,html.tf-hide-end .videowall-endscreen,html.tf-hide-end .ended-mode .ytp-fullscreen-grid{display:none!important}
+/* 新しいプレーヤーでは、終わったあとの動画の一覧が「全画面のグリッド」(ytp-fullscreen-grid)に出る。再生中のグリッドは隠さず、終わったとき(ended-mode)だけ隠す */
+html.tf-hide-ce .ytp-ce-element,html.tf-hide-ce .ytp-ce-covering-overlay{display:none!important}
+
+/* TubeFolio3 のおすすめ(動画の終わり・4本) */
+html.tf-end-on .html5-endscreen,html.tf-end-on .ytp-endscreen-content,html.tf-end-on .ended-mode .ytp-fullscreen-grid,html.tf-end-on .ytp-autonav-endscreen-countdown-overlay{display:none!important}
+.tf-end{position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;justify-content:safe center;overflow-y:auto;gap:12px;padding:20px 28px 64px;background:rgba(0,0,0,.82);color:#fff;font-family:Roboto,"Noto Sans JP",sans-serif;text-align:left}
+.tf-end-h{display:flex;align-items:center;gap:10px;font-size:15px}
+.tf-end-h b{margin-right:auto}
+.tf-end-re,.tf-end-x{height:30px;padding:0 12px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(0,0,0,.4);color:#ddd;font-size:13px;cursor:pointer}
+.tf-end-x{width:30px;padding:0}
+.tf-end-re:hover,.tf-end-x:hover{background:#333;color:#fff}
+.tf-end-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tf-end-c{display:flex;flex-direction:column;gap:6px;min-width:0;color:#fff;text-decoration:none}
+.tf-end-th{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#222;outline:2px solid transparent;transition:outline-color .15s}
+.tf-end-c:hover .tf-end-th{outline-color:var(--tf-acc,#ffb400)}
+.tf-end-th img{display:block;width:100%;height:100%;object-fit:cover}
+.tf-end-d{position:absolute;right:6px;bottom:6px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.8);font-size:12px;font-weight:600}
+.tf-end-n{position:absolute;left:6px;top:6px;padding:1px 8px;border-radius:999px;background:rgba(0,0,0,.75);font-size:12px;font-weight:700}
+.tf-end-c:first-child .tf-end-n{background:var(--tf-acc,#ffb400);color:#000}
+.tf-end-t{font-size:14px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tf-end-m{color:#bbb;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#movie_player.ytp-xsmall-width-mode .tf-end,#movie_player.ytp-small-mode .tf-end{padding:10px 12px 52px}
+#movie_player.ytp-xsmall-width-mode .tf-end-g{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#movie_player.ytp-xsmall-width-mode .tf-end-t{font-size:12px;-webkit-line-clamp:1}
+#movie_player.ytp-xsmall-width-mode .tf-end-m{display:none}

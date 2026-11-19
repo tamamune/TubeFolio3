@@ -12,8 +12,8 @@
   "web_accessible_resources": [
     { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*"] }
   ],
-  "permissions": ["storage", "declarativeNetRequest", "cookies", "identity"],
-  "host_permissions": ["https://www.youtube.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*"],
+  "permissions": ["storage", "unlimitedStorage", "declarativeNetRequest", "cookies", "identity"],
+  "host_permissions": ["https://www.youtube.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/content.js"],
+      "js": ["src/sponsorblock.js", "src/subtitles.js", "src/endscreen.js", "src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_idle"
     }

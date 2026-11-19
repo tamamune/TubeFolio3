@@ -79,6 +79,15 @@ chrome.action.onClicked.addListener(async () => {
 // ヘッダーのボタンから管理ページを開く / YouTube のページから、再生リスト・チャンネル登録の操作を受け付ける
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg === "tf-open-manager") { chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") }); return; }
+  // SponsorBlock: 動画IDのハッシュの先頭4文字で問い合わせ、返ってきた候補から、その動画の区間だけを返す
+  if (msg?.tf === "sb") {
+    if (!/^[0-9a-f]{4}$/.test(msg.prefix || "") || !/^[\w-]{11}$/.test(msg.vid || "")) { reply({ ok: false, error: "動画IDが正しくありません" }); return; }
+    const q = new URLSearchParams({ categories: JSON.stringify(msg.cats || ["sponsor"]), actionTypes: JSON.stringify(["skip", "mute", "full", "poi"]) });
+    fetch(`https://sponsor.ajay.app/api/skipSegments/${msg.prefix}?${q}`)
+      .then((r) => (r.status === 404 ? [] : r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+      .then((list) => reply({ ok: true, r: (Array.isArray(list) ? list : []).find((x) => x.videoID === msg.vid)?.segments || [] }), (e) => reply({ ok: false, error: e?.message || String(e) }));
+    return true;
+  }
   if (msg?.tf === "yta" && typeof YTA?.[msg.op] === "function") {
     YTA[msg.op](...(msg.args || [])).then((r) => reply({ ok: true, r }), (e) => reply({ ok: false, error: e?.message || String(e) }));
     return true; // 非同期で返事をする

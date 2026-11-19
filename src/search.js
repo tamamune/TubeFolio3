@@ -250,7 +250,11 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
     else if (mode === "rec" && st.started) h += `<div class="s-more"><button class="btn s" data-act="s-reload">⟳ 読み込み直す</button></div>`;
   }
   if (box._h === h) return; // 中身が同じなら描き直さない(ちらつき防止)
+  // 横並びの棚(ショート)の左右の位置は、描き直しても保つ
+  // (ショートの日付などを後から取ってくるたびに描き直すので、保たないと矢印で送っても先頭に戻ってしまっていた)
+  const keepX = new Map([...box.querySelectorAll(".row")].map((r) => [r.querySelector("h2")?.textContent || "", r.querySelector(".track")?.scrollLeft || 0]));
   box._h = h; box.innerHTML = h;
+  box.querySelectorAll(".row").forEach((r) => { const x = keepX.get(r.querySelector("h2")?.textContent || ""), tr = r.querySelector(".track"); if (x && tr) tr.scrollLeft = x; });
   if (moreIO) { moreIO.disconnect(); const b = box.querySelector('[data-act="s-more"]'); if (b) moreIO.observe(b); } // 描き直すたびに、新しい「もっと見る」を見張り直す
 }
 

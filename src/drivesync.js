@@ -22,7 +22,7 @@ const dsMarkLocal = () => { if (!dsApplying) ls.set("tf-sync-dirty", "1"); }; //
   chrome.storage.onChanged.addListener((c) => { if (!c[KEY]) return; if (dsSkipStore) { dsSkipStore = false; return; } if (!dsApplying) { dsMarkLocal(); dsSoon(); } });
 })();
 // YouTube の再生画面のコメント表示の設定(chrome.storage の tf-cm-…)。拡張機能のどのページからも読み書きされるので、localStorage ではなくこちらに持つ
-const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode"];
+const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode", "tf-rel-mode", "tf-end-mode", "tf-end-tf", "tf-end-slots", "tf-end-at", ...["on", "bar", "notice", "cats"].map((k) => "tf-sb-" + k)];
 let dsCmSkipUntil = 0;
 chrome.storage.onChanged.addListener((c) => { if (Date.now() < dsCmSkipUntil || dsApplying) return; if (DS_CMKEYS.some((k) => k in c)) { dsMarkLocal(); dsSoon(); } });
 const dsSoon = () => { clearTimeout(dsTimer); dsTimer = setTimeout(() => dsSync("auto", false), 10000); }; // 変更の10秒後に自動で同期する
@@ -152,7 +152,7 @@ async function dsSync(mode = "auto", user = false) {
 }
 
 /* ---------- 同期の内容を見る(何が同期され、何が同期されないか) ---------- */
-const DS_NAMES = { "コメント表示の設定": "コメント表示の設定(YouTube の再生画面)", folders: "フォルダ", videos: "保存した動画", bookmarks: "ブックマーク", channels: "チャンネル(フォルダ分け・調査結果)", playlists: "再生リストの控え",
+const DS_NAMES = { "コメント表示の設定": "コメント表示・SponsorBlock の設定(YouTube の再生画面)", folders: "フォルダ", videos: "保存した動画", bookmarks: "ブックマーク", channels: "チャンネル(フォルダ分け・調査結果)", playlists: "再生リストの控え",
   "tf-home-cache": "ホームの一覧のキャッシュ", "tf-accent": "色の変更", "tf-sub-style": "登録済みチャンネルの見分け方", "tf-date-mode": "日付の表記", "tf-home-hidden": "ホームで非表示の行", "tf-home-hpl": "非表示の再生リスト",
   "tf-acct": "YouTubeアカウントの控え", "tf-ch-sync": "登録チャンネルの取得状況", "tf-watched": "視聴済みの印", "tf-home-dummy": "ダミー表示", "tf-sync-cid": "同期のクライアントID", "tf-sync-conn": "同期のログイン状態", "tf-sync-tok": "同期のトークン" };
 const dsName = (k) => DS_NAMES[k] || k;

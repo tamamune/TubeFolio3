@@ -2,6 +2,46 @@
    youtube.com 自身が使っている非公式の youtubei API を、ログイン中のアカウントとして呼び出す。
    公式APIではないので、YouTube の仕様変更で動かなくなることがある。
    ※ 本物のアカウントに書き込む。自分の再生リストの削除は YouTube 上でも元に戻せない。 */
+/* 翻訳(Google 翻訳の無料の窓口)。
+   調べた結果: client=gtx(translate_a/single)は、たくさん送ると「自動送信」と見なされて断られる(HTMLの Sorry ページが返る)。
+   client=dict-chrome-ex(translate_a/t)は、q を複数付けると、文ごとに [[訳, 元の言語], …] で返す。こちらを使い、まとめて送る。
+   断られたら 1分間は送らず、待っている依頼もすぐに失敗で返す(待たせ続けると、コメントがいつまでも出ないため) */
+const trQ = []; let trBusy = false, trBlock = 0;
+const TR_BLOCK_MSG = "翻訳の窓口が一時的に断っています(1分ほどで戻ります)";
+async function trFetch(texts) { // 返すのは texts と同じ順の { text, src } の配列
+  const res = await fetch("https://translate.googleapis.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ja&" + texts.map((t) => "q=" + encodeURIComponent(t)).join("&"));
+  const raw = await res.text(); let j;
+  try { j = JSON.parse(raw); } catch { throw Object.assign(new Error(TR_BLOCK_MSG + "(HTTP " + res.status + ")"), { limited: true }); }
+  if (!Array.isArray(j)) throw new Error("翻訳の結果を読めませんでした");
+  return texts.map((_, i) => { const x = j[i]; return Array.isArray(x) ? { text: String(x[0] ?? ""), src: String(x[1] ?? "") } : typeof x === "string" ? { text: x, src: "" } : null; });
+}
+async function trPump() {
+  if (trBusy) return; trBusy = true;
+  while (trQ.length) {
+    const job = trQ.shift();
+    if (Date.now() < trBlock) { job.reject(new Error(TR_BLOCK_MSG)); continue; }
+    try {
+      if (job.many) job.resolve(await trFetch(job.many));
+      else { const r = (await trFetch([job.text]))[0]; if (!r) throw new Error("翻訳の結果が空でした"); job.resolve(r); }
+    } catch (e) {
+      if (e.limited) trBlock = Date.now() + 60000;
+      job.reject(e);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  trBusy = false;
+}
+// 文の配列を、URLに入る長さごとにまとめる
+function trChunks(texts) {
+  const out = []; let cur = [], len = 0;
+  for (const t of texts) {
+    const n = encodeURIComponent(t).length + 3;
+    if (cur.length && len + n > 6000) { out.push(cur); cur = []; len = 0; }
+    cur.push(t); len += n;
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
 const YTA = (() => {
   let cfg = null; // { context, version }: youtube.com のページに埋め込まれているクライアント情報
 
@@ -126,10 +166,24 @@ const YTA = (() => {
     },
     // 動画のタグ(投稿者が設定した、画面には出ないキーワード)
     tags: async (videoId) => (await post("player", { videoId })).videoDetails?.keywords || [],
+    // 動画のタグと概要欄(ハッシュタグを取り出す用)。返すのは { keywords, description, title, channel }
+    videoMeta: async (videoId) => { const d = (await post("player", { videoId })).videoDetails || {}; return { keywords: d.keywords || [], description: d.shortDescription || "", title: d.title || "", channel: d.author || "" }; },
     // コメントの翻訳(日本語へ)。公開コメントの文だけを、Google 翻訳の無料の窓口に送る。返すのは { text: 翻訳, src: 元の言語 }
-    translate: async (text) => {
-      const j = await (await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=" + encodeURIComponent(String(text).slice(0, 400)))).json();
-      return { text: (j[0] || []).map((x) => x[0]).join(""), src: j[2] || "" };
+    // 一度に大量に送ると、窓口から断られる(HTMLが返る)ので、1件ずつ間を空けて送る。字幕(prio)はコメントより先に処理する。断られたら少し待ってやり直す
+    translate: (text, prio) => new Promise((resolve, reject) => {
+      const job = { text: String(text).slice(0, 400), resolve, reject };
+      if (prio) trQ.unshift(job); else trQ.push(job);
+      trPump();
+    }),
+    // 複数の文をまとめて翻訳する(コメント用)。返すのは texts と同じ順の { text, src } の配列(訳せなかった所は null)
+    translateMany: async (texts) => {
+      const list = (texts || []).map((t) => String(t).replace(/\s+/g, " ").trim().slice(0, 400)), out = [];
+      for (const chunk of trChunks(list)) {
+        let r = null;
+        try { r = await new Promise((resolve, reject) => { trQ.push({ many: chunk, resolve, reject }); trPump(); }); } catch { r = null; }
+        out.push(...(r || chunk.map(() => null)));
+      }
+      return out;
     },
     // チャンネル登録・解除(params は YouTube の登録ボタンが使っている固定の値)
     subscribe: (channelId) => post("subscription/subscribe", { channelIds: [channelId], params: "EgIIAhgA" }),

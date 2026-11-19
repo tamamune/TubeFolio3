@@ -173,13 +173,14 @@ function render() {
 // 再生方法(設定): "embed" = このページ内の埋め込み / "yt" = YouTubeを新しいタブで開く(YouTubeの履歴に残る)
 // 設定はクリックのたびに読むので、変えるとすぐに反映される
 const playOnYt = () => ls.get("tf-play-mode", "embed") === "yt";
-function openV(id) {
+function openV(id, start) { // start: 再生を始める秒(ブックマークのメモから)
   const v = data.videos[id] || vmap.get(id), short = v?.kind === "short"; // ショートは縦長のプレイヤーで再生する
-  const ytUrl = short ? `https://www.youtube.com/shorts/${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  const at = start > 0 ? Math.floor(start) : 0;
+  const ytUrl = short && !at ? `https://www.youtube.com/shorts/${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}${at ? `&t=${at}s` : ""}`;
   if (playOnYt()) return void window.open(ytUrl, "_blank", "noopener");
   if (!v) return;
   $("pl").classList.toggle("short", short);
-  $("pl-f").src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${short ? "&loop=1&playlist=" + encodeURIComponent(id) : ""}`; // ショートは YouTube と同じく繰り返し再生
+  $("pl-f").src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${at ? "&start=" + at : ""}${short ? "&loop=1&playlist=" + encodeURIComponent(id) : ""}`; // ショートは YouTube と同じく繰り返し再生
   $("pl-t").textContent = v.title; $("pl-m").textContent = v.channel || v.views || ""; $("pl-o").href = ytUrl;
   $("pl-bm").dataset.bm = id; $("pl-bm").classList.toggle("on", isBm(id));
   $("pl").showModal();
@@ -198,8 +199,30 @@ document.addEventListener("click", (e) => {
   if ((b = t("[data-v]"))) return openV(b.dataset.v);
   if ((b = t("[data-t]"))) { showSettings(false); tab = b.dataset.t; scrollTo(0, 0); if (innerWidth <= 820) document.body.classList.remove("nav-on"); return render(); }
   if ((b = t("[data-h]"))) { heroI = +b.dataset.h; return swapHero(); }
-  if ((b = t("[data-s]"))) { const tr = b.parentElement.querySelector(".track"); tr.scrollBy({ left: +b.dataset.s * tr.clientWidth * 0.8, behavior: "smooth" }); }
+  if ((b = t("[data-s]"))) { const tr = b.parentElement.querySelector(".track"); railScroll(tr, +b.dataset.s * tr.clientWidth * 0.8); }
 });
+// 棚を左右の矢印で送る。ブラウザの smooth スクロールは、自動の横スクロール(autoStep)が毎フレーム位置を書き換えると打ち消されるので、
+// 自分で動かし、動かしている間と少しの間は autoStep を止める(railHold)
+const railHold = new WeakMap(); // track -> この時刻(performance.now)までは自動で動かさない
+function railScroll(tr, dx) {
+  const from = tr.scrollLeft, to = Math.max(0, Math.min(tr.scrollWidth - tr.clientWidth, from + dx)), t0 = performance.now(), dur = 350;
+  railHold.set(tr, t0 + dur + 1500);
+  const step = (now) => { const p = Math.min(1, (now - t0) / dur); tr.scrollLeft = from + (to - from) * (1 - Math.pow(1 - p, 3)); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+// 検索結果のショートの棚(#s-out の中の横並び)の上でマウスのホイールを回すと、左右に動かす(下へ回すと右へ)
+// ホームの行は対象にしない(ホイールはページの縦スクロールのまま)
+// 端まで行ったら、いつもどおりページを縦にスクロールする(棚の上で止まってしまわないように)
+document.addEventListener("wheel", (e) => {
+  if (e.ctrlKey || e.shiftKey) return; // 拡大縮小・Shift+ホイール(ブラウザの横スクロール)はそのまま
+  const tr = e.target.closest?.("#s-out .rail")?.querySelector(".track"); if (!tr) return;
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // タッチパッドの横スクロールは、そのまま
+  const d = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY, max = tr.scrollWidth - tr.clientWidth;
+  if (max <= 0 || (d < 0 && tr.scrollLeft <= 0) || (d > 0 && tr.scrollLeft >= max - 1)) return;
+  e.preventDefault();
+  railHold.set(tr, performance.now() + 1500); // ホイールで動かしている間も、自動の横スクロールは止める
+  tr.scrollLeft += d * 1.5;
+}, { passive: false });
 $("menu").onclick = () => {
   if (innerWidth <= 820) document.body.classList.toggle("nav-on");
   else { document.body.classList.toggle("rail"); ls.set("tf-home-rail", document.body.classList.contains("rail") ? "1" : "0"); }
@@ -425,15 +448,15 @@ function listView(k) {
     const p = pls().find((x) => x.id === k.slice(3)), items = p ? plItems(p) : [];
     if (p) loadPl(p); // 保存した再生リストなど、まだ中身を持っていなければ取りに行く(開くたびに最新にする)
     const msg = !p ? "再生リストが見つかりません。" : cache.plErr?.[p.id] || (cache.pl?.[p.id] ? "表示できる項目がありません。" : "読み込み中…");
-    return `<section class="row">${back}<h2>${esc(p ? plTitle(p) : "再生リスト")}<small>${items.length}本</small></h2>${items.length ? vbar() + vgrid(items.map((e) => cardWith(e, rmBtn(p, e[0]))).join("")) : `<div class="empty" style="margin-top:0">${esc(msg)}</div>`}</section>`;
+    return `<section class="row">${back}<h2>${esc(p ? plTitle(p) : "再生リスト")}<small>${items.length}本</small></h2>${items.length ? vbar(ordSeg()) + vgrid(plOrdered(items).map((e) => cardWith(e, rmBtn(p, e[0]))).join("")) : `<div class="empty" style="margin-top:0">${esc(msg)}</div>`}</section>`;
   }
   let lp = null;
   if (k === "resume") items = resumeItems();
-  else if (k === "later") { lp = laterPl(); items = useDummy ? DUMMY.later : (lp && cache.later?.[lp.id]) || []; }
+  else if (k === "later") { lp = laterPl(); items = plOrdered(useDummy ? DUMMY.later : (lp && cache.later?.[lp.id]) || []); }
   else if (k === "saved") items = all();
   if (k === "pl" || k === "savedpl") { const l = plsOf(k); cards = l.map(plCard).join(""); items = l; unit = "件"; }
   else cards = items.map((e) => cardWith(e, k === "later" ? rmBtn(lp, e[0]) : k === "resume" ? rsBtn(e[0]) : "")).join("");
-  return `<section class="row">${back}<h2>${esc(T[k] || "一覧")}<small>${items.length}${unit}</small></h2>${items.length ? vbar() + vgrid(cards) : `<div class="empty" style="margin-top:0">表示できる項目がありません。</div>`}</section>`;
+  return `<section class="row">${back}<h2>${esc(T[k] || "一覧")}<small>${items.length}${unit}</small></h2>${items.length ? vbar(k === "later" ? ordSeg() : "") + vgrid(cards) : `<div class="empty" style="margin-top:0">表示できる項目がありません。</div>`}</section>`;
 }
 // 「すべて表示」画面で、サムネイルの左下に出す「この再生リストから外す」ボタン(自分で作成したリストだけ。YouTubeにも反映)
 const rmBtn = (p, vid) => p && !p.dummy && kindOf(p) === "own" ? `<span class="rm" data-plrm="${esc(p.id)}|${esc(vid)}" role="button" title="この再生リストから外す(YouTubeにも反映)" aria-label="再生リストから外す">✕</span>` : "";
@@ -595,7 +618,7 @@ function paintSettings() {
 }
 function openSettings() {
   paintSettings();
-  chrome.storage.local.get("tf-cm-hidemode").then((r) => { const s = $("set-cmhide"); if (s) s.value = r["tf-cm-hidemode"] === "onplay" ? "onplay" : "show"; }); // YouTube の再生画面のコメント欄(content.js が読む)
+  chrome.storage.local.get(["tf-cm-hidemode", "tf-rel-mode", "tf-end-mode", "tf-end-tf"]).then((r) => { const en = $("set-endmode"), et = $("set-endtf"); if (en) { en.value = r["tf-end-mode"] || "show"; if (!en.value) en.value = "show"; } if (et) et.value = r["tf-end-tf"] === "on" ? "on" : "off"; paintEndSlots();  const a = $("set-cmhide"), b = $("set-relmode"); if (a) a.value = r["tf-cm-hidemode"] || "show"; if (a && !a.value) a.value = "show"; if (b) b.value = r["tf-rel-mode"] || "show"; if (b && !b.value) b.value = "show"; }); // YouTube の再生画面のコメント欄(content.js が読む)
   $("set-auto").checked = autoScroll;
   $("set-date").value = dateMode;
   $("set-play").value = playOnYt() ? "yt" : "embed";
@@ -613,7 +636,12 @@ function showSettings(on) {
 }
 $("test-nav").onclick = (e) => { e.stopPropagation(); showSettings(false); tab = "test"; render(); scrollTo(0, 0); }; // テストのページ(今後のテスト用)
 $("settings").onclick =(e) => { e.stopPropagation(); openSettings(); }; // アカウント欄の中にあるので、アカウント欄のクリックにしない
-document.addEventListener("change", (e) => { if (e.target.id === "set-cmhide") chrome.storage.local.set({ "tf-cm-hidemode": e.target.value }); });
+document.addEventListener("change", (e) => { if (e.target.id === "set-cmhide") chrome.storage.local.set({ "tf-cm-hidemode": e.target.value });
+  if (e.target.id === "set-relmode") chrome.storage.local.set({ "tf-rel-mode": e.target.value });
+  if (e.target.id === "set-endmode") chrome.storage.local.set({ "tf-end-mode": e.target.value });
+  if (e.target.id === "set-endtf") { chrome.storage.local.set({ "tf-end-tf": e.target.value }); paintEndSlots(); }
+  if (e.target.id === "set-endat") chrome.storage.local.set({ "tf-end-at": +e.target.value });
+  if (e.target.dataset.endslot != null) saveEndSlots(); });
 $("set-close").onclick = () => { showSettings(false); if (tab !== "all") { tab = "all"; render(); } };
 $("set-list").addEventListener("change", (e) => {
   const k = e.target.dataset.k, p = e.target.dataset.p;
@@ -646,7 +674,10 @@ function autoStep(now) {
     for (const tr of document.querySelectorAll(".track")) {
       const max = tr.scrollWidth - tr.clientWidth; if (max <= 4) continue;
       let st = AS.get(tr); if (!st) AS.set(tr, st = { x: tr.scrollLeft, dir: 1, wait: 1 });
-      if (tr.matches(":hover") || tr.contains(document.activeElement)) { st.x = tr.scrollLeft; continue; } // 触っている間は止める
+      // 触っている間は止める。左右の矢印は .track の外(.rail の中)にあるので、.rail ごと見る
+      // (.track だけ見ていると、矢印を押したときも動かし続けて、矢印のなめらかなスクロールを毎フレーム打ち消していた)
+      const area = tr.closest(".rail") || tr;
+      if ((railHold.get(tr) || 0) > now || area.matches(":hover") || area.contains(document.activeElement)) { st.x = tr.scrollLeft; continue; }
       if (Math.abs(tr.scrollLeft - st.x) > 2) st.x = tr.scrollLeft; // 手動・矢印で動かしたら、その位置から再開
       if (st.wait > 0) { st.wait -= dt; continue; }
       st.x += st.dir * 28 * dt; // 約28px/秒
@@ -658,3 +689,34 @@ function autoStep(now) {
 }
 requestAnimationFrame(autoStep);
 $("set-auto").onchange = () => { autoScroll = $("set-auto").checked; ls.set("tf-home-auto", autoScroll ? "1" : "0"); };
+
+/* 動画の終わりの「TubeFolio3 のおすすめ(4本)」: 4つの枠それぞれに、おすすめを選ぶ再生リストを指定する(content の endscreen.js が読む)
+   保存: "tf-end-slots" = [{ id, title } | null] ×4 */
+async function paintEndSlots() {
+  const box = $("set-endslots"), mode = $("set-endtf")?.value === "on" ? "tf" : ""; if (!box) return;
+  box.hidden = mode !== "tf"; if (box.hidden) return;
+  const got = await chrome.storage.local.get(["tf-end-slots", "tf-end-at"]), cur = got["tf-end-slots"] || [], atv = String(+got["tf-end-at"] || 0);
+  const AT = [["0", "動画が終わったとき"], ["5", "終わる5秒前"], ["10", "終わる10秒前"], ["20", "終わる20秒前"], ["30", "終わる30秒前"], ["60", "終わる1分前"]];
+  const atRow = `<label class="set-row sub"><span>表示するタイミング <small>「終わる◯秒前」では、動画の上に重ねて出します(再生は続きます)</small></span><select class="sel" id="set-endat">${AT.map(([v, l]) => `<option value="${v}" ${v === atv ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  const list = pls().filter((p) => !p.dummy);
+  const name = ["1番目", "2番目", "3番目", "4番目"], note = ["見ている動画がこのリストにあれば、その次の動画。なければリストからランダム", "リストからランダム", "リストからランダム", "リストからランダム"];
+  box.innerHTML = atRow + name.map((n, i) => {
+    const sel = cur[i]?.id || "";
+    const opts = `<option value="">(使わない)</option>` + list.map((p) => `<option value="${esc(p.id)}" ${p.id === sel ? "selected" : ""}>${esc(p.title)}</option>`).join("")
+      + (sel && !list.some((p) => p.id === sel) ? `<option value="${esc(sel)}" selected>${esc(cur[i].title || sel)}</option>` : "");
+    return `<label class="set-row sub"><span>${n}の動画 <small>${note[i]}</small></span><select class="sel" data-endslot="${i}">${opts}</select></label>`;
+  }).join("") + (list.length ? "" : `<p class="hint">再生リストを読み込み中です。少し待ってから開き直してください。</p>`);
+}
+async function saveEndSlots() {
+  const slots = [...document.querySelectorAll("[data-endslot]")].map((s) => { const o = s.selectedOptions[0]; return s.value ? { id: s.value, title: o?.textContent || "" } : null; });
+  await chrome.storage.local.set({ "tf-end-slots": slots });
+}
+// 以前の形式(「YouTube のおすすめ」の選択肢の中に TubeFolio3 のおすすめがあった)からの移し替え
+chrome.storage.local.get("tf-end-mode").then((r) => { if (r["tf-end-mode"] === "tf") chrome.storage.local.set({ "tf-end-mode": "show", "tf-end-tf": "on" }); });
+
+/* 再生リストの「すべて表示」: 登録順の 新しい順 / 古い順 を切り替える(すべての再生リストで共通。"tf-pl-ord")
+   YouTube の再生リストの並び(追加した動画が後ろに付く)を「古い順」とし、「新しい順」はその逆にする */
+let plOrd = ls.get("tf-pl-ord", "old") === "new" ? "new" : "old";
+const plOrdered = (items) => (plOrd === "new" ? [...items].reverse() : items);
+const ordSeg = () => `<span class="pord"><span class="pord-l">登録順</span><div class="vseg" role="radiogroup" aria-label="登録順の並び">${[["new", "新しい順"], ["old", "古い順"]].map(([v, l]) => `<button type="button" class="${plOrd === v ? "on" : ""}" data-plord="${v}" role="radio" aria-checked="${plOrd === v}" title="登録した順で${l}に並べる">${l}</button>`).join("")}</div></span>`;
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-plord]"); if (!b || b.dataset.plord === plOrd) return; plOrd = b.dataset.plord; ls.set("tf-pl-ord", plOrd); render(); });

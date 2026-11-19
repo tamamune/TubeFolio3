@@ -364,37 +364,89 @@ $("kwd-save").onclick = async () => {
 };
 $("kwd-reset").onclick = async () => { const f = data.folders.find((x) => x.id === kwId); if (f) { delete f.ignored; await persist(); render(); toast("候補から外した分を元に戻しました"); } };
 
-/* ===== 設定の「チャンネルのキーワード」タブ: すべてのフォルダのキーワードを一覧で管理 ===== */
+/* ===== 設定の「チャンネルのキーワード」タブ: すべてのフォルダのキーワードを一覧で管理 =====
+   ・入れ子は字下げの木で表示し、▾ で子フォルダをたためる(たたんだ状態は覚えておく)
+   ・上の検索欄で、フォルダ名・キーワードで絞り込める
+   ・「キーワードあり / 未設定 / 候補あり」で絞り込める(絞り込み中は、親の名前も添えて平らに並べる)
+   ・追加欄はふだん隠し、「＋」を押したフォルダだけ開く */
+const kwUi = { q: "", filter: "all", open: "", fold: new Set((() => { try { return JSON.parse(ls.get("tf-kw-folded", "[]") || "[]"); } catch { return []; } })()) };
+const kwSaveFold = () => ls.set("tf-kw-folded", JSON.stringify([...kwUi.fold]));
+function kwRows() {
+  const rows = [], seen = new Set();
+  (function walk(pid, d) { data.folders.filter((f) => (f.parent || "") === pid).forEach((f) => { if (seen.has(f.id)) return; seen.add(f.id); rows.push({ f, d }); walk(f.id, d + 1); }); })("", 0);
+  return rows;
+}
 function paintKw() {
   const box = $("set-kw"); if (!box) return;
-  const rows = []; (function walk(pid, d) { data.folders.filter((f) => (f.parent || "") === pid).forEach((f) => { rows.push([f, d]); walk(f.id, d + 1); }); })("", 0);
+  const rows = kwRows();
   if (!rows.length) { box.innerHTML = `<p class="hint">フォルダがありません。フォルダ管理の画面で作成してください。</p>`; return; }
-  const tmap = titlesByChannel();
-  box.innerHTML = `<p class="hint kw-hint">フォルダごとのキーワードです。チャンネル名・ハンドル名・そのチャンネルの動画タイトルに含まれると、そのフォルダの候補として表示します(自動では入れません)。</p><div class="kw-g">`
-    + rows.map(([f, d]) => {
-      const n = suggestions(f, tmap).length, kws = f.keywords || [];
-      const ic = `<span class="fbg"${f.bg ? ` style="background:${esc(f.bg)}"` : ""}>${f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${esc(f.color || "#ccc")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`}</span>`, up = f.parent ? folderPath(f.parent) : "";
-      return `<div class="kw-r ${d ? "sub" : ""}" data-kwf="${esc(f.id)}"><div class="kw-n">${ic}<div class="kw-t">${up ? `<small class="kw-up">${esc(up)} /</small>` : ""}<b>${esc(f.name)}</b></div><small class="kw-cnt">${kws.length}個</small>${n ? `<small class="kw-s">候補 ${n}件</small>` : ""}${f.ignored?.length ? `<button type="button" class="kw-rs" data-kwreset="${esc(f.id)}" title="候補から外したチャンネルを、また候補に出します">無視を解除(${f.ignored.length})</button>` : ""}</div>
-        <div class="kw-c">${kws.map((k, i) => `<span class="kw-chip">${esc(k)}<button type="button" data-kwdel="${esc(f.id)}|${i}" aria-label="「${esc(k)}」を削除">✕</button></span>`).join("")}<input class="kw-in" data-kwin="${esc(f.id)}" maxlength="40" placeholder="キーワードを追加(Enter)"><button type="button" class="btn s kw-add" data-kwadd="${esc(f.id)}">＋ 追加</button></div></div>`;
-    }).join("") + `</div>`;
+  const withKw = rows.filter((r) => r.f.keywords?.length).length, total = rows.reduce((s, r) => s + (r.f.keywords?.length || 0), 0);
+  const seg = (v, label) => `<button type="button" class="${kwUi.filter === v ? "on" : ""}" data-kwfilter="${v}">${label}</button>`;
+  box.innerHTML = `<p class="hint kw-hint">フォルダごとのキーワードです。チャンネル名・ハンドル名・そのチャンネルの動画タイトルに含まれると、そのフォルダの候補として表示します(自動では入れません)。</p>`
+    + `<div class="kw-bar"><input type="search" class="kw-q" id="kw-q" placeholder="フォルダ名・キーワードで探す" value="${esc(kwUi.q)}">`
+    + `<div class="kw-seg">${seg("all", "すべて")}${seg("has", "キーワードあり")}${seg("none", "未設定")}${seg("sug", "候補あり")}</div>`
+    + `<span class="kw-sum">${rows.length}フォルダ ・ 設定済み ${withKw} ・ キーワード ${total}個</span>`
+    + `<span class="kw-fa"><button type="button" class="btn s" data-kwall="open">すべて開く</button><button type="button" class="btn s" data-kwall="close">すべて閉じる</button></span></div>`
+    + `<div class="kw-g" id="kw-list"></div>`;
+  paintKwList();
+}
+function paintKwList() {
+  const list = $("kw-list"); if (!list) return;
+  const rows = kwRows(), tmap = titlesByChannel(), q = kwUi.q.trim().toLowerCase();
+  const kids = new Map(); rows.forEach((r) => { const p = r.f.parent || ""; kids.set(p, (kids.get(p) || 0) + 1); });
+  const sub = (id) => { let n = 0, k = 0; (function walk(pid) { data.folders.filter((x) => x.parent === pid).forEach((x) => { n++; k += x.keywords?.length || 0; walk(x.id); }); })(id); return { n, k }; };
+  const flat = !!q || kwUi.filter !== "all";
+  let shown = rows.map((r) => ({ ...r, sug: suggestions(r.f, tmap).length }));
+  if (kwUi.filter === "has") shown = shown.filter((r) => r.f.keywords?.length);
+  if (kwUi.filter === "none") shown = shown.filter((r) => !r.f.keywords?.length);
+  if (kwUi.filter === "sug") shown = shown.filter((r) => r.sug);
+  if (q) shown = shown.filter((r) => folderPath(r.f.id).toLowerCase().includes(q) || (r.f.keywords || []).some((k) => k.toLowerCase().includes(q)));
+  if (!flat) { // たたんだフォルダの子は出さない
+    const hide = new Set(); shown = shown.filter((r) => { if (r.f.parent && (hide.has(r.f.parent) || kwUi.fold.has(r.f.parent))) { hide.add(r.f.id); return false; } return true; });
+  }
+  if (!shown.length) { list.innerHTML = `<p class="kw-empty">${q ? `「${esc(kwUi.q)}」に一致するフォルダ・キーワードはありません。` : "該当するフォルダはありません。"}</p>`; return; }
+  list.innerHTML = shown.map(({ f, d, sug }) => {
+    const kws = f.keywords || [], hasKids = kids.get(f.id), folded = kwUi.fold.has(f.id), open = kwUi.open === f.id;
+    const ic = `<span class="fbg"${f.bg ? ` style="background:${esc(f.bg)}"` : ""}>${f.img ? `<img class="fimg" decoding="async" loading="lazy" src="${esc(f.img)}" alt="">` : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${esc(f.color || "#ccc")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`}</span>`;
+    const tg = !flat && hasKids ? `<button type="button" class="kw-tg" data-kwfold="${esc(f.id)}" aria-label="${folded ? "開く" : "たたむ"}" aria-expanded="${!folded}">${folded ? "▸" : "▾"}</button>` : `<span class="kw-tg sp"></span>`;
+    const up = flat && f.parent ? `<small class="kw-up">${esc(folderPath(f.parent))} /</small>` : "";
+    const fs = !flat && hasKids && folded ? (() => { const s = sub(f.id); return `<small class="kw-fs">サブ ${s.n} ・ ${s.k}個</small>`; })() : "";
+    const hit = (k) => q && k.toLowerCase().includes(q) ? " hit" : "";
+    return `<div class="kw-r${kws.length ? "" : " kw-no"}" data-kwf="${esc(f.id)}" style="--d:${flat ? 0 : d}">`
+      + `<div class="kw-n">${tg}${ic}<div class="kw-t" title="${esc(folderPath(f.id))}">${up}<b>${esc(f.name)}</b></div>${fs}</div>`
+      + `<div class="kw-c">${kws.map((k, i) => `<span class="kw-chip${hit(k)}">${esc(k)}<button type="button" data-kwdel="${esc(f.id)}|${i}" aria-label="「${esc(k)}」を削除">✕</button></span>`).join("")}`
+      + (open ? `<input class="kw-in" data-kwin="${esc(f.id)}" maxlength="40" placeholder="キーワード(Enterで追加・Escで閉じる)"><button type="button" class="btn s kw-add" data-kwadd="${esc(f.id)}">追加</button>`
+        : `<button type="button" class="kw-plus" data-kwopen="${esc(f.id)}" title="キーワードを追加">＋${kws.length ? "" : " キーワード"}</button>`)
+      + `</div><div class="kw-m">${sug ? `<small class="kw-s" title="キーワードに合う、まだこのフォルダに入っていないチャンネル">候補 ${sug}</small>` : ""}${f.ignored?.length ? `<button type="button" class="kw-rs" data-kwreset="${esc(f.id)}" title="候補から外したチャンネルを、また候補に出します">無視を解除(${f.ignored.length})</button>` : ""}<small class="kw-cnt">${kws.length ? kws.length + "個" : "未設定"}</small></div></div>`;
+  }).join("");
+  if (kwUi.open) document.querySelector(`[data-kwin="${CSS.escape(kwUi.open)}"]`)?.focus();
 }
 async function kwAdd(fid, text) {
   const f = data.folders.find((x) => x.id === fid); if (!f) return;
   const add = text.split(/[\n,、,]+/).map((x) => x.trim()).filter(Boolean); if (!add.length) return;
   f.keywords = [...new Set([...(f.keywords || []), ...add])];
-  await persist(); paintKw(); render();
-  document.querySelector(`[data-kwin="${CSS.escape(fid)}"]`)?.focus();
+  kwUi.open = fid; await persist(); paintKw(); render(); // 続けて入力できるよう、追加欄は開いたまま
 }
 $("set-kw").addEventListener("click", async (e) => {
   const t = (s) => e.target.closest(s); let b;
+  if ((b = t("[data-kwopen]"))) { kwUi.open = b.dataset.kwopen; return paintKwList(); }
+  if ((b = t("[data-kwfold]"))) { const id = b.dataset.kwfold; kwUi.fold.has(id) ? kwUi.fold.delete(id) : kwUi.fold.add(id); kwSaveFold(); return paintKwList(); }
+  if ((b = t("[data-kwall]"))) { kwUi.fold = b.dataset.kwall === "open" ? new Set() : new Set(data.folders.filter((x) => data.folders.some((y) => y.parent === x.id)).map((x) => x.id)); kwSaveFold(); return paintKwList(); }
+  if ((b = t("[data-kwfilter]"))) { kwUi.filter = b.dataset.kwfilter; document.querySelectorAll("[data-kwfilter]").forEach((x) => x.classList.toggle("on", x === b)); return paintKwList(); }
   if ((b = t("[data-kwadd]"))) { const i = document.querySelector(`[data-kwin="${CSS.escape(b.dataset.kwadd)}"]`); return kwAdd(b.dataset.kwadd, i?.value || ""); }
-  if ((b = t("[data-kwdel]"))) { const [fid, i] = b.dataset.kwdel.split("|"), f = data.folders.find((x) => x.id === fid); if (!f) return; f.keywords.splice(+i, 1); if (!f.keywords.length) delete f.keywords; await persist(); paintKw(); return render(); }
+  if ((b = t("[data-kwdel]"))) { const [fid, i] = b.dataset.kwdel.split("|"), f = data.folders.find((x) => x.id === fid); if (!f?.keywords) return; f.keywords.splice(+i, 1); if (!f.keywords.length) delete f.keywords; await persist(); paintKw(); return render(); }
   if ((b = t("[data-kwreset]"))) { const f = data.folders.find((x) => x.id === b.dataset.kwreset); if (f) { delete f.ignored; await persist(); paintKw(); render(); toast("候補から外した分を元に戻しました"); } }
 });
-$("set-kw").addEventListener("keydown", (e) => { const i = e.target.closest?.("[data-kwin]"); if (i && e.key === "Enter" && !e.isComposing) { e.preventDefault(); kwAdd(i.dataset.kwin, i.value); } });
+$("set-kw").addEventListener("input", (e) => { if (e.target.id === "kw-q") { kwUi.q = e.target.value; paintKwList(); } });
+$("set-kw").addEventListener("keydown", (e) => {
+  const i = e.target.closest?.("[data-kwin]"); if (!i || e.isComposing) return;
+  if (e.key === "Enter") { e.preventDefault(); kwAdd(i.dataset.kwin, i.value); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); kwUi.open = ""; paintKwList(); }
+});
 // 設定のタブ(一般 / チャンネルのキーワード)
 function setSetTab(k) {
-  $("set-gen").hidden = k !== "gen"; $("set-kw").hidden = k !== "kw"; $("set-home").hidden = k !== "home"; $("set-sync").hidden = k !== "sync";
+  $("set-gen").hidden = k !== "gen"; $("set-kw").hidden = k !== "kw"; $("set-home").hidden = k !== "home"; $("set-sync").hidden = k !== "sync"; $("set-tags").hidden = k !== "tags";
+  if (k === "tags" && typeof paintTags === "function") paintTags(); // tags.js
   document.querySelectorAll("[data-settab]").forEach((b) => { const on = b.dataset.settab === k; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
   if (k === "gen" && typeof paintLook === "function") paintLook();
   if (k === "kw") paintKw();
@@ -505,7 +557,8 @@ function openFolderEditor(id) {
   paint(); dlg.showModal(); dlg.querySelector("[data-fed=name]").select();
 }
 function imageToData(cb, dropped) { // 画像(選ぶ・ドロップ)を、64×64 に中央で切り抜いた data URL にして返す
-  const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+  // accept は拡張子で並べる。「image/*」だと Windows では、ファイル選択を開く前に画像の種類を全部調べるので、開くのがワンテンポ遅れる
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".png,.jpg,.jpeg,.jfif,.gif,.webp,.avif,.bmp,.ico,.svg";
   inp.style.display = "none"; document.body.append(inp); // 画面に付けておく(付けないと、選ぶ前に破棄されて、反応しないことがある)
   inp.addEventListener("cancel", () => inp.remove());
   inp.onchange = () => {
