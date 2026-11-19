@@ -8,7 +8,7 @@
    ・ログインは chrome.identity.launchWebAuthFlow を使う(Chrome・Vivaldi・Edge など)。クライアントIDは、設定の「同期」で入力する */
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
-const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash"]);
+const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-fid"]);
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
 const dsIds = {};    // ファイル名 → ドライブ上のファイルID
@@ -63,11 +63,19 @@ async function dsApi(url, init = {}, user = false, retry = true) {
 }
 
 /* ---------- ドライブのファイルの読み書き(appDataFolder) ---------- */
+// 同じ名前のファイルが2つ以上あるとき(2台が同時に初めて同期すると、それぞれが新しく作ってしまう)は、
+// どのパソコンでも同じものを使うよう、いちばん先に作られたものに揃える。ほかは名前を変えて残す(消さない)
+let dsDups = 0;
 async function dsFind(name, user) {
   if (dsIds[name]) return dsIds[name];
   const q = encodeURIComponent(`name='${name}' and trashed=false`);
-  const j = await (await dsApi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name)&pageSize=5`, {}, user)).json();
-  return (dsIds[name] = j.files?.[0]?.id || null);
+  const j = await (await dsApi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&orderBy=createdTime&fields=files(id,name,createdTime)&pageSize=20`, {}, user)).json();
+  const files = j.files || [];
+  for (const f of files.slice(1)) {
+    const tag = (f.createdTime || "").replace(/\D/g, "").slice(0, 14) || f.id.slice(0, 8);
+    try { await dsApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.replace(/\.json$/, `.dup-${tag}.json`) }) }, user); dsDups++; } catch {}
+  }
+  return (dsIds[name] = files[0]?.id || null);
 }
 async function dsReadText(name, user) {
   const id = await dsFind(name, user); if (!id) return null;
@@ -158,14 +166,16 @@ async function dsSync(mode = "auto", user = false) {
     const cur = (await chrome.storage.local.get(KEY))[KEY] || {};
     const hs = ls.get("tf-sync-hash", "");
     const dirty = ls.get("tf-sync-dirty", "0") === "1" || (base > 0 && hs && hs !== dsHash(cur)) || (base === 0 && ((cur.folders || []).length > 0 || Object.keys(cur.videos || {}).length > 0 || (cur.bookmarks || []).length > 0));
+    // ドライブの内容が、このパソコンが最後に同期したものと違うか(版が進んだ、または別のファイルに切り替わった)
+    const rat = +ls.get("tf-sync-rat", "0"), newer = !!remote && ((remote.rev || 0) > base || (rat > 0 && remote.savedAt !== rat));
     let act = mode;
     if (mode === "auto") {
       if (!remote) act = "push";
-      else if ((remote.rev || 0) > base && dirty) {
+      else if (newer && dirty) {
         if (!user) { dsMsg = "ドライブとこのパソコンの両方が変更されています(「今すぐ同期」で選べます)"; if (!dsWarned) { dsWarned = true; toast("ドライブとこのパソコンの両方が変更されています。設定の「同期」で「今すぐ同期」を押してください"); } return; }
         act = await askDlg("ドライブとこのパソコンの両方が変更されています", "どちらの内容を使いますか?\n・ドライブの内容を使う: このパソコンの変更は消えます\n・このパソコンの内容を使う: ドライブを上書きします(前の内容は tubefolio-sync.prev.json に残ります)", [["pull", "ドライブの内容を使う", "p"], ["push", "このパソコンの内容を使う", "s"], ["", "やめる", "s"]]);
         if (!act) { dsMsg = "同期をやめました"; return; }
-      } else if ((remote.rev || 0) > base) act = "pull";
+      } else if (newer) act = "pull";
       else if (dirty) act = "push";
       else act = "none";
     }
@@ -173,6 +183,7 @@ async function dsSync(mode = "auto", user = false) {
     if (act === "pull") { const changed = await dsPull(remote); dsMsg = `ドライブから読み込みました(${new Date(remote.savedAt).toLocaleString("ja-JP")})${dsKept ? `。このパソコンで新しく変えたフォルダのアイコン ${dsKept}件は残し、ドライブへ書き出します` : ""}`; dsKept = 0; if (changed) { toast("ドライブの設定を反映するため、再読み込みします"); setTimeout(() => location.reload(), 800); } }
     else if (act === "push") { await dsPush(text, user); dsMsg = "ドライブへ書き出しました"; }
     else { ls.set("tf-sync-last", String(Date.now())); dsMsg = "同期済みです(変更はありません)"; }
+    if (dsDups) { dsMsg += `(ドライブに同期ファイルが重なってできていたので、${dsDups}個を外して1つに揃えました)`; dsDups = 0; }
   } catch (e) { dsMsg = "同期できませんでした: " + (e?.message || e); }
   finally { dsBusy = false; paintSync(); }
 }
