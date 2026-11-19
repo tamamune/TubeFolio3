@@ -943,3 +943,17 @@ dialog.ask p{margin:0 0 16px;font-size:14px;line-height:1.6;white-space:pre-wrap
 .ask-b{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .ask-b .btn{min-height:38px;padding:0 16px;border-radius:999px}
 @media (max-width:520px){.ask-b{flex-direction:column}.ask-b .btn{width:100%}}
+
+/* 設定の「ログ」タブ */
+.log-l{border:1px solid #222;border-radius:12px;background:#0f0f0f;overflow:hidden;font-size:12.5px}
+.log-r{display:grid;grid-template-columns:120px 52px 120px minmax(0,1fr);gap:4px 12px;padding:7px 12px;border-bottom:1px solid #1b1b1b;align-items:start}
+.log-r:last-child{border-bottom:0}
+.log-t{color:#888;font-variant-numeric:tabular-nums;white-space:nowrap}
+.log-lv{font-weight:700;color:#8ab4f8}
+.log-r.warn .log-lv{color:#fbbc04}
+.log-r.error{background:rgba(255,60,60,.07)}
+.log-r.error .log-lv{color:#ff6b6b}
+.log-c{color:#ccc}
+.log-c small{display:block;color:#666;font-size:11px}
+.log-m{white-space:pre-wrap;word-break:break-word;color:#eee;line-height:1.5}
+@media (max-width:700px){.log-r{grid-template-columns:auto auto 1fr}.log-m{grid-column:1/-1}}

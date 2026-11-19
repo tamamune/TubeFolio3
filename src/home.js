@@ -737,3 +737,32 @@ function askDlg(title, msg, btns) {
   });
 }
 const uiConfirm = async (msg, ok = "OK") => (await askDlg("", msg, [["ok", ok, "p"], ["", "キャンセル", "s"]])) === "ok";
+
+/* 設定の「ログ」タブ: log.js が残した記録(このパソコンだけ)を新しい順に見る。コピーして送れば、不具合の調べに使える */
+let logLv = "all";
+async function paintLog() {
+  const box = $("set-log"); if (!box) return;
+  const all = ((await chrome.storage.local.get("tf-log"))["tf-log"] || []).slice().reverse();
+  const list = logLv === "all" ? all : all.filter((e) => (logLv === "error" ? e.lv === "error" : e.lv !== "info"));
+  const n = (f) => all.filter(f).length, LV = { info: "情報", warn: "注意", error: "エラー" };
+  const seg = (v, l) => `<button type="button" class="${logLv === v ? "on" : ""}" data-loglv="${v}">${l}</button>`;
+  const when = (t) => new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  box.innerHTML = `<p class="hint kw-hint">同期の流れやエラーの記録です(このパソコンだけに残り、ドライブには同期しません。新しい 500件まで)。うまく動かないときは「コピー」して送ってください。</p>`
+    + `<div class="kw-bar"><div class="kw-seg">${seg("all", `すべて ${all.length}`)}${seg("warn", `注意とエラー ${n((e) => e.lv !== "info")}`)}${seg("error", `エラー ${n((e) => e.lv === "error")}`)}</div>`
+    + `<span class="kw-fa"><button type="button" class="btn s" data-log="reload">↻ 更新</button><button type="button" class="btn s" data-log="copy">コピー</button><button type="button" class="btn s" data-log="clear">消す</button></span></div>`
+    + (list.length ? `<div class="log-l">${list.map((e) => `<div class="log-r ${esc(e.lv)}"><span class="log-t">${when(e.t)}</span><span class="log-lv">${LV[e.lv] || esc(e.lv)}</span><span class="log-c">${esc(e.cat)}<small>${esc(e.where || "")}</small></span><span class="log-m">${esc(e.msg)}</span></div>`).join("")}</div>`
+      : `<p class="kw-empty">記録はまだありません。</p>`);
+}
+document.addEventListener("click", async (e) => {
+  const lv = e.target.closest?.("[data-loglv]"); if (lv) { logLv = lv.dataset.loglv; return paintLog(); }
+  const b = e.target.closest?.("[data-log]"); if (!b) return;
+  const a = b.dataset.log;
+  if (a === "reload") return paintLog();
+  if (a === "clear") { if (!await uiConfirm("ログをすべて消しますか?")) return; await chrome.storage.local.set({ "tf-log": [] }); return paintLog(); }
+  if (a === "copy") {
+    const all = (await chrome.storage.local.get("tf-log"))["tf-log"] || [];
+    const text = `TubeFolio3 ログ(${navigator.userAgent})\n` + all.map((x) => `${new Date(x.t).toLocaleString("ja-JP")} [${x.lv}] ${x.cat}/${x.where}: ${x.msg}`).join("\n");
+    try { await navigator.clipboard.writeText(text); toast(`ログ ${all.length}件をコピーしました`); } catch { toast("コピーできませんでした"); }
+  }
+});
+chrome.storage.onChanged.addListener((c) => { if (c["tf-log"] && !$("set-log")?.hidden) paintLog(); });

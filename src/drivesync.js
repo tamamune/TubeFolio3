@@ -9,6 +9,7 @@
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-fid"]);
+let dsConnLost = false; // ログインが切れて、自動同期が止まっているか
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
 const dsIds = {};    // ファイル名 → ドライブ上のファイルID
@@ -45,10 +46,20 @@ async function dsAuth(user) {
   const urlOf = (extra) => "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ ...base, ...extra });
   // 画面を出さずに取り直すときは prompt=none を付ける(付けないと、許可済みでもアカウント選択画面になり、静かには取れない)
   const run = (interactive) => chrome.identity.launchWebAuthFlow({ url: urlOf(interactive ? {} : { prompt: "none" }), interactive });
-  let res; try { res = await run(false); } catch { res = null; }
-  if (!res) { if (!user) throw new Error("ログインが必要です(設定の「同期」で「Googleでログイン」を押してください)"); res = await run(true); }
-  const p = new URLSearchParams(new URL(res).hash.slice(1)), tok = p.get("access_token");
+  const parse = (u) => { try { return new URLSearchParams(new URL(u).hash.slice(1) || new URL(u).search.slice(1)); } catch { return new URLSearchParams(); } };
+  // 画面を出さずに試す。失敗すると、例外になるか、error=interaction_required などの付いた結果が返る(どちらも「ログイン画面が必要」)
+  let res = null, why = "";
+  try { res = await run(false); } catch (e) { why = e?.message || String(e); }
+  let p = res ? parse(res) : new URLSearchParams();
+  if (!p.get("access_token")) {
+    why = p.get("error") || why || "no token";
+    tfLog("warn", "同期", `画面を出さないログインに失敗: ${why}`);
+    if (!user) { dsConnLost = true; throw new Error("ログインが切れています(設定の「同期」で「今すぐ同期」を押すと、ログイン画面が出ます)"); }
+    res = await run(true); p = parse(res);
+  }
+  const tok = p.get("access_token");
   if (!tok) throw new Error(p.get("error") || "ログインできませんでした");
+  dsConnLost = false; tfLog("info", "同期", "ログインしました(アクセストークンを取得)");
   dsToken = { v: tok, exp: Date.now() + (+p.get("expires_in") || 3000) * 1000 };
   ls.set("tf-sync-tok", JSON.stringify(dsToken));
   ls.set("tf-sync-conn", "1");
@@ -73,7 +84,7 @@ async function dsFind(name, user) {
   const files = j.files || [];
   for (const f of files.slice(1)) {
     const tag = (f.createdTime || "").replace(/\D/g, "").slice(0, 14) || f.id.slice(0, 8);
-    try { await dsApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.replace(/\.json$/, `.dup-${tag}.json`) }) }, user); dsDups++; } catch {}
+    try { await dsApi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.replace(/\.json$/, `.dup-${tag}.json`) }) }, user); dsDups++; tfLog("warn", "同期", `同じ名前の同期ファイルが重なっていたので、名前を変えて外しました(${name} / 作成 ${f.createdTime || "?"})`); } catch (e) { tfLog("error", "同期", `重なったファイルの名前を変えられませんでした: ${e?.message || e}`); }
   }
   return (dsIds[name] = files[0]?.id || null);
 }
@@ -112,6 +123,7 @@ async function dsPush(oldText, user) {
   const snap = await dsSnapshot(savedAt, rev);
   await dsWriteText(DS_FILE, JSON.stringify(snap), user);
   ls.set("tf-sync-hash", dsHash(snap.data));
+  tfLog("info", "同期", `ドライブへ書き出し: 版${rev}・${Math.round(JSON.stringify(snap).length / 1024)}KB・フォルダ ${(snap.data.folders || []).length}個`);
   dsApplying = true; ls.set("tf-sync-base", String(rev)); ls.set("tf-sync-rat", String(savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now())); dsApplying = false;
 }
 
@@ -137,6 +149,7 @@ async function dsPull(remote) {
   const local = (await chrome.storage.local.get(KEY))[KEY] || {};
   try { await chrome.storage.local.set({ "tf-sync-backup": { at: Date.now(), data: local } }); } catch {} // 読み込む前の内容を、このパソコンに1つ残す(設定の「同期」から戻せる)
   const { data: merged, kept } = dsKeepIcons(remote.data, local);
+  tfLog("info", "同期", `ドライブから読み込み: 版${remote.rev}・フォルダ ${(remote.data.folders || []).length}個(このパソコンは ${(local.folders || []).length}個)${kept ? `・アイコン ${kept}件はこのパソコンの方を残す` : ""}`);
   await chrome.storage.local.set({ [KEY]: merged });
   setTimeout(() => { dsSkipStore = false; }, 1500); // 値が同じで変更通知が来なかったときに、次の本当の変更を見逃さないため
   dsApplying = true; // 設定の書き換えも同じく(同期の処理が終わるまでの、ごく短い間だけ)
@@ -159,7 +172,7 @@ async function dsSync(mode = "auto", user = false) {
     if (!dsCid()) { dsMsg = "クライアントIDが未設定です"; return; }
     if (!user && !dsConnected()) return;
     try { await dsAuth(user); }
-    catch (e) { dsMsg = e?.message || "ログインできませんでした"; if (!user && !dsWarned) { dsWarned = true; toast("ドライブ同期の再開には、設定の「同期」でログインが必要です"); } return; }
+    catch (e) { dsMsg = e?.message || "ログインできませんでした"; tfLog(user ? "error" : "warn", "同期", `ログインできませんでした: ${dsMsg}`); if (!user && !dsWarned) { dsWarned = true; toast("ドライブ同期の再開には、設定の「同期」でログインが必要です"); } return; }
     const text = await dsReadText(DS_FILE, user), remote = dsParse(text);
     const base = +ls.get("tf-sync-base", "0");
     // このパソコンに変更があるか。まだ一度も同期していないときは、フォルダや動画が入っていれば「変更あり」とみなす(読み込みで消さないため)
@@ -179,12 +192,14 @@ async function dsSync(mode = "auto", user = false) {
       else if (dirty) act = "push";
       else act = "none";
     }
+    tfLog("info", "同期", `${user ? "手動" : "自動"}の同期(${mode}): ドライブ 版${remote ? remote.rev ?? 0 : "なし"}${remote?.savedAt ? "・" + new Date(remote.savedAt).toLocaleString("ja-JP") : ""}${remote?.device ? "・端末 " + remote.device : ""} / このパソコン 版${base}・変更${dirty ? "あり" : "なし"}${newer ? "・ドライブが新しい" : ""} → ${{ pull: "読み込み", push: "書き出し", none: "何もしない" }[act] || act}`);
     if (act === "pull" && !remote) { dsMsg = "ドライブに同期ファイルがありません"; return; }
     if (act === "pull") { const changed = await dsPull(remote); dsMsg = `ドライブから読み込みました(${new Date(remote.savedAt).toLocaleString("ja-JP")})${dsKept ? `。このパソコンで新しく変えたフォルダのアイコン ${dsKept}件は残し、ドライブへ書き出します` : ""}`; dsKept = 0; if (changed) { toast("ドライブの設定を反映するため、再読み込みします"); setTimeout(() => location.reload(), 800); } }
     else if (act === "push") { await dsPush(text, user); dsMsg = "ドライブへ書き出しました"; }
     else { ls.set("tf-sync-last", String(Date.now())); dsMsg = "同期済みです(変更はありません)"; }
     if (dsDups) { dsMsg += `(ドライブに同期ファイルが重なってできていたので、${dsDups}個を外して1つに揃えました)`; dsDups = 0; }
-  } catch (e) { dsMsg = "同期できませんでした: " + (e?.message || e); }
+    tfLog("info", "同期", dsMsg);
+  } catch (e) { dsMsg = "同期できませんでした: " + (e?.message || e); tfLog("error", "同期", dsMsg); }
   finally { dsBusy = false; paintSync(); }
 }
 
