@@ -8,7 +8,7 @@
    ・ログインは chrome.identity.launchWebAuthFlow を使う(Chrome・Vivaldi・Edge など)。クライアントIDは、設定の「同期」で入力する */
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
-const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok"]);
+const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash"]);
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
 const dsIds = {};    // ファイル名 → ドライブ上のファイルID
@@ -25,7 +25,9 @@ const dsMarkLocal = () => { if (!dsApplying) ls.set("tf-sync-dirty", "1"); }; //
 const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode", "tf-rel-mode", "tf-end-mode", "tf-end-tf", "tf-end-slots", "tf-end-at", ...["on", "bar", "notice", "cats"].map((k) => "tf-sb-" + k)];
 let dsCmSkipUntil = 0;
 chrome.storage.onChanged.addListener((c) => { if (Date.now() < dsCmSkipUntil || dsApplying) return; if (DS_CMKEYS.some((k) => k in c)) { dsMarkLocal(); dsSoon(); } });
-const dsSoon = () => { clearTimeout(dsTimer); dsTimer = setTimeout(() => dsSync("auto", false), 10000); }; // 変更の10秒後に自動で同期する
+const dsSoon = () => { clearTimeout(dsTimer); dsTimer = setTimeout(() => { dsTimer = 0; dsSync("auto", false); }, 3000); }; // 変更の3秒後に自動で同期する(画面を閉じる・切り替えるときは、待たずにすぐ)
+// 保存データの指紋。最後に同期したときと違えば、このページを開いていない間の変更(YouTube の画面でのメモやフォルダ登録など)があったとわかる
+const dsHash = (o) => { const s = JSON.stringify(o || {}); let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + "." + s.length; };
 
 /* ---------- ログイン(OAuth) ---------- */
 // このアプリ用の OAuth クライアントID(固定。公開されても問題ない値)
@@ -99,7 +101,9 @@ async function dsPush(oldText, user) {
   const savedAt = Date.now();
   let rev = 1; try { rev = (JSON.parse(oldText)?.rev || 0) + 1; } catch {} // 版番号(時計のずれに左右されないよう、時刻ではなく版で新旧を判断する)
   if (oldText) await dsWriteText(DS_PREV, oldText, user); // 上書きする前の内容を残す
-  await dsWriteText(DS_FILE, JSON.stringify(await dsSnapshot(savedAt, rev)), user);
+  const snap = await dsSnapshot(savedAt, rev);
+  await dsWriteText(DS_FILE, JSON.stringify(snap), user);
+  ls.set("tf-sync-hash", dsHash(snap.data));
   dsApplying = true; ls.set("tf-sync-base", String(rev)); ls.set("tf-sync-rat", String(savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now())); dsApplying = false;
 }
 
@@ -114,6 +118,7 @@ async function dsPull(remote) {
     for (const k of dsKeys()) if (!(k in (remote.settings || {}))) { try { localStorage.removeItem(k); } catch {} }
     for (const [k, v] of Object.entries(remote.settings || {})) if (k.startsWith("tf-") && !DS_SKIP.has(k)) ls.set(k, v);
     const changed = before !== JSON.stringify(dsKeys().map((k) => [k, ls.get(k, "")]));
+    ls.set("tf-sync-hash", dsHash(remote.data));
     ls.set("tf-sync-base", String(remote.rev || 0)); ls.set("tf-sync-rat", String(remote.savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now()));
     return changed;
   } finally { dsApplying = false; }
@@ -132,12 +137,13 @@ async function dsSync(mode = "auto", user = false) {
     const base = +ls.get("tf-sync-base", "0");
     // このパソコンに変更があるか。まだ一度も同期していないときは、フォルダや動画が入っていれば「変更あり」とみなす(読み込みで消さないため)
     const cur = (await chrome.storage.local.get(KEY))[KEY] || {};
-    const dirty = ls.get("tf-sync-dirty", "0") === "1" || (base === 0 && ((cur.folders || []).length > 0 || Object.keys(cur.videos || {}).length > 0 || (cur.bookmarks || []).length > 0));
+    const hs = ls.get("tf-sync-hash", "");
+    const dirty = ls.get("tf-sync-dirty", "0") === "1" || (base > 0 && hs && hs !== dsHash(cur)) || (base === 0 && ((cur.folders || []).length > 0 || Object.keys(cur.videos || {}).length > 0 || (cur.bookmarks || []).length > 0));
     let act = mode;
     if (mode === "auto") {
       if (!remote) act = "push";
       else if ((remote.rev || 0) > base && dirty) {
-        if (!user) { dsMsg = "ドライブとこのパソコンの両方が変更されています(「今すぐ同期」で選べます)"; return; }
+        if (!user) { dsMsg = "ドライブとこのパソコンの両方が変更されています(「今すぐ同期」で選べます)"; if (!dsWarned) { dsWarned = true; toast("ドライブとこのパソコンの両方が変更されています。設定の「同期」で「今すぐ同期」を押してください"); } return; }
         act = confirm("ドライブの内容と、このパソコンの内容の両方が変更されています。\n\nOK: ドライブの内容を使う(このパソコンの変更は、書き換える前の内容として残りません)\nキャンセル: このパソコンの内容でドライブを上書きする(ドライブの前の内容は tubefolio-sync.prev.json に残ります)") ? "pull" : "push";
       } else if ((remote.rev || 0) > base) act = "pull";
       else if (dirty) act = "push";
@@ -229,5 +235,10 @@ document.addEventListener("click", async (e) => {
 (function dsStart() {
   setTimeout(() => { if (dsConnected()) dsSync("auto", false); }, 3000);
   setInterval(() => { if (dsConnected() && !document.hidden) dsSync("auto", false); }, 3 * 60 * 1000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && dsConnected()) dsSync("auto", false); });
+  document.addEventListener("visibilitychange", () => {
+    if (!dsConnected()) return;
+    if (!document.hidden) return void dsSync("auto", false);
+    if (dsTimer || ls.get("tf-sync-dirty", "0") === "1") { clearTimeout(dsTimer); dsTimer = 0; dsSync("auto", false); } // 別のタブへ移る・閉じる前に、待っている変更をすぐ書き出す
+  });
+  addEventListener("pagehide", () => { if (dsConnected() && (dsTimer || ls.get("tf-sync-dirty", "0") === "1")) { clearTimeout(dsTimer); dsTimer = 0; dsSync("auto", false); } });
 })();
