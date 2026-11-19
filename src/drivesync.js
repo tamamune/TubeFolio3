@@ -107,19 +107,38 @@ async function dsPush(oldText, user) {
   dsApplying = true; ls.set("tf-sync-base", String(rev)); ls.set("tf-sync-rat", String(savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now())); dsApplying = false;
 }
 
+// フォルダのアイコン(画像・背景色・色)は、新しく変えた方を残す。ドライブの内容を読み込んでも、このパソコンで後から変えたアイコンは消さない
+// (icoAt = アイコンを変えた時刻。記録がない古いデータでは、画像がある方を残す)
+let dsKept = 0;
+function dsKeepIcons(remoteData, local) {
+  const data = JSON.parse(JSON.stringify(remoteData || {})), lf = new Map((local.folders || []).map((f) => [f.id, f]));
+  let kept = 0;
+  for (const rf of data.folders || []) {
+    const l = lf.get(rf.id); if (!l) continue;
+    const newer = (l.icoAt || 0) > (rf.icoAt || 0) || (!l.icoAt && !rf.icoAt && l.img && !rf.img);
+    if (!newer || ((l.img || "") === (rf.img || "") && (l.bg || "") === (rf.bg || "") && l.color === rf.color)) continue;
+    for (const k of ["img", "bg", "color", "icoAt"]) { if (l[k] != null) rf[k] = l[k]; else delete rf[k]; }
+    kept++;
+  }
+  return { data, kept };
+}
 async function dsPull(remote) {
   const before = JSON.stringify(dsKeys().map((k) => [k, ls.get(k, "")]));
   dsSkipStore = true; // これから書き込む保存データの変更通知は、「このパソコンの変更」と数えない
   if (remote.cm) { dsCmSkipUntil = Date.now() + 2000; await chrome.storage.local.set(remote.cm); } // コメント表示の設定も、ドライブの内容に合わせる
-  await chrome.storage.local.set({ [KEY]: remote.data });
+  const local = (await chrome.storage.local.get(KEY))[KEY] || {};
+  try { await chrome.storage.local.set({ "tf-sync-backup": { at: Date.now(), data: local } }); } catch {} // 読み込む前の内容を、このパソコンに1つ残す(設定の「同期」から戻せる)
+  const { data: merged, kept } = dsKeepIcons(remote.data, local);
+  await chrome.storage.local.set({ [KEY]: merged });
   setTimeout(() => { dsSkipStore = false; }, 1500); // 値が同じで変更通知が来なかったときに、次の本当の変更を見逃さないため
   dsApplying = true; // 設定の書き換えも同じく(同期の処理が終わるまでの、ごく短い間だけ)
   try {
     for (const k of dsKeys()) if (!(k in (remote.settings || {}))) { try { localStorage.removeItem(k); } catch {} }
     for (const [k, v] of Object.entries(remote.settings || {})) if (k.startsWith("tf-") && !DS_SKIP.has(k)) ls.set(k, v);
     const changed = before !== JSON.stringify(dsKeys().map((k) => [k, ls.get(k, "")]));
-    ls.set("tf-sync-hash", dsHash(remote.data));
-    ls.set("tf-sync-base", String(remote.rev || 0)); ls.set("tf-sync-rat", String(remote.savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now()));
+    ls.set("tf-sync-hash", dsHash(remote.data)); // アイコンを残したときは、ドライブと違うので次の同期で書き出される
+    ls.set("tf-sync-base", String(remote.rev || 0)); ls.set("tf-sync-rat", String(remote.savedAt)); ls.set("tf-sync-dirty", kept ? "1" : "0"); ls.set("tf-sync-last", String(Date.now()));
+    if (kept) { dsKept = kept; setTimeout(() => dsSync("auto", false), 1500); }
     return changed;
   } finally { dsApplying = false; }
 }
@@ -151,7 +170,7 @@ async function dsSync(mode = "auto", user = false) {
       else act = "none";
     }
     if (act === "pull" && !remote) { dsMsg = "ドライブに同期ファイルがありません"; return; }
-    if (act === "pull") { const changed = await dsPull(remote); dsMsg = `ドライブから読み込みました(${new Date(remote.savedAt).toLocaleString("ja-JP")})`; if (changed) { toast("ドライブの設定を反映するため、再読み込みします"); setTimeout(() => location.reload(), 800); } }
+    if (act === "pull") { const changed = await dsPull(remote); dsMsg = `ドライブから読み込みました(${new Date(remote.savedAt).toLocaleString("ja-JP")})${dsKept ? `。このパソコンで新しく変えたフォルダのアイコン ${dsKept}件は残し、ドライブへ書き出します` : ""}`; dsKept = 0; if (changed) { toast("ドライブの設定を反映するため、再読み込みします"); setTimeout(() => location.reload(), 800); } }
     else if (act === "push") { await dsPush(text, user); dsMsg = "ドライブへ書き出しました"; }
     else { ls.set("tf-sync-last", String(Date.now())); dsMsg = "同期済みです(変更はありません)"; }
   } catch (e) { dsMsg = "同期できませんでした: " + (e?.message || e); }
@@ -214,7 +233,7 @@ function paintSync() {
     </section>
     <section class="ds-card"><h3>上書きして揃える</h3>
       <p class="ds-sm">通常は自動で同期されます。どちらかの内容に強制的に揃えたいときだけ使ってください。</p>
-      <div class="ds-b"><button type="button" class="btn s" data-ds="push" ${on ? "" : "disabled"} title="このパソコンの内容で、ドライブのデータを上書きします">↑ ドライブへ書き出す</button><button type="button" class="btn s" data-ds="pull" ${on ? "" : "disabled"} title="ドライブの内容で、このパソコンの内容を上書きします">↓ ドライブから読み込む</button></div>
+      <div class="ds-b"><button type="button" class="btn s" data-ds="push" ${on ? "" : "disabled"} title="このパソコンの内容で、ドライブのデータを上書きします">↑ ドライブへ書き出す</button><button type="button" class="btn s" data-ds="pull" ${on ? "" : "disabled"} title="ドライブの内容で、このパソコンの内容を上書きします">↓ ドライブから読み込む</button><button type="button" class="btn s" data-ds="restore" title="最後にドライブから読み込む前の、このパソコンの内容に戻します">↶ 読み込む前に戻す</button></div>
     </section>
     <details class="ds-how" ${open ? "open" : ""}><summary>別のパソコンで使うとき</summary>
       <p class="ds-sm">拡張機能を入れたパソコンごとに、Google Cloud の OAuth クライアントの「承認済みのリダイレクト URI」に、下の URL を追加してください。そのあと同じ Google アカウントでログインします。</p>
@@ -229,6 +248,13 @@ document.addEventListener("click", async (e) => {
   if (a === "login") return dsSync("auto", true);
   if (a === "logout") { dsToken = null; ls.set("tf-sync-tok", "null"); ls.set("tf-sync-conn", "0"); dsMsg = "ログアウトしました(自動同期を止めました)"; return paintSync(); }
   if (a === "push") { if (!await uiConfirm("このパソコンの内容で、ドライブのデータを上書きします。よろしいですか?\n(上書き前の内容は tubefolio-sync.prev.json に残ります)")) return; return dsSync("push", true); }
+  if (a === "restore") {
+    const b = (await chrome.storage.local.get("tf-sync-backup"))["tf-sync-backup"];
+    if (!b?.data) return toast("戻せる内容がありません(まだドライブから読み込んでいません)");
+    if (!await uiConfirm(`${new Date(b.at).toLocaleString("ja-JP")} にドライブから読み込む前の内容(フォルダ ${(b.data.folders || []).length}個)に戻します。よろしいですか?
+戻した内容は、ドライブへ書き出されます。`)) return;
+    await chrome.storage.local.set({ [KEY]: b.data }); ls.set("tf-sync-dirty", "1"); dsMsg = "読み込む前の内容に戻しました"; paintSync(); return dsSync("push", true);
+  }
   if (a === "pull") { if (!await uiConfirm("ドライブの内容で、このパソコンのフォルダ・動画・設定を上書きします。よろしいですか?")) return; return dsSync("pull", true); }
 });
 

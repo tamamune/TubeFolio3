@@ -542,8 +542,9 @@ function openFolderEditor(id) {
     else if (k === "img") imageToData((u) => { st.img = u; paint(); });
     else if (k === "save") {
       const name = st.name.trim() || f.name;
-      f.name = name; f.color = st.color;
-      st.bg ? (f.bg = st.bg) : delete f.bg; st.img ? (f.img = st.img) : delete f.img;
+      f.name = name;
+      if ((f.bg || "") !== st.bg || (f.img || "") !== st.img || f.color !== st.color) f.icoAt = Date.now(); // 見た目を変えた時刻(同期で、新しい方のアイコンを残すため)
+      f.color = st.color; st.bg ? (f.bg = st.bg) : delete f.bg; st.img ? (f.img = st.img) : delete f.img;
       persist().then(() => { render(); toast(`「${name}」を保存しました`); }); dlg.close();
     }
   });
