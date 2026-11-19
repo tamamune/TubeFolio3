@@ -3,7 +3,7 @@
   const info = () => {
     const f = document.querySelector("ytd-watch-flexy");
     const d = f?.playerData?.videoDetails || f?.__data?.playerData?.videoDetails || window.ytInitialPlayerResponse?.videoDetails;
-    return d ? { videoId: d.videoId, title: d.title, channel: d.author, channelId: d.channelId } : null;
+    return d ? { videoId: d.videoId, title: d.title, channel: d.author, channelId: d.channelId, keywords: d.keywords || null } : null;
   };
   addEventListener("message", (e) => {
     if (e.source !== window || e.data?.tf !== "req") return;

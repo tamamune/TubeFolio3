@@ -22,7 +22,7 @@ const dsMarkLocal = () => { if (!dsApplying) ls.set("tf-sync-dirty", "1"); }; //
   chrome.storage.onChanged.addListener((c) => { if (!c[KEY]) return; if (dsSkipStore) { dsSkipStore = false; return; } if (!dsApplying) { dsMarkLocal(); dsSoon(); } });
 })();
 // YouTube の再生画面のコメント表示の設定(chrome.storage の tf-cm-…)。拡張機能のどのページからも読み書きされるので、localStorage ではなくこちらに持つ
-const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop"].map((k) => "tf-cm-" + k), "tf-cm-hidemode"];
+const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode"];
 let dsCmSkipUntil = 0;
 chrome.storage.onChanged.addListener((c) => { if (Date.now() < dsCmSkipUntil || dsApplying) return; if (DS_CMKEYS.some((k) => k in c)) { dsMarkLocal(); dsSoon(); } });
 const dsSoon = () => { clearTimeout(dsTimer); dsTimer = setTimeout(() => dsSync("auto", false), 10000); }; // 変更の10秒後に自動で同期する

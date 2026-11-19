@@ -107,10 +107,25 @@ const YTA = (() => {
           if (n.continuationItemRenderer) token = n.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || token; // 最後のものが「次のページ」
         });
         const items = order.length ? order.map((k) => ent.get(k)).filter(Boolean) : [...ent.values(), ...legacy];
-        for (const c of items) { const s = (c.text || "").replace(/\s+/g, " ").trim(); if (s && !seen.has(s)) { seen.add(s); out.push({ text: s.slice(0, 140), name: c.name, icon: c.icon || "", likes: String(c.likes || ""), time: c.time }); } }
+        for (const c of items) { const s = (c.text || "").replace(/\s+/g, " ").trim(); if (s && !seen.has(s)) { seen.add(s); out.push({ text: s.slice(0, 140), raw: String(c.text || "").slice(0, 1500), name: c.name, icon: c.icon || "", likes: String(c.likes || ""), time: c.time }); } }
       }
       return out;
     },
+    // 動画のチャプター。返すのは { sec 開始秒, title } の配列(開始の早い順)
+    chapters: async (videoId) => {
+      const walk = (n, fn) => { if (!n || typeof n !== "object") return; fn(n); (Array.isArray(n) ? n : Object.values(n)).forEach((x) => walk(x, fn)); };
+      const tx = (t) => (t?.simpleText || t?.runs?.map((r) => r.text).join("") || "").trim();
+      const out = new Map();
+      walk(await post("next", { videoId }), (n) => {
+        const m = n.macroMarkersListItemRenderer;
+        if (m) { const s = m.onTap?.watchEndpoint?.startTimeSeconds; if (s != null && !out.has(+s)) out.set(+s, tx(m.title)); }
+        const c = n.chapterRenderer;
+        if (c && c.timeRangeStartMillis != null) { const s = Math.floor(c.timeRangeStartMillis / 1000); if (!out.has(s)) out.set(s, tx(c.title)); }
+      });
+      return [...out].map(([sec, title]) => ({ sec, title })).sort((a, b) => a.sec - b.sec);
+    },
+    // 動画のタグ(投稿者が設定した、画面には出ないキーワード)
+    tags: async (videoId) => (await post("player", { videoId })).videoDetails?.keywords || [],
     // コメントの翻訳(日本語へ)。公開コメントの文だけを、Google 翻訳の無料の窓口に送る。返すのは { text: 翻訳, src: 元の言語 }
     translate: async (text) => {
       const j = await (await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=" + encodeURIComponent(String(text).slice(0, 400)))).json();

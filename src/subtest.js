@@ -14,6 +14,7 @@ const ACCS = [["amber", "オレンジ(標準)", "#ffb400"], ["green", "緑", "#3
 let accent = ls.get("tf-accent", "amber");
 if (!ACCS.some(([k]) => k === accent)) accent = "amber";
 document.body.dataset.acc = accent;
+chrome.storage?.local.set({ "tf-accent": accent }); // YouTube の再生画面のツール(content.js)も、同じ色にする
 
 const subNorm = (x) => String(x || "").normalize("NFKC").toLowerCase().trim();
 let subMemo = { key: null };
@@ -91,5 +92,5 @@ document.addEventListener("change", (e) => {
 $("set-date").onchange = () => { dateMode = $("set-date").value; ls.set("tf-date-mode", dateMode); render(); };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-accent]"); if (!b) return;
-  accent = b.dataset.accent; ls.set("tf-accent", accent); document.body.dataset.acc = accent; render(); paintLook();
+  accent = b.dataset.accent; ls.set("tf-accent", accent); document.body.dataset.acc = accent; chrome.storage?.local.set({ "tf-accent": accent }); render(); paintLook();
 });
