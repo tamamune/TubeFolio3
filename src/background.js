@@ -28,6 +28,33 @@ async function setupEmbedReferer() {
 chrome.runtime.onInstalled.addListener(setupEmbedReferer);
 chrome.runtime.onStartup.addListener(setupEmbedReferer);
 
+// モバイル版のブラウザ(Android の Vivaldi など)対策:
+// スマホの User-Agent だと、www.youtube.com へのリクエストが m.youtube.com(スマホ版)に転送され、
+// 管理ページのホーム・検索などが読み込めなかった(m.youtube.com は形式が違い、権限もない)。
+// モバイルのときだけ、この拡張機能自身が出す youtube.com へのリクエストを、PC 版として送る(YouTube のタブには影響しない)
+const isMobile = () => !!navigator.userAgentData?.mobile || /Android|Mobile|iPhone|iPad/i.test(navigator.userAgent);
+async function setupDesktopUa() {
+  if (!isMobile()) { await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [2] }); return; }
+  const ver = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || "140";
+  const ua = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ver}.0.0.0 Safari/537.36`;
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [2],
+    addRules: [{
+      id: 2, priority: 1,
+      action: { type: "modifyHeaders", requestHeaders: [
+        { header: "User-Agent", operation: "set", value: ua },
+        { header: "Sec-CH-UA-Mobile", operation: "set", value: "?0" },
+        { header: "Sec-CH-UA-Platform", operation: "set", value: '"Windows"' },
+      ] },
+      condition: { requestDomains: ["youtube.com"], initiatorDomains: [chrome.runtime.id], resourceTypes: ["xmlhttprequest", "other"] },
+    }],
+  });
+  tfLog?.("info", "モバイル", "モバイルのブラウザなので、この拡張機能から YouTube への読み込みを PC 版として送ります");
+}
+chrome.runtime.onInstalled.addListener(setupDesktopUa);
+chrome.runtime.onStartup.addListener(setupDesktopUa);
+setupDesktopUa().catch((e) => tfLog?.("error", "モバイル", `PC 版として読む設定に失敗: ${e?.message || e}`));
+
 // おすすめのカテゴリ(音楽・ニュースなど)の切り替え:
 // YouTubeの内部API(youtubei)へのリクエストを、youtube.com のページから送ったものと同じ扱いにするため
 // この拡張機能自身が送るリクエストにだけ Origin / Referer を付ける。
