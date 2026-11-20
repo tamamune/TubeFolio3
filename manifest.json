@@ -13,7 +13,7 @@
     { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*"] }
   ],
   "permissions": ["storage", "unlimitedStorage", "declarativeNetRequest", "cookies", "identity", "alarms", "notifications"],
-  "host_permissions": ["https://www.youtube.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*", "https://returnyoutubedislikeapi.com/*", "https://youtube-trending.info/*", "https://trends.google.co.jp/*", "https://www.bing.com/*", "https://news.google.com/*"],
+  "host_permissions": ["https://www.youtube.com/*", "https://i.ytimg.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*", "https://returnyoutubedislikeapi.com/*", "https://youtube-trending.info/*", "https://trends.google.co.jp/*", "https://www.bing.com/*", "https://news.google.com/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/log.js", "src/sponsorblock.js", "src/subtitles.js", "src/endscreen.js", "src/miniplay.js", "src/chrate.js", "src/pip.js", "src/wellbeing.js", "src/ptools.js", "src/content.js"],
+      "js": ["src/log.js", "src/sponsorblock.js", "src/subtitles.js", "src/endscreen.js", "src/miniplay.js", "src/chrate.js", "src/pip.js", "src/wellbeing.js", "src/ptools.js", "src/nvtoast.js", "src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_idle"
     }

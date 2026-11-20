@@ -850,3 +850,20 @@ document.addEventListener("click", async (e) => {
   }
 });
 chrome.storage.onChanged.addListener((c) => { if (c["tf-log"] && !$("set-log")?.hidden) paintLog(); });
+
+/* 設定「一般」の「お知らせの確認」: テスト通知 / 今すぐ確認(background.js の nvDeliver / nvCheck) */
+async function paintNvLast() {
+  const s = $("nv-last"); if (!s) return;
+  const t = (await chrome.storage.local.get("tf-nv-last"))["tf-nv-last"];
+  s.textContent = t ? `(最後に確認: ${new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })})` : "(まだ確認していません)";
+}
+paintNvLast();
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest?.("[data-nv]"); if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.nv === "test") { const r = await chrome.runtime.sendMessage({ tf: "nv-test" }); toast(r?.ok ? "テスト通知を出しました(出ないときは、Windows とブラウザの通知の設定を見てください)" : "テスト通知を出せませんでした: " + (r?.error || "")); }
+    else { toast("新着を確認しています…"); const r = await chrome.runtime.sendMessage({ tf: "nv-check" }); toast(!r?.ok ? "確認できませんでした: " + (r?.error || "") : r.first ? `新着 ${r.count}本を覚えました(次の確認から、新しい動画を知らせます)` : `新着 ${r.count}本を確認しました(お知らせ ${r.notified}本)`); }
+  } catch (err) { toast("拡張機能に接続できませんでした: " + (err?.message || err)); }
+  finally { b.disabled = false; paintNvLast(); }
+});

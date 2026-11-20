@@ -104,6 +104,7 @@ const YTA = (() => {
   return {
     useHtml,
     browse: (continuation) => post("browse", { continuation }), // 一覧の続きを読む
+    subsFeed: () => post("browse", { browseId: "FEsubscriptions" }), // 登録チャンネルの新着(ログイン中のアカウントとして読む。新着のお知らせで使う)
     // privacy: "PRIVATE"(非公開) / "UNLISTED"(限定公開) / "PUBLIC"(公開)。作成した再生リストのIDを返す
     create: async (title, privacy = "PRIVATE") => {
       const j = await post("playlist/create", { title, privacyStatus: privacy });
@@ -158,7 +159,8 @@ const YTA = (() => {
       const out = new Map();
       walk(await post("next", { videoId }), (n) => {
         const m = n.macroMarkersListItemRenderer;
-        if (m) { const s = m.onTap?.watchEndpoint?.startTimeSeconds; if (s != null && !out.has(+s)) out.set(+s, tx(m.title)); }
+        // 同じチャプターが2か所から小数の秒(85.2 など)でも返ってくるので、秒は切り捨ててそろえ、重なりを1つにする
+        if (m) { const s = m.onTap?.watchEndpoint?.startTimeSeconds; if (s != null && isFinite(+s) && !out.has(Math.floor(+s))) out.set(Math.floor(+s), tx(m.title)); }
         const c = n.chapterRenderer;
         if (c && c.timeRangeStartMillis != null) { const s = Math.floor(c.timeRangeStartMillis / 1000); if (!out.has(s)) out.set(s, tx(c.title)); }
       });

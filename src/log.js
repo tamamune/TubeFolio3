@@ -4,7 +4,7 @@
    ・使い方: tfLog("info" | "warn" | "error", "分類", "内容") */
 (() => {
   const K = "tf-log", MAX = 500;
-  const where = location.protocol === "chrome-extension:" ? "管理ページ" : "YouTube";
+  const where = typeof document === "undefined" ? "バックグラウンド" : location.protocol === "chrome-extension:" ? "管理ページ" : "YouTube"; // バックグラウンド … 新着のお知らせなど
   let buf = [], timer = 0;
   function flush() {
     timer = 0; const add = buf; buf = []; if (!add.length) return;

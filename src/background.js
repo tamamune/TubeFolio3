@@ -1,4 +1,4 @@
-importScripts("ytapi.js"); // YouTube への書き込み(YTA)。YouTube のページの拡張機能から、メッセージで呼び出される
+importScripts("ytapi.js", "log.js"); // YouTube への書き込み(YTA)。YouTube のページの拡張機能から、メッセージで呼び出される
 // 初回インストール時に空のデータを用意する(既存データは上書きしない)
 chrome.runtime.onInstalled.addListener(async () => {
   const cur = await chrome.storage.local.get("tubefolio");
@@ -94,12 +94,17 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
 });
 
-/* ===== 新着動画のお知らせ(PC の通知) =====
-   15分ごとに YouTube の「登録チャンネルの新着」を読み、まだ知らせていない動画のうち
+/* ===== 新着動画のお知らせ(TubeFolio2 と同じ知らせ方) =====
+   15分ごとに YouTube の「登録チャンネルの新着」を、ログイン中のアカウントとして読み(YTA.subsFeed。だめならページのHTML)、
+   まだ知らせていない動画のうち
    ・フォルダ設定で 🔔 にしたチャンネルの動画
    ・タイトルに LIVE・ライブ・生配信・緊急・速報 などがある動画、または配信中の動画(チャンネルの設定に関係なく、いつも)
-   を通知する。設定「一般」の「新着のお知らせ」(tf-notify: on/off。既定 on)で全体を止められる。
-   知らせた動画は tf-nv-seen(このパソコンだけ)に覚える。初めて読んだときは、今ある動画を覚えるだけで通知しない */
+   を知らせる。知らせ方は TubeFolio2 と同じで、
+   ・開いている YouTube のタブの右下に、サムネ+タイトルのお知らせ(content.js の nvToast)
+   ・PC の通知(アイコンは動画のサムネ。4件以上はまとめて1つ)
+   の両方。設定「一般」の「新着のお知らせ」(tf-notify: on/off。既定 on)で全体を止められる。
+   知らせた動画は tf-nv-seen(このパソコンだけ)に覚える。配信は「L:動画ID」でも覚え、あとから配信が始まった動画も1回知らせる。
+   初めて読んだときは、今ある動画を覚えるだけで通知しない。確認の結果はログ(設定の「ログ」)に残す */
 // いつも知らせるタイトルの文字(設定「一般」で追加・削除できる。tf-nv-words。ドライブ同期の対象)
 const NV_WORDS = ["LIVE", "ライブ", "生配信", "生放送", "配信中", "緊急", "速報", "重大発表", "ゲリラ"];
 // 英字だけの語は、単語として探す(「deliver」を LIVE と見なさない)。ほかは、含まれていればよい
@@ -115,49 +120,113 @@ function nvCollect(root) {
     if (r?.videoId && !seen.has(r.videoId)) {
       seen.add(r.videoId);
       const live = /BADGE_STYLE_TYPE_LIVE_NOW|"LIVE"|ライブ/.test(JSON.stringify([r.badges, r.thumbnailOverlays]));
-      out.push({ id: r.videoId, title: txt(r.title), ch: txt(r.ownerText) || txt(r.shortBylineText), uc: ucOf(r.ownerText || r.shortBylineText), live });
+      const upcoming = !!r.upcomingEventData;
+      out.push({ id: r.videoId, title: txt(r.title), ch: txt(r.ownerText) || txt(r.shortBylineText), uc: ucOf(r.ownerText || r.shortBylineText), live, upcoming });
       return;
     }
     const lv = n.lockupViewModel;
     if (lv && /VIDEO/.test(lv.contentType || "") && lv.contentId && !seen.has(lv.contentId)) {
       seen.add(lv.contentId);
       const m = lv.metadata?.lockupMetadataViewModel, rows = m?.metadata?.contentMetadataViewModel?.metadataRows || [];
-      const live = /BADGE_STYLE_LIVE|THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE/.test(JSON.stringify(lv.contentImage || {}));
-      out.push({ id: lv.contentId, title: m?.title?.content || "", ch: rows[0]?.metadataParts?.[0]?.text?.content || "", uc: ucOf(lv.metadata), live });
+      const img = JSON.stringify(lv.contentImage || {});
+      const live = /BADGE_STYLE_LIVE|THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE/.test(img);
+      const upcoming = /UPCOMING|予定/.test(img + JSON.stringify(rows));
+      out.push({ id: lv.contentId, title: m?.title?.content || "", ch: rows[0]?.metadataParts?.[0]?.text?.content || "", uc: ucOf(lv.metadata), live, upcoming });
       return;
     }
     Object.values(n).forEach(walk);
   })(root);
   return out;
 }
-async function nvCheck() {
-  const st = await chrome.storage.local.get(["tf-notify", "tf-nv-seen", "tubefolio", "tf-nv-words"]);
-  const words = Array.isArray(st["tf-nv-words"]) ? st["tf-nv-words"] : NV_WORDS;
-  if (st["tf-notify"] === "off") return;
-  let html;
-  try { const r = await fetch("https://www.youtube.com/feed/subscriptions?hl=ja", { credentials: "include" }); if (!r.ok) return; html = await r.text(); } catch { return; }
-  const a = html.indexOf("ytInitialData = "), b = html.indexOf(";</script>", a); if (a < 0 || b < 0) return;
-  let list; try { list = nvCollect(JSON.parse(html.slice(a + 16, b))).slice(0, 80); } catch { return; }
-  if (!list.length) return;
-  const first = !Array.isArray(st["tf-nv-seen"]), seen = new Set(st["tf-nv-seen"] || []);
-  const chs = st.tubefolio?.channels || {};
-  const byName = new Map(Object.values(chs).map((c) => [String(c.name || "").normalize("NFKC").toLowerCase().trim(), c]));
-  let n = 0;
-  for (const v of list) {
-    if (seen.has(v.id)) continue; seen.add(v.id);
-    if (first) continue;
-    const c = chs[v.uc] || byName.get(String(v.ch).normalize("NFKC").toLowerCase().trim());
-    const urgent = v.live || nvHit(v.title, words);
-    if (!(urgent || c?.notify) || n >= 5) continue; // 一度に出すのは5件まで
-    n++;
-    chrome.notifications.create("tfnv:" + v.id, { type: "basic", iconUrl: "icons/icon-128.png", title: `${urgent ? "🔴 " : "🔔 "}${v.ch || "新着動画"}`, message: v.title || "新しい動画", contextMessage: urgent ? "TubeFolio3 ・ LIVE・緊急の新着" : "TubeFolio3 ・ 新着動画", priority: urgent ? 2 : 0 });
+// 登録チャンネルの新着を読む。まずログイン中のアカウントとして API で、だめならページのHTMLから
+async function nvFeed() {
+  try { const list = nvCollect(await YTA.subsFeed()); if (list.length) return list; tfLog("warn", "新着", "登録チャンネルの新着(API)が空でした。ページから読み直します"); }
+  catch (e) { tfLog("warn", "新着", `登録チャンネルの新着(API)を読めませんでした: ${e?.message || e}。ページから読み直します`); }
+  const r = await fetch("https://www.youtube.com/feed/subscriptions?hl=ja", { credentials: "include" });
+  if (!r.ok) throw new Error(`YouTube が ${r.status} を返しました`);
+  const html = await r.text(), a = html.indexOf("ytInitialData = "), b = html.indexOf(";</script>", a);
+  if (a < 0 || b < 0) throw new Error("ページの形式が読めませんでした(YouTube にログインしていない可能性があります)");
+  return nvCollect(JSON.parse(html.slice(a + 16, b)));
+}
+let nvBusy = false;
+async function nvCheck(manual = false) {
+  if (nvBusy) return { ok: false, error: "確認中です" };
+  nvBusy = true;
+  try {
+    const st = await chrome.storage.local.get(["tf-notify", "tf-nv-seen", "tubefolio", "tf-nv-words"]);
+    const words = Array.isArray(st["tf-nv-words"]) ? st["tf-nv-words"] : NV_WORDS;
+    if (st["tf-notify"] === "off" && !manual) return { ok: true, off: true };
+    let list;
+    try { list = (await nvFeed()).slice(0, 80); }
+    catch (e) { tfLog("error", "新着", `登録チャンネルの新着を確認できませんでした: ${e?.message || e}`); return { ok: false, error: e?.message || String(e) }; }
+    if (!list.length) { tfLog("warn", "新着", "登録チャンネルの新着が0本でした(YouTube にログインしているか確かめてください)"); return { ok: false, error: "新着が0本でした" }; }
+    const first = !Array.isArray(st["tf-nv-seen"]), seen = new Set(st["tf-nv-seen"] || []);
+    const chs = st.tubefolio?.channels || {};
+    const byName = new Map(Object.values(chs).map((c) => [String(c.name || "").normalize("NFKC").toLowerCase().trim(), c]));
+    const out = [];
+    for (const v of list) {
+      const c = chs[v.uc] || byName.get(String(v.ch).normalize("NFKC").toLowerCase().trim());
+      // 配信中: 前は配信前・通常で知らせなかった動画でも、配信が始まったら1回知らせる(TubeFolio2 と同じ)
+      if (v.live && !seen.has("L:" + v.id)) { seen.add("L:" + v.id); seen.add(v.id); if (!first) out.push({ ...v, kind: "live", bell: !!c?.notify }); continue; }
+      if (seen.has(v.id)) continue; seen.add(v.id);
+      if (first || v.upcoming) continue;
+      const kw = nvHit(v.title, words);
+      if (kw || c?.notify) out.push({ ...v, kind: kw ? "kw" : "new", bell: !!c?.notify });
+    }
+    await chrome.storage.local.set({ "tf-nv-seen": [...seen].slice(-1500), "tf-nv-last": Date.now() });
+    tfLog("info", "新着", `${manual ? "手動" : "定期"}の確認: 新着 ${list.length}本${first ? "(初めてなので、今ある動画を覚えただけ)" : ""} → お知らせ ${out.length}本`);
+    if (out.length && st["tf-notify"] !== "off") await nvDeliver(out);
+    return { ok: true, count: list.length, notified: out.length, first };
+  } finally { nvBusy = false; }
+}
+// PC の通知のアイコンを、動画のサムネにする(通知は外の画像URLを使えないので、取ってきて data URL にする。真ん中を正方形に切り抜く)
+async function nvThumb(v) {
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
+    const r = await fetch(`https://i.ytimg.com/vi/${encodeURIComponent(v)}/mqdefault.jpg`, { credentials: "omit", signal: ctl.signal }).finally(() => clearTimeout(t));
+    if (!r.ok) return null;
+    const bmp = await createImageBitmap(await r.blob()), s = Math.min(bmp.width, bmp.height);
+    const cv = new OffscreenCanvas(192, 192); cv.getContext("2d").drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, 192, 192);
+    const buf = new Uint8Array(await (await cv.convertToBlob({ type: "image/jpeg", quality: 0.85 })).arrayBuffer());
+    let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return "data:image/jpeg;base64," + btoa(bin);
+  } catch { return null; }
+}
+const NV_KIND = { live: "🔴 配信中", kw: "⚡", new: "🔔", test: "🔔" };
+const nvIcon = () => chrome.runtime.getURL("icons/icon-128.png"); // service worker は src/ にあるので、相対パスでは見つからない(通知が出なかった原因)
+const nvCreate = (id, opt) => new Promise((res) => {
+  try { chrome.notifications.create(id, opt, () => { const e = chrome.runtime.lastError; if (e) tfLog("error", "新着", `PC の通知を出せませんでした: ${e.message}`); res(!e); }); }
+  catch (e) { tfLog("error", "新着", `PC の通知を出せませんでした: ${e?.message || e}`); res(false); }
+});
+const nvUrl = new Map(); // 通知ID → 押したときに開くURL
+async function nvDeliver(items, why = "") {
+  tfLog("info", "新着", `${why ? why + ": " : ""}${items.length}本を知らせます ` + items.slice(0, 5).map((x) => `${NV_KIND[x.kind] || ""}${x.ch}「${x.title}」`).join("、"));
+  // YouTube のタブの右下(サムネ+タイトル)。開いているタブのうち、いちばん最近使ったものに出す
+  const tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })).sort((a, b) => (b.active - a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
+  for (const t of tabs) { try { const r = await chrome.tabs.sendMessage(t.id, { tf: "nv-toast", items }); if (r?.ok) break; } catch { /* 拡張機能を入れ直す前に開いたタブなど */ } }
+  // PC の通知(YouTube を見ていないときにも気づけるように、いつも出す)
+  const urgent = items.filter((x) => x.kind !== "new"), rest = items.filter((x) => x.kind === "new");
+  const single = async (it) => {
+    const id = "tfnv:" + it.id + ":" + Date.now().toString(36);
+    nvUrl.set(id, it.url || "https://www.youtube.com/watch?v=" + encodeURIComponent(it.id));
+    await nvCreate(id, { type: "basic", iconUrl: (it.id && (await nvThumb(it.id))) || nvIcon(), title: `${NV_KIND[it.kind] || "🔔"} ${it.ch || "新着動画"}`, message: it.title || "新しい動画", contextMessage: "TubeFolio3", priority: it.kind === "new" ? 1 : 2, requireInteraction: it.kind === "live" });
+  };
+  for (const it of urgent) await single(it);
+  if (rest.length <= 3) { for (const it of rest) await single(it); }
+  else {
+    const id = "tfnv:many:" + Date.now().toString(36); nvUrl.set(id, "https://www.youtube.com/feed/subscriptions");
+    await nvCreate(id, { type: "list", iconUrl: nvIcon(), title: `🔔 新着 ${rest.length}本`, message: "", items: rest.slice(0, 5).map((x) => ({ title: x.ch || "", message: x.title || "" })), contextMessage: "TubeFolio3", priority: 1 });
   }
-  await chrome.storage.local.set({ "tf-nv-seen": [...seen].slice(-600) });
 }
 chrome.notifications?.onClicked.addListener((nid) => {
   if (!nid.startsWith("tfnv:")) return;
-  chrome.tabs.create({ url: "https://www.youtube.com/watch?v=" + encodeURIComponent(nid.slice(5)) });
-  chrome.notifications.clear(nid);
+  const parts = nid.split(":"), url = nvUrl.get(nid) || (parts[1] && parts[1] !== "many" ? "https://www.youtube.com/watch?v=" + encodeURIComponent(parts[1]) : "https://www.youtube.com/feed/subscriptions");
+  chrome.tabs.create({ url }); chrome.notifications.clear(nid);
+});
+// 設定「一般」の「テスト通知」「今すぐ確認」
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.tf === "nv-test") { nvDeliver([{ id: "dQw4w9WgXcQ", title: "テスト通知です(押すと動画を開きます)", ch: "TubeFolio3", kind: "test" }], "テスト").then(() => reply({ ok: true }), (e) => reply({ ok: false, error: e?.message || String(e) })); return true; }
+  if (msg?.tf === "nv-check") { nvCheck(true).then(reply, (e) => reply({ ok: false, error: e?.message || String(e) })); return true; }
 });
 const nvSetup = () => chrome.alarms?.create("tf-nv", { periodInMinutes: 15, delayInMinutes: 1 });
 chrome.runtime.onInstalled.addListener(nvSetup);

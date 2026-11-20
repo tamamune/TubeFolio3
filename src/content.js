@@ -402,7 +402,7 @@
   const ex = { vid: null, gen: 0, comments: [], chapters: [] };
   const TS_RE = /(?<![\d:])((?:\d{1,2}:)?[0-5]?\d:[0-5]\d)(?![\d:])/;
   const tsSec = (s) => s.split(":").reduce((a, x) => a * 60 + +x, 0);
-  const fmtT = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
+  const fmtT = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
   // コメント1件から、時間のある行を取り出す(曲のリストのように、1件に時間が複数あれば、行ごとに分ける)
   function exComments(list) {
     const out = [];
@@ -430,14 +430,26 @@
     if (ex.vid === v) return;
     ex.vid = v; ex.comments = []; ex.chapters = []; const g = ++ex.gen; closeTsPanel(); updateTsBtn();
     if (!v) return;
-    yta("chapters", v).then((r) => { if (ex.gen === g) { ex.chapters = r; updateTsBtn(); } }).catch(() => {});
+    yta("chapters", v).then((r) => { if (ex.gen === g) { ex.chapters = r; updateTsBtn(); exTranslate(g); } }).catch(() => {});
     const tryC = async (n) => {
       let list = []; try { list = await yta("comments", v, 150, "top"); } catch { /* 取れなければ、やり直す */ }
       if (ex.gen !== g) return;
-      ex.comments = exComments(list); updateTsBtn();
+      ex.comments = exComments(list); updateTsBtn(); exTranslate(g);
       if (!list.length && n < 3) setTimeout(() => tryC(n + 1), 4000);
     };
     tryC(0);
+  }
+  // 一覧のコメントとチャプターの題名を日本語に翻訳する(コメント表示の「外国語: 日本語に翻訳」のとき。流すコメントと同じ訳の控え trRes を使う)
+  // 訳せたら一覧を描き直す。原文は、行に重ねたときのヒントに出す
+  const exLabel = (s) => (cm.tr && trRes.get(s)?.[1] ? trRes.get(s)[0] : s);
+  async function exTranslate(g) {
+    if (!cm.tr) return;
+    const todo = [...new Set([...ex.comments.map((r) => r.text), ...ex.chapters.map((r) => r.title)].filter((s) => s && needTr(s) && !trRes.get(s)?.[2]))];
+    if (!todo.length) return;
+    let out = null;
+    try { out = await Promise.race([yta("translateMany", todo), new Promise((res) => setTimeout(() => res(null), 30000))]); } catch { out = null; }
+    todo.forEach((s, i) => { const r = out?.[i]; if (r?.text) trRes.set(s, r.src !== "ja" && r.text !== s ? [r.text, true, true] : [s, false, true]); });
+    if (ex.gen === g) renderTsPanel();
   }
   document.addEventListener("durationchange", (e) => { if (e.target?.closest?.("#movie_player")) updateTsBtn(); }, true);
   function closeTsPanel() { document.querySelector(".tf-tsp")?.remove(); }
@@ -446,7 +458,7 @@
   function renderTsPanel() {
     const m = document.querySelector(".tf-tsp"); if (!m) return;
     const { c, h } = exItems();
-    const sig = JSON.stringify([c.map((r) => [r.sec, r.text, r.name]), h.map((r) => [r.sec, r.title])]);
+    const sig = JSON.stringify([c.map((r) => [r.sec, exLabel(r.text), r.name]), h.map((r) => [r.sec, exLabel(r.title)])]); // 訳が届いたら描き直す
     if (m.dataset.sig === sig) return;
     m.dataset.sig = sig;
     const top = m.scrollTop; m.textContent = "";
@@ -454,10 +466,10 @@
       const hd = el("div", "tf-tsh", `${title}(${rows.length})`); m.append(hd);
       for (const r of rows) {
         const d = el("div", "tf-tsr"), t = el("button", "tf-tst", fmtT(r.sec)); t.type = "button";
-        const label = r.text || r.title || ""; // コメントは text、チャプター(ytapi.js の chapters)は title
+        const orig = r.text || r.title || "", label = exLabel(orig); // コメントは text、チャプター(ytapi.js の chapters)は title。訳があれば訳を出す
         const tx = el("div", "tf-tsx"); tx.append(el("span", null, label || "(題名なし)"));
         if (kind === "c" && r.name) tx.append(el("small", null, r.name.replace(/^@/, "")));
-        d.append(t, tx); d.title = (r.name ? r.name.replace(/^@/, "") + ": " : "") + label; d.dataset.sec = r.sec; m.append(d); // 押したときの処理は、一覧の箱(toggleTsPanel)でまとめて行う
+        d.append(t, tx); d.title = (r.name ? r.name.replace(/^@/, "") + ": " : "") + label + (label !== orig ? "\n原文: " + orig : ""); d.dataset.sec = r.sec; m.append(d); // 押したときの処理は、一覧の箱(toggleTsPanel)でまとめて行う
       }
     };
     if (c.length) sect("コメントの時間", c, "c");
