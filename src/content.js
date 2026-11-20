@@ -394,6 +394,7 @@
     seg("最後まで流したら", "loop", [[true, "ループ"], [false, "非表示"]]);
   }
   addEventListener("keydown", (e) => { if (e.key === "Escape") closeCmMenu(); });
+  globalThis.tfCm = { buildPane: buildCmPane }; // 🛠 ツールの「コメント表示」タブ(ptools.js)から使う
 
   /* ---------- 「時間」ボタン: コメント欄の時間(0:15 など)とチャプターの一覧 ----------
      ・コメントに時間があれば「時間 + コメント」、動画にチャプターがあれば「時間 + 題名」を一覧にする。押すとその時間へ移動する
@@ -526,7 +527,7 @@
       if (k === "ts") b.append(el("span", "tf-bdg")); // アイコンの上の数字
       bar.prepend(b);
     };
-    mkb("more", "TubeFolio3 の設定(コメント表示・SponsorBlock)", toggleMore);
+    bar.querySelector(".tf-ytp[data-k=more]")?.remove(); // 「⋯」の設定(コメント表示・SponsorBlock・字幕)は、🛠 ツール(ptools.js)のタブに移した
     mkb("ts", "チャプター", toggleTsPanel, true); // 「⋯」の左側。表示するものがあるときだけ見せる
     applyCm(); loadEx(); updateTsBtn();
   }
@@ -666,7 +667,7 @@
 })();
 // ツールの色は、TubeFolio3 の設定「色の変更」(manager 側が chrome.storage の tf-accent に写す)に合わせる
 (() => {
-  const paint = (a) => document.documentElement.setAttribute("data-tf-acc", ["green", "purple", "gray"].includes(a) ? a : "amber");
+  const paint = (a) => document.documentElement.setAttribute("data-tf-acc", /^[a-z]{2,12}$/.test(a || "") ? a : "amber");
   chrome.storage.local.get("tf-accent").then((r) => paint(r["tf-accent"]));
   chrome.storage.onChanged.addListener((c) => { if (c["tf-accent"]) paint(c["tf-accent"].newValue); });
 })();

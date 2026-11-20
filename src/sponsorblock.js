@@ -3,7 +3,7 @@
      カテゴリごとに「自動でスキップ / ボタンでスキップ / 表示だけ / 使わない」を選べる
    ・シークバーに区間を色で表示する。スキップしたら左下に通知(「元に戻す」で戻れる)
    ・動画IDは、ハッシュの先頭4文字だけを送る(どの動画を見ているかを、サーバーに知られないように)
-   ・設定は、プレーヤーの「⋯」メニューの「SponsorBlock」タブ(content.js が buildPane を呼ぶ)
+   ・設定は、操作バーの 🛠 ツールの「SponsorBlock」タブ(ptools.js が buildPane を呼ぶ)
    ・設定は chrome.storage の tf-sb-…(ドライブ同期の対象) */
 globalThis.tfSB = (() => {
   const CATS = [

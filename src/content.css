@@ -249,3 +249,91 @@ html.tf-end-on .html5-endscreen,html.tf-end-on .ytp-endscreen-content,html.tf-en
 #movie_player.ytp-xsmall-width-mode .tf-end-g{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 #movie_player.ytp-xsmall-width-mode .tf-end-t{font-size:12px;-webkit-line-clamp:1}
 #movie_player.ytp-xsmall-width-mode .tf-end-m{display:none}
+
+/* ===== 再生画面のワイプ(miniplay.js): 下へスクロールしたら、四隅の小さな画面で再生を続ける ===== */
+html.tf-mini ytd-watch-flexy #movie_player{position:fixed!important;z-index:2100!important;width:var(--tf-mini-w,400px)!important;height:calc(var(--tf-mini-w,400px) * 9 / 16)!important;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 10px 32px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.12)}
+html.tf-mini-br ytd-watch-flexy #movie_player{right:16px!important;bottom:16px!important;left:auto!important;top:auto!important}
+html.tf-mini-bl ytd-watch-flexy #movie_player{left:16px!important;bottom:16px!important;right:auto!important;top:auto!important}
+html.tf-mini-tr ytd-watch-flexy #movie_player{right:16px!important;top:72px!important;left:auto!important;bottom:auto!important}
+html.tf-mini-tl ytd-watch-flexy #movie_player{left:16px!important;top:72px!important;right:auto!important;bottom:auto!important}
+html.tf-mini ytd-watch-flexy #movie_player video{width:100%!important;height:100%!important;left:0!important;top:0!important;object-fit:contain}
+html.tf-mini ytd-watch-flexy #movie_player :is(.ytp-chrome-top,.ytp-ce-element,.ytp-paid-content-overlay,.ytp-cards-teaser,.ytp-pause-overlay){display:none!important}
+#tf-mini-bar{position:fixed;z-index:2101;display:flex;gap:4px;transform:translateX(-100%);opacity:.75;transition:opacity .15s}
+#tf-mini-bar:hover{opacity:1}
+#tf-mini-bar button{height:26px;padding:0 9px;border:0;border-radius:13px;background:rgba(0,0,0,.72);color:#fff;font:700 12px/26px Roboto,Arial,sans-serif;cursor:pointer}
+#tf-mini-bar button:hover{background:#fff;color:#000}
+html.tf-mini ytd-watch-flexy #movie_player .ytp-chrome-bottom{width:calc(100% - 24px)!important;left:12px!important}
+
+/* チャンネルごとの再生速度をかけたときの表示(chrate.js) */
+#tf-rate-badge{position:absolute;left:50%;top:14px;z-index:70;transform:translate(-50%,-6px);padding:6px 14px;border-radius:999px;background:rgba(0,0,0,.78);color:#fff;font:700 14px/1.2 Roboto,Arial,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+#tf-rate-badge.show{opacity:1;transform:translate(-50%,0)}
+
+/* ピクチャインピクチャのボタン(pip.js): YouTube の操作バーの右側 */
+.tf-pip-btn{display:inline-flex!important;align-items:center;justify-content:center;opacity:.9}
+.tf-pip-btn:hover{opacity:1}
+.tf-pip-btn svg{width:100%;height:100%}
+
+/* 休憩・就寝のお知らせ(wellbeing.js): プレーヤーの上に重ねる */
+.tf-wb{position:absolute;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);font-family:Roboto,"Noto Sans JP",Arial,sans-serif}
+.tf-wb-in{max-width:min(420px,88%);padding:24px 26px 20px;border-radius:16px;background:#181818;color:#fff;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.6)}
+.tf-wb-ic{font-size:36px;line-height:1;margin-bottom:10px}
+.tf-wb-in b{display:block;font-size:18px;margin-bottom:8px}
+.tf-wb-in p{margin:0 0 18px;color:#bbb;font-size:14px;line-height:1.6}
+.tf-wb-b{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tf-wb-b button{height:38px;padding:0 18px;border:0;border-radius:999px;font:700 14px/1 inherit;cursor:pointer}
+.tf-wb-b .ok{background:#3ddc84;color:#000}
+.tf-wb-b .more{background:#2c2c2c;color:#ddd}
+.tf-wb-b .more:hover{background:#3a3a3a;color:#fff}
+
+/* ツールの色: 追加の色(TubeFolio3 の設定「色の変更」と同じ) */
+html[data-tf-acc=blue]{--tf-acc:#7b8ff0;--tf-acc-t:#b2bef6;--tf-acc-a:123,143,240}
+html[data-tf-acc=lavender]{--tf-acc:#b39dff;--tf-acc-t:#d7ccff;--tf-acc-a:179,157,255}
+html[data-tf-acc=violet]{--tf-acc:#a855f7;--tf-acc-t:#c68ffa;--tf-acc-a:168,85,247}
+html[data-tf-acc=pink]{--tf-acc:#ff4fa0;--tf-acc-t:#ff8cc1;--tf-acc-a:255,79,160}
+html[data-tf-acc=rose]{--tf-acc:#e8b0a8;--tf-acc-t:#f4dad7;--tf-acc-a:232,176,168}
+html[data-tf-acc=mauve]{--tf-acc:#d0708c;--tf-acc-t:#df9eb1;--tf-acc-a:208,112,140}
+html[data-tf-acc=crimson]{--tf-acc:#ff4d5e;--tf-acc-t:#ff8a95;--tf-acc-a:255,77,94}
+html[data-tf-acc=yolk]{--tf-acc:#ffc857;--tf-acc-t:#ffdc94;--tf-acc-a:255,200,87}
+html[data-tf-acc=lime]{--tf-acc:#9ccc65;--tf-acc-t:#badb93;--tf-acc-a:156,204,101}
+html[data-tf-acc=forest]{--tf-acc:#5fb38d;--tf-acc-t:#88c7ab;--tf-acc-a:95,179,141}
+html[data-tf-acc=mint]{--tf-acc:#5ee6b0;--tf-acc-t:#93eeca;--tf-acc-a:94,230,176}
+html[data-tf-acc=cyan]{--tf-acc:#3cc8e6;--tf-acc-t:#72d7ed;--tf-acc-a:60,200,230}
+html[data-tf-acc=dune]{--tf-acc:#b9ab98;--tf-acc-t:#d2c9bc;--tf-acc-a:185,171,152}
+html[data-tf-acc=white]{--tf-acc:#f2f2f2;--tf-acc-t:#e6e6e6;--tf-acc-a:242,242,242}
+
+/* ワイプ(miniplay.js)の修正:
+   ・動画の入れ物(.html5-video-container)に大きさがないため、動画が高さ0になって黒く見えていた → 入れ物をプレーヤー全体に広げる
+   ・ワイプではコメント表示(tf-cm)とその設定メニューは出さない */
+html.tf-mini ytd-watch-flexy #movie_player .html5-video-container{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+html.tf-mini ytd-watch-flexy #movie_player video.html5-main-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;transform:none!important}
+html.tf-mini ytd-watch-flexy #movie_player :is(.tf-cm,.tf-cmenu){display:none!important}
+/* ワイプを手で動かす(✥ 移動) */
+#tf-mini-bar .tf-mini-move{cursor:grab;touch-action:none}
+html.tf-mini-drag #tf-mini-bar .tf-mini-move{cursor:grabbing}
+html.tf-mini-drag,html.tf-mini-drag *{user-select:none!important}
+html.tf-mini-drag ytd-watch-flexy #movie_player{transition:none!important;pointer-events:none}
+
+/* ===== 再生画面のツール(ptools.js) ===== */
+.tf-seekg{display:inline-flex;align-items:center}
+.tf-seekb{width:auto!important;min-width:40px;padding:0 6px!important;color:#fff;font:700 13px/1 Roboto,Arial,sans-serif!important;white-space:nowrap;opacity:.9}
+.tf-seekb:hover{opacity:1}
+.tf-toolb{display:inline-flex!important;align-items:center;justify-content:center;font-size:18px!important;line-height:1}
+.tf-tpanel{width:min(560px,92%);max-height:calc(100% - 84px)}
+.tf-tr{align-items:flex-start;padding:8px 0}
+.tf-tr .tf-cml{flex:none;width:118px;padding-top:6px}
+.tf-tk{display:flex;align-items:center;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.tf-tb{height:30px;padding:0 12px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:600 13px/1 Roboto,Arial,sans-serif;cursor:pointer}
+.tf-tb:hover{background:rgba(255,255,255,.16)}
+.tf-tb.on{border-color:var(--tf-acc,#ffb400);color:var(--tf-acc,#ffb400);background:rgba(var(--tf-acc-a,255,180,0),.15)}
+.tf-tinfo{color:#aaa;font-size:12px}
+.tf-tsl{display:flex;align-items:center;gap:8px;width:100%;font-size:12.5px;color:#ddd}
+.tf-tsl span{width:76px;flex:none}
+.tf-tsl input{flex:1;accent-color:var(--tf-acc,#ffb400)}
+.tf-tsl b{width:46px;text-align:right;font-weight:600}
+.tf-abr{position:absolute;bottom:0;height:100%;z-index:40;background:rgba(var(--tf-acc-a,255,180,0),.45);pointer-events:none;border-radius:2px}
+/* 正確な公開日時(タイトルの下) */
+.tf-pub{margin:4px 0 2px;color:var(--yt-spec-text-secondary,#aaa);font:500 13px/1.5 Roboto,"Noto Sans JP",Arial,sans-serif}
+/* 🛠 ツールのタブ(6つ)は、入りきらなければ折り返す */
+.tf-tpanel .tf-mtabs{flex-wrap:wrap;border-radius:16px}
+.tf-tpanel .tf-mtabs button{flex:1 1 auto;padding:0 10px;white-space:nowrap}
+.tf-tpanel .tf-mpane{max-height:calc(100vh - 220px);overflow-y:auto}

@@ -1,9 +1,24 @@
 // YouTube のページ本体の側(MAIN world)で動く小さなスクリプト: 再生中の動画のチャンネルIDなどを、拡張機能の側へ渡す。
 (() => {
+  /* ===== H.264 で再生(設定「一般」。ptools.js が youtube.com の localStorage の tf-h264 に写す) =====
+     VP9・AV1 を「再生できない」と答えて、パソコンの負荷が軽い H.264 を YouTube に選ばせる(ページを読み込んだときに効く) */
+  try {
+    if (localStorage.getItem("tf-h264") === "1") {
+      const no = (t) => /vp0?9|av01/i.test(String(t || ""));
+      const ms = window.MediaSource;
+      if (ms?.isTypeSupported) { const o = ms.isTypeSupported.bind(ms); ms.isTypeSupported = (t) => (no(t) ? false : o(t)); }
+      const cp = HTMLMediaElement.prototype.canPlayType;
+      HTMLMediaElement.prototype.canPlayType = function (t) { return no(t) ? "" : cp.call(this, t); };
+    }
+  } catch {}
+
   const info = () => {
-    const f = document.querySelector("ytd-watch-flexy");
-    const d = f?.playerData?.videoDetails || f?.__data?.playerData?.videoDetails || window.ytInitialPlayerResponse?.videoDetails;
-    return d ? { videoId: d.videoId, title: d.title, channel: d.author, channelId: d.channelId, keywords: d.keywords || null, description: d.shortDescription ?? null } : null;
+    const f = document.querySelector("ytd-watch-flexy"), mp = document.getElementById("movie_player");
+    const resp = (() => { try { return mp?.getPlayerResponse?.(); } catch { return null; } })();
+    const d = (resp?.videoDetails?.videoId && resp.videoDetails) || f?.playerData?.videoDetails || f?.__data?.playerData?.videoDetails || window.ytInitialPlayerResponse?.videoDetails;
+    const mf = (resp?.videoDetails?.videoId === d?.videoId ? resp : f?.playerData)?.microformat?.playerMicroformatRenderer || null; // 公開日時(ptools.js)
+    return d ? { videoId: d.videoId, title: d.title, channel: d.author, channelId: d.channelId, keywords: d.keywords || null, description: d.shortDescription ?? null,
+      publishDate: mf?.publishDate || "", uploadDate: mf?.uploadDate || "", liveStart: mf?.liveBroadcastDetails?.startTimestamp || "", viewCount: d.viewCount || mf?.viewCount || "" } : null;
   };
 
   /* ===== 字幕(subtitles.js から頼まれる) =====
@@ -105,8 +120,39 @@
     }
     return null;
   }
+  /* ===== 再生速度(chrate.js から頼まれる): チャンネルごとに決めた速さにする =====
+     2倍までは YouTube の機能(setPlaybackRate)で変える(YouTube の速度メニューの表示もそろう)。2倍より速いときは、動画そのものの速さを変える。
+     広告の間は変えない(広告が速くなるだけで、本編に戻ると元に戻るため) */
+  function setRate(rate) {
+    const p = document.getElementById("movie_player"), v = p?.querySelector("video");
+    if (!p || !v) return { ok: false, why: "player" };
+    if (p.classList.contains("ad-showing")) return { ok: false, why: "ad" };
+    const cur = v.playbackRate;
+    if (rate == null) return { ok: true, cur };
+    try { if (rate <= 2 && p.setPlaybackRate) p.setPlaybackRate(rate); } catch {}
+    if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
+    return { ok: Math.abs(v.playbackRate - rate) < 0.001, cur, now: v.playbackRate };
+  }
+  /* ===== 別のタブに移ったときの自動 PiP(pip.js から頼まれる) =====
+     ブラウザの「自動ピクチャインピクチャ」(Media Session の enterpictureinpicture)を受け付けると、
+     動画を再生中にタブを切り替えたとき、ブラウザが自動で PiP にしてくれる(対応していないブラウザでは何もしない) */
+  function setAutoPip(on) {
+    try {
+      navigator.mediaSession.setActionHandler("enterpictureinpicture", on ? () => {
+        const v = document.querySelector("#movie_player video");
+        if (v && !v.paused) v.requestPictureInPicture().catch(() => {});
+      } : null);
+    } catch {}
+  }
   addEventListener("message", async (e) => {
     if (e.source === window && e.data?.tf === "cap") { let r = null; try { r = await cap(e.data.op, e.data.arg); } catch {} postMessage({ tf: "capres", id: e.data.id, r }, "*"); return; }
+    if (e.source === window && e.data?.tf === "quality") { // 画質の固定(ptools.js)
+      let ok = false;
+      try { const p = document.getElementById("movie_player"), q = e.data.q; if (p && q && q !== "auto") { p.setPlaybackQualityRange?.(q, q); p.setPlaybackQuality?.(q); ok = true; } } catch {}
+      postMessage({ tf: "qres", id: e.data.id, r: { ok } }, "*"); return;
+    }
+    if (e.source === window && e.data?.tf === "pipauto") { setAutoPip(!!e.data.on); return; }
+    if (e.source === window && e.data?.tf === "rate") { postMessage({ tf: "rateres", id: e.data.id, r: setRate(e.data.rate) }, "*"); return; }
     if (e.source !== window || e.data?.tf !== "req") return;
     postMessage({ tf: "res", id: e.data.id, info: info() }, "*");
   });

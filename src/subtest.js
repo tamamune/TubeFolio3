@@ -10,9 +10,12 @@ const SUB_STYLES = [
 let subStyle = ls.get("tf-sub-style", "B");
 if (!SUB_STYLES.some(([k]) => k === subStyle)) subStyle = "B";
 document.body.dataset.sub = subStyle;
-const ACCS = [["amber", "オレンジ(標準)", "#ffb400"], ["green", "緑", "#3ddc84"], ["purple", "紫", "#b388ff"], ["gray", "グレー", "#d0d0d0"]];
-let accent = ls.get("tf-accent", "amber");
-if (!ACCS.some(([k]) => k === accent)) accent = "amber";
+const ACCS = [["blue", "ブルー", "#7b8ff0"], ["lavender", "ラベンダー", "#b39dff"], ["violet", "バイオレット", "#a855f7"], ["pink", "ピンク", "#ff4fa0"], ["rose", "ローズゴールド", "#e8b0a8"], ["mauve", "モーブ", "#d0708c"], ["crimson", "クリムゾン", "#ff4d5e"], ["yolk", "山吹", "#ffc857"], ["lime", "黄緑", "#9ccc65"], ["forest", "深緑", "#5fb38d"], ["mint", "ミント", "#5ee6b0"], ["cyan", "シアン", "#3cc8e6"], ["dune", "砂色", "#b9ab98"], ["white", "白", "#f2f2f2"]];
+// 以前の4色(オレンジ・緑・紫・グレー)は外したので、近い色に置き換える。最初の色は「山吹」
+const ACC_OLD = { amber: "yolk", green: "mint", purple: "lavender", gray: "white" };
+let accent = ls.get("tf-accent", "yolk");
+if (ACC_OLD[accent]) { accent = ACC_OLD[accent]; ls.set("tf-accent", accent); }
+if (!ACCS.some(([k]) => k === accent)) accent = "yolk";
 document.body.dataset.acc = accent;
 chrome.storage?.local.set({ "tf-accent": accent }); // YouTube の再生画面のツール(content.js)も、同じ色にする
 

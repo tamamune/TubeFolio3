@@ -4,11 +4,11 @@ let vMode = ls.get("tf-vmode", "grid") === "list" ? "list" : "grid";
 let vCols = Math.min(7, Math.max(3, +ls.get("tf-vcols", "5") || 5));
 
 const vbar = (pre = "") => `<div class="vbar">${pre}
-  <div class="vseg" role="radiogroup" aria-label="表示形式">
+  <div class="vseg grp" role="radiogroup" aria-label="表示形式">
     <button type="button" class="${vMode === "grid" ? "on" : ""}" data-vmode="grid" role="radio" aria-checked="${vMode === "grid"}" title="グリッド表示"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>グリッド</button>
     <button type="button" class="${vMode === "list" ? "on" : ""}" data-vmode="list" role="radio" aria-checked="${vMode === "list"}" title="リスト表示"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="3" y="4" width="18" height="4" rx="1.5"/><rect x="3" y="10" width="18" height="4" rx="1.5"/><rect x="3" y="16" width="18" height="4" rx="1.5"/></svg>リスト</button>
   </div>
-  <label class="vcols" ${vMode === "list" ? "hidden" : ""}>列数 <input type="range" min="3" max="7" step="1" value="${vCols}" data-vcols aria-label="横に並べる列数"><b data-vcols-n>${vCols}</b></label>
+  <label class="vcols grp" ${vMode === "list" ? "hidden" : ""} title="横に並べる列数(マウスのホイールでも変えられます)"><span class="s-cl">列数</span><select class="wsel" data-vcols aria-label="横に並べる列数">${[3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${n === vCols ? "selected" : ""}>${n}列</option>`).join("")}</select></label>
 </div>`;
 const vgrid = (cards) => `<div class="grid vg ${vMode === "list" ? "vl" : ""}" style="--cols:${vCols}">${cards}</div>`;
 
@@ -21,26 +21,20 @@ function setCols(n) {
   vCols = n; ls.set("tf-vcols", String(vCols));
   document.querySelectorAll(".vg").forEach((g) => g.style.setProperty("--cols", vCols));
   document.querySelectorAll("[data-vcols]").forEach((r) => { if (+r.value !== vCols) r.value = vCols; });
-  document.querySelectorAll("[data-vcols-n]").forEach((x) => { x.textContent = vCols; });
 }
 document.addEventListener("input", (e) => { if (e.target.matches("[data-vcols]")) setCols(+e.target.value); });
-// マウスのホイール: 「列数」の上で回すと 1列ずつ変える(上へ回すと増える)。その間、ページはスクロールしない
+// 選ぶリスト(select.wsel)の上でマウスのホイールを回すと、1つずつ変える(上へ回すと大きく)。その間、ページはスクロールしない
+// 列数・検索のランダムの個数などで共通に使う。変えたら change と input を送る(選んだのと同じ扱い)
 let vWheelAt = 0;
 document.addEventListener("wheel", (e) => {
-  const box = e.target.closest?.(".vcols"); if (!box || box.hidden) return;
+  const sel = e.target.closest?.("select.wsel") || e.target.closest?.(".vcols:not([hidden])")?.querySelector("select.wsel");
+  if (!sel || sel.disabled) return;
   e.preventDefault();
   const d = e.deltaY || e.deltaX; if (!d) return;
-  const now = performance.now(); if (now - vWheelAt < 120) return; // タッチパッドなどで一度に何回も届くのを、1列ずつにする
-  vWheelAt = now; setCols(vCols + (d < 0 ? 1 : -1));
+  const now = performance.now(); if (now - vWheelAt < 120) return; // タッチパッドなどで一度に何回も届くのを、1つずつにする
+  vWheelAt = now;
+  const i = Math.min(sel.options.length - 1, Math.max(0, sel.selectedIndex + (d < 0 ? 1 : -1)));
+  if (i === sel.selectedIndex) return;
+  sel.selectedIndex = i;
+  sel.dispatchEvent(new Event("input", { bubbles: true })); sel.dispatchEvent(new Event("change", { bubbles: true }));
 }, { passive: false });
-// タッチ・ペン: 指の位置から列数を決める(ブラウザの標準のスライダーは、タッチだとページのスクロールと取り違えて動かないことがある)
-// マウスは標準のスライダーのまま。CSS の touch-action:none と組み合わせる
-document.addEventListener("pointerdown", (e) => {
-  const r = e.target.closest?.("[data-vcols]"); if (!r || e.pointerType === "mouse") return;
-  e.preventDefault();
-  try { r.setPointerCapture(e.pointerId); } catch {}
-  const at = (ev) => { const b = r.getBoundingClientRect(); setCols(+r.min + Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)) * (+r.max - +r.min)); };
-  at(e);
-  const end = () => { r.removeEventListener("pointermove", at); r.removeEventListener("pointerup", end); r.removeEventListener("pointercancel", end); };
-  r.addEventListener("pointermove", at); r.addEventListener("pointerup", end); r.addEventListener("pointercancel", end);
-});

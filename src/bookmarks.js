@@ -2,6 +2,9 @@
    データ: data.marks = { [動画ID]: { title, channel, duration, pub, at, notes: [{ t: 秒, text, at }] } }
    ・サムネイルの🔖ボタンはやめた(bmBtn は空を返す)。埋め込みプレーヤーの🔖(pl-bm)は残す */
 const bmAll = () => Object.entries(data.marks || {}).sort((a, b) => (b[1].at || "").localeCompare(a[1].at || ""));
+// ダミー表示(設定のテスト)のときに並べる、見え方の確認用のブックマーク
+const D_MARK = [["作業用BGM 集中できる音楽", "音楽チャンネル", "1:02:10", [[95, "サビ前のこの展開が好き"], [610, "ここから作業用に最適"]]], ["はじめてのプログラミング入門", "プログラミング講座", "24:30", [[130, "変数の説明"], [480, "関数の書き方(あとで復習)"], [1210, ""]]], ["15分で作る簡単晩ごはん", "料理の達人", "15:12", [[200, "調味料の分量をメモ"]]], ["世界の絶景ドライブ 4K", "旅行Vlog", "38:05", [[900, "ここの景色がきれい"]]]];
+const dummyMarks = () => D_MARK.map(([t, c, d, ns], i) => [`dummymark${i}`, { dummy: true, n: 400 + i, title: `【ダミー】${t}`, channel: `【ダミー】${c}`, duration: d, at: new Date(Date.now() - i * 864e5).toISOString(), notes: ns.map(([s, x], j) => ({ t: s, text: x, at: `dummy${i}-${j}` })) }]);
 const isBm = (id) => !!data.marks?.[id];
 const bmBtn = () => "";
 const bmFmt = (s) => { s = Math.max(0, Math.floor(+s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0"); };
@@ -17,22 +20,22 @@ async function bmToggle(id) {
 }
 
 function bookmarksView() {
-  const list = bmAll();
+  const list = useDummy ? dummyMarks() : bmAll();
   if (!list.length) return `<div class="s-head">ブックマーク</div><div class="empty">ブックマークはまだありません。<br>YouTube で動画を再生しているときにキーボードの <kbd>B</kbd> を押すと、その時間にメモを書けます。書いたメモはここに並びます。</div>`;
   const q = bmQ.trim().toLowerCase(); let shown = 0;
   const nNotes = list.reduce((s, [, v]) => s + (v.notes?.length || 0), 0);
   return `<div class="s-bar"><div class="s-head">ブックマーク<small class="bm-n">${list.length}本 ・ メモ ${nNotes}件</small></div><input type="search" id="bm-q" class="bm-q" placeholder="メモ・タイトル・チャンネルで探す" value="${esc(bmQ)}"></div>`
     + `<p class="bm-hint">YouTube で再生中に <kbd>B</kbd> を押すと、その時間のメモを追加できます。時間を押すと、その場面から再生します。</p>`
     + `<div class="bm-list">${list.map(([id, v]) => {
-      vmap.set(id, v);
+      if (!v.dummy) vmap.set(id, v);
       const notes = (v.notes || []).slice().sort((a, b) => a.t - b.t);
       const hay = [v.title, v.channel, ...notes.map((n) => n.text)].join("\n").toLowerCase();
       const ok = !q || hay.includes(q); if (ok) shown++;
       const scene = (v.notes || []).filter((n) => n.img).sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0]; // いちばん新しくメモした場面の画像
-      return `<div class="bm-r" data-bmhay="${esc(hay)}"${ok ? "" : " hidden"}>${scene ? `<button class="bm-th" data-bmt="${esc(id)}|${scene.t}" title="${bmFmt(scene.t)} から再生"><img loading="lazy" src="${esc(scene.img)}" alt=""><span class="dur">${bmFmt(scene.t)}</span></button>` : `<button class="bm-th" data-v="${esc(id)}" title="再生"><img loading="lazy" src="${thumb(id)}" alt="">${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}</button>`}`
-        + `<div class="bm-b"><div class="bm-tt"><button class="bm-ti" data-v="${esc(id)}">${esc(v.title || id)}</button><button type="button" class="bm-rm" data-bmrm="${esc(id)}" title="ブックマークから外す(メモも消えます)">✕</button></div>`
+      return `<div class="bm-r" data-bmhay="${esc(hay)}"${ok ? "" : " hidden"}>${v.dummy ? `<span class="bm-th">${dummyTh(v.n)}${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}</span>` : scene ? `<button class="bm-th" data-bmt="${esc(id)}|${scene.t}" title="${bmFmt(scene.t)} から再生"><img loading="lazy" src="${esc(scene.img)}" alt=""><span class="dur">${bmFmt(scene.t)}</span></button>` : `<button class="bm-th" data-v="${esc(id)}" title="再生"><img loading="lazy" src="${thumb(id)}" alt="">${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}</button>`}`
+        + `<div class="bm-b"><div class="bm-tt">${v.dummy ? `<span class="bm-ti">${esc(v.title)}</span>` : `<button class="bm-ti" data-v="${esc(id)}">${esc(v.title || id)}</button><button type="button" class="bm-rm" data-bmrm="${esc(id)}" title="ブックマークから外す(メモも消えます)">✕</button>`}</div>`
         + `<small class="bm-ch">${esc(v.channel || "")}${v.at ? ` ・ ${esc(v.at.slice(0, 10).replace(/-/g, "/"))}` : ""}</small>`
-        + (notes.length ? `<ul class="bm-ns">${notes.map((n) => `<li>${n.img && notes.length > 1 ? `<button type="button" class="bm-ni" data-bmt="${esc(id)}|${n.t}" title="${bmFmt(n.t)} から再生"><img loading="lazy" src="${esc(n.img)}" alt=""></button>` : ""}<button type="button" class="bm-t" data-bmt="${esc(id)}|${n.t}" title="${bmFmt(n.t)} から再生">${bmFmt(n.t)}</button><span class="bm-x" data-bmed="${esc(id)}|${esc(n.at)}" role="button" tabindex="0" title="押すと編集">${n.text ? esc(n.text) : `<i>(メモなし ・ 押すと書けます)</i>`}</span><button type="button" class="bm-eb" data-bmedit="${esc(id)}|${esc(n.at)}" title="このメモを書き直す">✎ 編集</button><button type="button" class="bm-nd" data-bmnd="${esc(id)}|${esc(n.at)}" title="このメモを消す">✕</button></li>`).join("")}</ul>` : "")
+        + (notes.length ? `<ul class="bm-ns">${notes.map((n) => `<li>${n.img && notes.length > 1 ? `<button type="button" class="bm-ni" data-bmt="${esc(id)}|${n.t}" title="${bmFmt(n.t)} から再生"><img loading="lazy" src="${esc(n.img)}" alt=""></button>` : ""}${v.dummy ? `<span class="bm-t">${bmFmt(n.t)}</span><span class="bm-x">${n.text ? esc(n.text) : `<i>(メモなし)</i>`}</span>` : `<button type="button" class="bm-t" data-bmt="${esc(id)}|${n.t}" title="${bmFmt(n.t)} から再生">${bmFmt(n.t)}</button><span class="bm-x" data-bmed="${esc(id)}|${esc(n.at)}" role="button" tabindex="0" title="押すと編集">${n.text ? esc(n.text) : `<i>(メモなし ・ 押すと書けます)</i>`}</span><button type="button" class="bm-eb" data-bmedit="${esc(id)}|${esc(n.at)}" title="このメモを書き直す">✎ 編集</button><button type="button" class="bm-nd" data-bmnd="${esc(id)}|${esc(n.at)}" title="このメモを消す">✕</button>`}</li>`).join("")}</ul>` : "")
         + `</div></div>`;
     }).join("")}</div><p class="bm-none"${shown ? " hidden" : ""}>一致するブックマークはありません。</p>`;
 }

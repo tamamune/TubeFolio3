@@ -13,9 +13,10 @@ const bucket = (ages) => [...PERIODS.map(([, d]) => ages.filter((a) => a <= d * 
 const ageOf = (v) => { const d = vDate(v); return d ? Date.now() - d.getTime() : null; }; // vDate は search.js
 
 // 動画 / ライブ配信のタブを、1年より前の投稿が出てくるまで読む
-async function tabAges(id, tab) {
+async function tabAges(id, tab, info) {
   const ages = []; let partial = false;
   let page = await ytPage(`https://www.youtube.com/channel/${encodeURIComponent(id)}/${tab}?hl=ja`); // ytPage / ytMore は search.js
+  if (info) { if (page.desc) info.desc = page.desc.slice(0, 800); info.titles.push(...page.list.map((v) => v.title).filter(Boolean)); } // 登録補助で使う: 概要欄と動画のタイトル
   for (let i = 0; ; i++) {
     const ds = page.list.map(ageOf).filter((a) => a != null);
     ages.push(...ds);
@@ -46,8 +47,11 @@ async function fetchStats(c) {
   if (c.dummy) return dummyStats(c.id);
   const s = { at: Date.now(), part: [], last: {} };
   const latest = (ages) => ages.length ? Date.now() - Math.min(...ages) : null; // いちばん新しい投稿の時刻
-  for (const [k, tab] of [["video", "videos"], ["live", "streams"]]) { const r = await tabAges(c.id, tab); s[k] = bucket(r.ages); s.last[k] = latest(r.ages); if (r.partial) s.part.push(k); }
+  const info = { desc: "", titles: [] };
+  for (const [k, tab] of [["video", "videos"], ["live", "streams"]]) { const r = await tabAges(c.id, tab, info); s[k] = bucket(r.ages); s.last[k] = latest(r.ages); if (r.partial) s.part.push(k); }
   const sh = await shortAges(c.id); s.short = bucket(sh.ages); s.last.short = latest(sh.ages); if (sh.partial) s.part.push("short");
+  // 登録補助(フォルダの候補)のために、概要欄と最近の動画タイトルを覚えておく(ドライブ同期の対象。大きくなりすぎないよう短く)
+  c.desc = info.desc; c.titles = [...new Set(info.titles)].slice(0, 30).map((t) => t.slice(0, 80));
   return s;
 }
 // ids のチャンネルを順に調べる(同時に2件まで)。1件終わるごとにその行だけ描き直す
@@ -104,13 +108,94 @@ function chRow(c, from) {
   const sum = s && statMode === "last" ? STAT_KINDS.map(([k, n]) => { const li = lastInfo(s, k); return `<span class="cs-chip" title="${n}: いちばん新しい投稿">${n} <b>${li.text || (li.idx >= 0 ? (li.idx < 7 ? PERIODS[li.idx][0] : "1年以上") : "")}</b></span>`; }).join("") + `<small>最新の投稿</small>`
     : s ? STAT_KINDS.map(([k, n]) => `<span class="cs-chip" title="${n}: 1か月以内の投稿数">${n} <b>${s[k][3]}</b></span>`).join("") + `<small>1か月以内</small>` : `<small>未調査</small>`;
   return `<div class="chr ${c.subscribed === false ? "gone" : ""} ${open ? "open" : ""}" draggable="true" data-chid="${esc(c.id)}">
-    <div class="chr-h">${av}<div class="chr-t">${name}<small>${esc(handleTxt(c.handle))}${c.subscribed === false ? " ・ 登録解除済み" : ""}</small></div>
+    <div class="chr-h">${av}<div class="chr-t"><span class="chr-nl">${name}${rateBtn(c)}${skipBtn(c)}${notifyBtn(c)}</span><small>${esc(handleTxt(c.handle))}${c.subscribed === false ? " ・ 登録解除済み" : ""}</small></div>
       <button class="chr-i ${fl.length ? "on named" : ""}" data-chf="${esc(c.id)}" title="フォルダ: ${fl.length ? esc(fl.join("・")) : "未分類"}(押すと選べます)" aria-label="フォルダを選ぶ">${ICO_FOLDER}${fl.length ? `<span class="chr-fn">${esc(fl[0])}</span>${fl.length > 1 ? `<i>+${fl.length - 1}</i>` : ""}` : ""}</button>
       <div class="chr-s">${sum}</div>
       <button class="chr-i ${busy ? "spin" : ""}" data-chstat="${esc(c.id)}" ${busy ? "disabled" : ""} title="${s ? "もう一度調べる" : "動画・ライブ配信・ショートの投稿を調べる"}" aria-label="${s ? "再調査" : "調べる"}">${ICO_REFRESH}</button>${from ? `<button class="chr-x" data-chrm="${esc(c.id)}" data-from="${esc(from)}" title="このフォルダから外す" aria-label="このフォルダから外す">✕</button>` : ""}</div>
+    ${chSugHtml(c)}
     ${open ? `<div class="chr-d">${statTable(c)}</div>` : ""}</div>`;
 }
+// 登録補助: 一覧の上に件数と「候補を表示/隠す」ボタン(候補そのものは、各チャンネルの行に出す)
+let sgShow = ls.get("tf-ch-sug", "1") === "1"; // 候補を出すか(設定はドライブ同期の対象)
+function sgCount(list) { const tm = titlesByChannel(); let n = 0; for (const c of list) n += chSuggest(c, tm).length; return n; } // 候補の数(ボタンに出す)
+// チャンネル名で検索(名前・ハンドル名。入力中は一覧だけ絞り込み、入力欄はそのまま)
+let chQ = "", chQTimer = 0;
+const chQOk = (c) => { const q = nz(chQ.trim()); return !q || nz(c.name).includes(q) || nz(c.handle).includes(q); };
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "ch-q") return;
+  chQ = e.target.value; clearTimeout(chQTimer);
+  chQTimer = setTimeout(() => { const a = e.target.selectionStart; render(); const i = $("ch-q"); if (i) { i.focus({ preventScroll: true }); try { i.setSelectionRange(a, a); } catch {} } }, 180);
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("[data-sgshow]")) return; sgShow = !sgShow; ls.set("tf-ch-sug", sgShow ? "1" : "0"); render(); });
+// 各チャンネルの行の候補: チャンネル名の下に1行で、フォルダ名だけの小さなボタンを並べる。押すと登録、✕で候補から外す
+let sgTmap = null, sgTmapAt = 0;
+function chSugHtml(c) {
+  if (!sgShow) return "";
+  if (Date.now() - sgTmapAt > 2000) { sgTmap = titlesByChannel(); sgTmapAt = Date.now(); } // 一覧を描くあいだは使い回す
+  const s = chSuggest(c, sgTmap); if (!s.length) return "";
+  return `<div class="chr-sg"><span class="chr-sgl">候補</span>${s.map(({ f, k, where }) => `<span class="chr-sgc"><button type="button" class="chr-sga" data-sgadd="${esc(c.id)}|${esc(f.id)}" title="「${esc(folderPath(f.id))}」に登録する(「${esc(k)}」← ${esc(where)})">＋ ${esc(folderPath(f.id))}</button><button type="button" class="chr-sgx" data-sgx="${esc(c.id)}|${esc(f.id)}" title="このフォルダの候補から外す" aria-label="候補から外す">✕</button></span>`).join("")}</div>`;
+}
 let curFolderForRow = "";
+
+/* ---------- チャンネルごとの再生速度(c.rate)。YouTube の再生画面で、このチャンネルの動画を開いたら自動でこの速さにする(chrate.js) ---------- */
+const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const rateTxt = (r) => r + "x";
+const rateBtn = (c) => `<button type="button" class="chr-rate ${c.rate ? "on" : ""}" data-chrate="${esc(c.id)}" title="${c.rate ? `このチャンネルの動画は ${rateTxt(c.rate)} で再生します(押すと変えられます)` : "このチャンネルの動画の再生速度を決める"}">⏩ ${c.rate ? rateTxt(c.rate) : "倍速"}</button>`;
+function rateMenu(btn) {
+  document.querySelector(".rate-pop")?.remove();
+  const id = btn.dataset.chrate, c = data.channels?.[id]; if (!c) return;
+  const m = document.createElement("div"); m.className = "rate-pop"; m.setAttribute("role", "menu");
+  m.innerHTML = `<div class="rate-h">再生速度 <small>${esc(c.name)}</small></div>`
+    + `<button type="button" role="menuitem" data-rateset="" class="${c.rate ? "" : "on"}">指定しない<small>YouTube の速さのまま</small></button>`
+    + `<div class="rate-g">${RATES.map((r) => `<button type="button" role="menuitem" data-rateset="${r}" class="${c.rate === r ? "on" : ""}">${rateTxt(r)}</button>`).join("")}</div>`;
+  document.body.appendChild(m);
+  const b = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left)) + "px";
+  m.style.top = (b.bottom + 6 + h > innerHeight ? Math.max(8, b.top - h - 6) : b.bottom + 6) + "px";
+  m.dataset.ratech = id;
+}
+document.addEventListener("click", async (e) => {
+  const nb = e.target.closest("[data-chnotify]");
+  if (nb) { e.preventDefault(); e.stopPropagation(); const c = data.channels?.[nb.dataset.chnotify]; if (!c) return; c.notify = !c.notify; if (!c.notify) delete c.notify; await persist(); paintRow(c.id); return toast(c.notify ? `「${c.name}」の新着をお知らせします` : `「${c.name}」の新着のお知らせを止めました(LIVE・緊急などはお知らせします)`); }
+  const sb = e.target.closest("[data-chskip]");
+  if (sb) { e.preventDefault(); e.stopPropagation(); return document.querySelector(`.sk-pop[data-skch="${CSS.escape(sb.dataset.chskip)}"]`) ? document.querySelector(".rate-pop").remove() : skipMenu(sb); }
+  const b = e.target.closest("[data-chrate]");
+  if (b) { e.preventDefault(); e.stopPropagation(); return document.querySelector(`.rate-pop[data-ratech="${CSS.escape(b.dataset.chrate)}"]`) ? document.querySelector(".rate-pop").remove() : rateMenu(b); }
+  const pop = document.querySelector(".rate-pop"); if (!pop) return;
+  const s = e.target.closest("[data-rateset]");
+  if (s && pop.contains(s)) {
+    const c = data.channels?.[pop.dataset.ratech];
+    if (c) { const r = +s.dataset.rateset; if (r) c.rate = r; else delete c.rate; await persist(); paintRow(c.id); toast(r ? `「${c.name}」の動画を ${rateTxt(r)} で再生します` : `「${c.name}」の再生速度の指定を外しました`); }
+  }
+  if (!pop.contains(e.target) || s) pop.remove();
+}, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelector(".rate-pop")?.remove(); });
+
+/* ---------- チャンネル別: 冒頭の〇秒を飛ばす / 最後の〇秒で止める(c.skip = { head, tail }。YouTube の再生画面で chrate.js が使う) ---------- */
+const SK_HEAD = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120], SK_TAIL = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120];
+const skipTxt = (c) => { const h = +c.skip?.head || 0, t = +c.skip?.tail || 0; return h || t ? [h ? `冒頭${h}秒` : "", t ? `最後${t}秒` : ""].filter(Boolean).join("・") : ""; };
+const skipBtn = (c) => `<button type="button" class="chr-rate ${skipTxt(c) ? "on" : ""}" data-chskip="${esc(c.id)}" title="${skipTxt(c) ? `冒頭を飛ばす・最後で止める: ${skipTxt(c)}(押すと変えられます)` : "このチャンネルの動画で、冒頭の〇秒を飛ばす・最後の〇秒で止める"}">⏭ ${skipTxt(c) || "スキップ"}</button>`;
+function skipMenu(btn) {
+  document.querySelector(".rate-pop")?.remove();
+  const id = btn.dataset.chskip, c = data.channels?.[id]; if (!c) return;
+  const m = document.createElement("div"); m.className = "rate-pop sk-pop"; m.dataset.skch = id;
+  const sel = (k, list, label) => `<label class="sk-r"><span>${label}</span><select class="sel wsel" data-skset="${k}">${list.map((n) => `<option value="${n}" ${(+c.skip?.[k] || 0) === n ? "selected" : ""}>${n ? n + "秒" : "しない"}</option>`).join("")}</select></label>`;
+  m.innerHTML = `<div class="rate-h">冒頭を飛ばす・最後で止める <small>${esc(c.name)}</small></div>${sel("head", SK_HEAD, "冒頭を飛ばす")}${sel("tail", SK_TAIL, "最後の〇秒で止める")}<small class="sk-n">オープニングや、終わりのお知らせ・エンドカードを飛ばすのに使います。途中から開いたときは飛ばしません。</small>`;
+  document.body.appendChild(m);
+  const b = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left)) + "px";
+  m.style.top = (b.bottom + 6 + h > innerHeight ? Math.max(8, b.top - h - 6) : b.bottom + 6) + "px";
+}
+document.addEventListener("change", async (e) => {
+  const s = e.target.closest?.("[data-skset]"); if (!s) return;
+  const id = s.closest(".sk-pop")?.dataset.skch, c = data.channels?.[id]; if (!c) return;
+  c.skip = { ...(c.skip || {}), [s.dataset.skset]: +s.value };
+  if (!c.skip.head && !c.skip.tail) delete c.skip;
+  await persist(); paintRow(id);
+});
+/* ---------- チャンネル別: 新着のお知らせ(c.notify。PC の通知。background.js が15分ごとに確かめる) ---------- */
+const notifyBtn = (c) => `<button type="button" class="chr-rate chr-bell ${c.notify ? "on" : ""}" data-chnotify="${esc(c.id)}" title="${c.notify ? "新着をお知らせします(押すと止める)" : "新着をお知らせしない(押すとお知らせする)。タイトルに LIVE・緊急などがある動画は、この設定に関係なくお知らせします"}" aria-pressed="${!!c.notify}">${c.notify ? "🔔" : "🔕"}</button>`;
+addEventListener("scroll", () => document.querySelector(".rate-pop")?.remove(), true);
 function paintRow(id) {
   const el = document.querySelector(`.chr[data-chid="${CSS.escape(id)}"]`), c = data.channels?.[id]; if (!el || !c) return;
   const t = document.createElement("div"); t.innerHTML = chRow(c, curFolderForRow); el.replaceWith(t.firstElementChild);
@@ -124,22 +209,28 @@ function paintStatBar() {
 
 // フォルダ管理の画面(登録チャンネル / フォルダ / 未分類): フォルダの切り替えは左のサイドバーで行い、ここにはチャンネルの表を出す
 function channelsView(t) {
-  const all = chIn(t), list = chPer >= 0 || chKind !== "all" ? all.filter(chPassPer) : all, f = data.folders.find((x) => x.id === t), miss = all.filter((c) => !c.stats).length;
+  const all = chIn(t), list = (chPer >= 0 || chKind !== "all" ? all.filter(chPassPer) : all).filter(chQOk), f = data.folders.find((x) => x.id === t), miss = all.filter((c) => !c.stats).length;
   curFolderForRow = f ? f.id : "";
   const last = +ls.get("tf-ch-sync", "0");
-  const sync = t === "channels" ? `<button class="btn s" data-act="sync" ${syncing ? "disabled" : ""}>${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span>` : "";
+  // YouTubeと同期: めったに使わないので、見出しの右端に小さく置く
+  const sync = t === "channels" ? `<span class="ch-sync"><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span><button type="button" class="s-op" data-act="sync" ${syncing ? "disabled" : ""} title="YouTubeの登録チャンネルを取り込み直します">${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button></span>` : "";
   const sib = f ? data.folders.filter((x) => (x.parent || "") === (f.parent || "")) : [], si = f ? sib.indexOf(f) : -1;
   const mv = f ? `<button class="btn s" data-act="up" data-id="${esc(f.id)}" ${si <= 0 ? "disabled" : ""} title="フォルダを上へ">▲ 上へ</button><button class="btn s" data-act="down" data-id="${esc(f.id)}" ${si >= sib.length - 1 ? "disabled" : ""} title="フォルダを下へ">▼ 下へ</button>${f.parent ? `<button class="btn s" data-act="unnest" data-id="${esc(f.id)}" title="親フォルダの外(ひとつ上の階層)へ出します">入れ子を解除</button>` : ""}` : "";
   const fa = ""; // フォルダの操作(上へ・下へ・名前の変更・削除など)は、サイドバーのフォルダ行の ▲▼ と「⋯」メニューで行う
-  const modeSw = `<span class="cs-sw" role="radiogroup" aria-label="表示の切り替え"><button type="button" class="tab ${statMode === "count" ? "on" : ""}" data-statmode="count" role="radio" aria-checked="${statMode === "count"}">投稿数</button><button type="button" class="tab ${statMode === "last" ? "on" : ""}" data-statmode="last" role="radio" aria-checked="${statMode === "last"}">最新の投稿</button></span>`;
-  const stat = all.length ? modeSw + `<button class="btn s" data-act="statsall" ${statBusy.size ? "disabled" : ""} title="表示中のチャンネルの、動画・ライブ配信・ショートの投稿数を期間ごとに調べます">📊 期間別に調べる(${all.length}件)</button><button class="btn s" data-act="statsmiss" ${statBusy.size || !miss ? "disabled" : ""} title="まだ調べていないチャンネルだけを、調べます">未取得を取得(${miss}件)</button><button class="btn s" data-act="statsopen">${list.every((c) => chOpen.has(c.id)) ? "すべて閉じる" : "すべて開く"}</button><span class="sync-i" id="cs-bar">${statBusy.size ? `調査中 ${statRun.done} / ${statRun.total}` : ""}</span>` : "";
+  const modeSw = `<span class="s-chips" role="radiogroup" aria-label="表示の切り替え"><span class="s-cl">表示</span><button type="button" class="tab ${statMode === "count" ? "on" : ""}" data-statmode="count" role="radio" aria-checked="${statMode === "count"}">投稿数</button><button type="button" class="tab ${statMode === "last" ? "on" : ""}" data-statmode="last" role="radio" aria-checked="${statMode === "last"}">最新の投稿</button></span>`;
+  // 調べるための操作(検索の「記号」と同じ小さなボタン)
+  // 右: 調べる操作(1段目「期間別に調べる」、2段目「未取得を取得」と調査の進み具合)
+  const tools = all.length ? `<div class="ch-tools"><div class="ch-tr"><span class="s-cl">調べる</span><button type="button" class="s-op s-dice" data-act="statsall" ${statBusy.size ? "disabled" : ""} title="表示中のチャンネルの、動画・ライブ配信・ショートの投稿数を期間ごとに調べます">📊 期間別に調べる(${all.length}件)</button></div><div class="ch-tr"><span class="sync-i" id="cs-bar">${statBusy.size ? `調査中 ${statRun.done} / ${statRun.total}` : ""}</span><button type="button" class="s-op" data-act="statsmiss" ${statBusy.size || !miss ? "disabled" : ""} title="まだ調べていないチャンネルだけを、調べます">未取得を取得(${miss}件)</button></div></div>` : "";
+  // 区切り線の下: 左にチャンネル名の検索、右に「候補を隠す」「すべて開く」
+  const sgN = sgCount(list);
+  const bar2 = all.length ? `<div class="ch-bar2"><label class="ch-q">${SEARCH_ICO}<input type="search" id="ch-q" placeholder="チャンネル名で検索" value="${esc(chQ)}" autocomplete="off"></label>${chPerNote(all, list)}${chQ ? `<span class="sync-i">${list.length}件</span>` : ""}<span class="ch-tr ch-b2r">${sgN ? `<button type="button" class="s-op ${sgShow ? "on" : ""}" data-sgshow aria-pressed="${sgShow}" title="${sgShow ? "フォルダ登録の補助機能を非表示にする" : "フォルダ登録の補助機能を表示する"}">${sgShow ? "登録補助を非表示" : "登録補助を表示"}(${sgN})</button>` : ""}<button type="button" class="s-op" data-act="statsopen">${list.length && list.every((c) => chOpen.has(c.id)) ? "投稿履歴を閉じる" : "投稿履歴を開く"}</button></span></div>` : "";
   const empty = t === "channels"
     ? (useDummy ? "ダミーのチャンネルを準備しています…" : "登録チャンネルがありません。「YouTubeと同期」を押すと、YouTubeの登録チャンネルを取り込みます。")
     : "このフォルダにはチャンネルがありません。チャンネルの📁ボタンか、ドラッグで追加できます。";
   const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
-  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length !== all.length ? `${list.length} / ${all.length}` : list.length}チャンネル</small></h2>
+  return `<section class="row"><h2 class="ch-h">${esc(folderName(t))}<small>${list.length !== all.length ? `${list.length} / ${all.length}` : list.length}チャンネル</small>${sync}</h2>
     <div class="fm2">
-    <div class="fm2-main">${crumb}<div class="ch-bar">${sync}${fa}</div><div class="ch-bar">${stat}</div>${all.length ? chPerBar(all, list) : ""}${sgPanel(t)}
+    <div class="fm2-main">${crumb}${all.length ? `<div class="ch-panel"><div class="ch-filters"><div class="ch-fr">${modeSw}${chPerBar(1)}</div><div class="ch-fr">${chPerBar(2)}</div></div>${tools}</div>${bar2}` : ""}
     ${list.length ? `<div class="chr-list">${list.map((c) => chRow(c, f ? f.id : "")).join("")}</div>` : `<div class="empty" style="margin:0">${empty}</div>`}</div></div></section>`;
 }
 
@@ -238,7 +329,7 @@ function placePv(t) {
 // マウスを乗せた要素から、プレビューするチャンネルを求める
 //  ・チャンネル一覧の行(.chr-h) / 動画カードのチャンネル名(.cn: ホーム・検索・ブックマーク)
 function pvTarget(e) { // チャンネル一覧の行にマウスを乗せたときだけ(動画カードの上では動画のプレビュー再生: thumbpv.js)
-  const h = e.target.closest(".chr-h"); if (!h) return null;
+  const h = e.target.closest(".chr-h"); if (!h || e.target.closest(".chr-rate,.chr-i,.chr-x")) return null; // 倍速・フォルダなどのボタンの上では出さない(押しやすく)
   const c = data.channels?.[h.closest(".chr")?.dataset.chid];
   return c ? { key: c.id, ck: c.id, c, anchor: h, side: "right" } : null;
 }
@@ -277,7 +368,7 @@ function folderListView(t) {
   const f = data.folders.find((x) => x.id === t), list = chIn(t);
   curFolderForRow = f ? f.id : "";
   const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
-  if (!useDummy && !S.sub.started) loadSub(true); // 新着をまだ読んでいなければ、読み始める(読むたびに paintFolderList で描き直す)
+  if (!S.sub.started) loadSub(true); // 新着をまだ読んでいなければ、読み始める(読むたびに paintFolderList で描き直す)
   setTimeout(paintFolderList, 0);
   const bar = `<div class="ch-bar cs-per"><span class="cs-pl">投稿が</span><span class="cs-sw" role="group" aria-label="期間で絞り込む">${perButtons(flPer, "flper")}</span></div>`;
   return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2>${crumb}${bar}<div id="fl-out"></div></section>`;
@@ -286,8 +377,7 @@ function paintFolderList() {
   const box = $("fl-out"); if (!box || folderMode !== "list") return;
   const t = tab, ids = new Set(chIn(t).map((c) => c.id)), st = S.sub;
   let h = "";
-  if (useDummy) h = `<div class="empty" style="margin:0">ダミー表示中は、動画の一覧は表示されません(設定で切り替えられます)。</div>`;
-  else if (!ids.size) h = `<div class="empty" style="margin:0">このフォルダにはチャンネルがありません。「設定」にして、📁ボタンかドラッグで追加できます。</div>`;
+  if (!ids.size) h = `<div class="empty" style="margin:0">このフォルダにはチャンネルがありません。「設定」にして、📁ボタンかドラッグで追加できます。</div>`;
   else {
     const items = shown(st.list).filter((v) => { const c = v.channel ? subMap().get(subNorm(v.channel)) : null; return c && ids.has(c.id) && (flPer < 0 || (ageOf(v) ?? Infinity) <= PERIODS[flPer][1] * DAY); }).sort((a, b) => (vDate(b)?.getTime() || 0) - (vDate(a)?.getTime() || 0));
     if (st.err) h += `<div class="empty" style="margin:12px 0">${esc(st.err)}</div>`;
@@ -322,9 +412,14 @@ let chKind = ls.get("tf-ch-kind", "all"); if (!["all", "video", "live", "short"]
 let flPer = +ls.get("tf-fl-per", "-1"); if (!(flPer >= 0 && flPer < PERIODS.length)) flPer = -1;
 const chPassPer = (c) => !!c.stats && STAT_KINDS.filter(([k]) => chKind === "all" || chKind === k).some(([k]) => { const li = lastInfo(c.stats, k); return li.idx >= 0 && (chPer < 0 || li.idx <= chPer); });
 const perButtons = (cur, attr) => `<button type="button" class="tab ${cur < 0 ? "on" : ""}" data-${attr}="-1">すべて</button>` + PERIODS.map(([n], i) => `<button type="button" class="tab ${cur === i ? "on" : ""}" data-${attr}="${i}">${n}</button>`).join("");
-function chPerBar(all, list) {
+// 絞り込み: 「最新の投稿が」〔種類〕「の」〔期間〕以内(検索の「対象」「種類」と同じ見た目)
+const chPerBar = (part) => (part === 2 ? "" : `<span class="s-chips" role="group" aria-label="投稿の種類"><span class="s-cl">種類</span>${[["all", "すべて"], ...STAT_KINDS].map(([k, n]) => `<button type="button" class="tab ${chKind === k ? "on" : ""}" data-chkind="${k}">${k === "all" ? "すべて" : n}</button>`).join("")}</span>`)
+  + (part === 1 ? "" : `<span class="s-chips" role="group" aria-label="最新の投稿の期間で絞り込む"><span class="s-cl">最新の投稿</span>${perButtons(chPer, "chper")}</span>`);
+// 絞り込み中の件数(調べていないチャンネルは対象外)
+function chPerNote(all, list) {
+  if (chPer < 0 && chKind === "all") return "";
   const miss = all.filter((c) => !c.stats).length;
-  return `<div class="ch-bar cs-per"><span class="cs-pl">最新の投稿が</span><span class="cs-sw" role="group" aria-label="投稿の種類">${[["all", "すべて"], ...STAT_KINDS].map(([k, n]) => `<button type="button" class="tab ${chKind === k ? "on" : ""}" data-chkind="${k}">${k === "all" ? "すべて" : n}</button>`).join("")}</span><span class="cs-pl">の</span><span class="cs-sw" role="group" aria-label="期間で絞り込む">${perButtons(chPer, "chper")}</span>${chPer >= 0 || chKind !== "all" ? `<span class="sync-i">${list.length}件${miss ? ` ・ 未調査の${miss}件は対象外(「未取得を取得」で調べられます)` : ""}</span>` : ""}</div>`;
+  return `<span class="sync-i">絞り込み ${list.length}件${miss ? ` ・ 未調査の${miss}件は対象外` : ""}</span>`;
 }
 document.addEventListener("click", (e) => { // 投稿の種類(すべて / 動画 / ライブ配信 / ショート)
   const b = e.target.closest("[data-chkind]"); if (!b) return;

@@ -957,3 +957,279 @@ dialog.ask p{margin:0 0 16px;font-size:14px;line-height:1.6;white-space:pre-wrap
 .log-c small{display:block;color:#666;font-size:11px}
 .log-m{white-space:pre-wrap;word-break:break-word;color:#eee;line-height:1.5}
 @media (max-width:700px){.log-r{grid-template-columns:auto auto 1fr}.log-m{grid-column:1/-1}}
+
+/* ===== 検索まわりの刷新: 上に固定の検索バー・入力の✕・履歴・差し色の選択表示 ===== */
+.s-top{position:sticky;top:0;z-index:12;padding:2px 0 10px;background:linear-gradient(#000 82%,rgba(0,0,0,0));backdrop-filter:blur(6px)}
+.s-top .s-form{max-width:none;width:calc(100% - 64px);margin:16px 32px 12px;padding:5px 5px 5px 20px;border:1px solid #333;border-radius:999px;background:#101010;transition:border-color .15s,box-shadow .15s}
+.s-top .s-form:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px rgba(var(--acc-a),.16)}
+.s-top .s-form input{height:42px;font-size:16px}
+.s-top .s-form input::-webkit-search-cancel-button{display:none}
+.s-top .s-form .btn{height:42px;padding:0 26px;border-radius:999px;background:var(--acc);color:#000;font-weight:800}
+.s-clr{flex:none;width:30px;height:30px;border:0;border-radius:50%;background:#262626;color:#ccc;font-size:13px;cursor:pointer}
+.s-clr:hover{background:#3a3a3a;color:#fff}.s-clr[hidden]{display:none}
+.s-top .s-filters{padding:0 0 4px;border:0}
+.s-top .s-chips{background:#121212;border:1px solid #232323}
+.s-top .s-chips .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+.s-hist{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 32px 0}.s-hist:empty{display:none}
+.s-h{max-width:220px;height:28px;padding:0 12px;border:1px solid #262626;border-radius:999px;background:#141414;color:#ccc;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.s-h:hover{border-color:var(--acc);color:#fff}
+.s-hx{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline}
+@media (max-width:820px){.s-top .s-form{width:calc(100% - 32px);margin-left:16px;margin-right:16px}.s-hist{margin-left:16px;margin-right:16px}}
+
+.s-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 32px 0}
+.s-op{height:28px;padding:0 11px;border:1px solid #2a2a2a;border-radius:8px;background:#141414;color:#ddd;font:600 12.5px/1 inherit;cursor:pointer}
+.s-op:hover{border-color:var(--acc);color:#fff}
+.s-rnd{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.s-rn{display:inline-flex;gap:2px;padding:2px;border-radius:999px;background:#121212;border:1px solid #232323}
+.s-n{width:26px;height:24px;border:0;border-radius:999px;background:none;color:#bbb;font-weight:700;cursor:pointer}
+.s-n.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+.s-dice{border-color:rgba(var(--acc-a),.5);color:var(--acc)}
+@media (max-width:820px){.s-tools{margin-left:16px;margin-right:16px}.s-rnd{margin-left:0}}
+
+/* タグ一覧: 開いた動画一覧は専用の行に置く(押した列より右の項目が動かない)。1つ分の取り置き・削除ボタン */
+.tg-r.open{grid-column:auto;background:none}
+.tg-r{position:relative}
+.tg-r.open .tg-n{background:#1c1c1c}
+.tg-pv{grid-column:1/-1;margin:2px 0 8px;padding:6px 0;background:#111;border-radius:8px}
+.tg-act{position:absolute;right:4px;top:2px;display:none;gap:2px;padding:1px;border-radius:6px;background:#1c1c1c}
+.tg-r:hover .tg-act,.tg-r:focus-within .tg-act{display:flex}
+.tg-ab{width:24px;height:24px;border:0;border-radius:5px;background:none;color:#ccc;font-size:12px;cursor:pointer;filter:grayscale(1);opacity:.75}
+.tg-ab:hover{background:#2c2c2c;opacity:1;filter:none}
+.tg-ab.on{opacity:1;filter:none;background:rgba(var(--acc-a),.2)}
+.tg-ab.del:hover{background:#c33;color:#fff}
+@media (hover:none){.tg-act{display:flex;position:static;background:none}}
+/* YouTube と Google ドライブ(同期)のアカウントが違うとき */
+.ds-hi small.ds-acct{color:#bbb}
+.ds-warn{margin:12px 0;padding:16px 18px;border:1px solid rgba(255,170,0,.55);border-radius:14px;background:rgba(255,170,0,.08)}
+.ds-warn>b{display:block;color:#ffb84d;font-size:15px}
+.ds-warn .ds-dl{border-top-color:rgba(255,170,0,.25);margin-top:10px;flex-wrap:wrap;gap:8px 28px}
+.ds-warn .ds-dl dd{word-break:break-all}
+.acct.acct-warn .acct-t small{color:#ffb84d}
+/* メンバー限定の印(サムネイルの左下) */
+.mem{position:absolute;left:6px;bottom:6px;z-index:1;padding:0 6px;border-radius:3px;background:#1f8a3a;color:#fff;font-size:11.5px;font-weight:800;line-height:18px;pointer-events:none}
+/* 検索の「隠す」(オンのときは反転) */
+.s-hide .tab.on{background:#fff;color:#000}
+
+/* ===== 登録チャンネル / フォルダの画面: 検索と同じ見た目にそろえる ===== */
+.row h2.ch-h{align-items:center;flex-wrap:wrap}
+.ch-sync{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:13px;font-weight:400}
+.ch-sync .s-op{height:28px}
+/* 左: 絞り込み(2段) / 右: 調べる操作(2段・右寄せ)。下に区切り線 */
+.ch-panel{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 24px;flex-wrap:wrap;margin:4px 0 14px;padding:0 0 12px;border-bottom:1px solid #262626}
+.ch-filters,.ch-tools{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ch-tools{align-items:flex-end;margin-left:auto}
+.ch-fr,.ch-tr{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.ch-tr{justify-content:flex-end;min-height:36px}
+.ch-filters .s-chips{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:#121212;border:1px solid #232323}
+.ch-filters .s-cl{width:auto;padding:0 8px 0 12px;color:var(--muted);font-size:12px;font-weight:700}
+.ch-filters .s-chips .tab{height:28px;padding:0 14px;background:none;color:#bbb;font-size:13px}
+.ch-filters .s-chips .tab:hover{color:#fff}
+.ch-filters .s-chips .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+.ch-tools .s-cl{color:var(--muted);font-size:12px;font-weight:700}
+.ch-tools .s-op{height:30px}
+.ch-tools .s-op:disabled{opacity:.45;cursor:default;border-color:#2a2a2a;color:#888}
+@media (max-width:820px){.ch-tools{align-items:flex-start;margin-left:0}.ch-tr{justify-content:flex-start}.ch-filters .s-chips{flex-wrap:wrap;border-radius:16px}}
+
+/* ===== チャンネルごとの再生速度(フォルダ設定のチャンネル名の横) ===== */
+.chr-nl{display:flex;align-items:center;gap:8px;min-width:0}
+.chr-nl .chr-n{min-width:0;overflow:hidden}
+.chr-rate{flex:none;height:22px;padding:0 9px;border:1px solid #333;border-radius:999px;background:#141414;color:#999;font:700 11.5px/1 inherit;cursor:pointer;white-space:nowrap}
+.chr-rate:hover{border-color:var(--acc);color:#fff}
+.chr-rate.on{border-color:rgba(var(--acc-a),.55);background:rgba(var(--acc-a),.16);color:var(--acc)}
+.rate-pop{position:fixed;z-index:60;width:236px;padding:10px;border:1px solid #2c2c2c;border-radius:12px;background:#161616;box-shadow:0 12px 32px rgba(0,0,0,.6)}
+.rate-h{margin:0 2px 8px;font-weight:800;font-size:13px}
+.rate-h small{display:block;margin-top:2px;color:var(--muted);font-weight:400;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rate-pop button{border:1px solid #2a2a2a;border-radius:8px;background:#101010;color:#ddd;font:700 13px/1 inherit;cursor:pointer}
+.rate-pop button:hover{border-color:var(--acc);color:#fff}
+.rate-pop button.on{border-color:rgba(var(--acc-a),.6);background:rgba(var(--acc-a),.18);color:var(--acc)}
+.rate-pop>button{display:flex;align-items:baseline;gap:8px;width:100%;height:32px;padding:0 10px;margin-bottom:6px}
+.rate-pop>button small{color:var(--muted);font-weight:400;font-size:11px}
+.rate-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.rate-g button{height:32px}
+/* キーワードの追加欄: 「,」区切りでまとめて入力できるよう広めに */
+.kw-in[data-kwin]{flex:1 1 320px;max-width:520px}
+
+/* ===== 登録補助: チャンネルの行に出すフォルダの候補(チャンネル名の下に1行で) ===== */
+.chr-sg{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:0 14px 12px 62px;margin-top:-4px}
+.chr-sgl{margin-right:2px;color:var(--muted);font-size:12px;font-weight:700}
+.chr-sgc{display:inline-flex;align-items:stretch;height:28px;border:1px solid rgba(var(--acc-a),.45);border-radius:999px;background:rgba(var(--acc-a),.08);overflow:hidden;transition:border-color .12s,background .12s}
+.chr-sgc:hover{border-color:var(--acc)}
+.chr-sga{max-width:260px;padding:0 10px 0 12px;border:0;background:none;color:var(--acc);font:700 12.5px/28px inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.chr-sga:hover{background:var(--acc);color:#000}
+.chr-sgx{flex:none;width:26px;border:0;border-left:1px solid rgba(var(--acc-a),.25);background:none;color:#888;font-size:11px;cursor:pointer}
+.chr-sgx:hover{background:#c33;color:#fff}
+@media (max-width:820px){.chr-sg{padding-left:14px}}
+.sg-sum{align-items:center}
+.sg-sum .s-op{margin-left:auto;height:28px}
+.sg-sum .s-op.on{border-color:rgba(var(--acc-a),.5);color:var(--acc)}
+.sg-sum.off{border-style:solid;border-color:#262626}
+@media (max-width:820px){.chr-sg{margin:0 8px 10px}.chr-sgg{grid-template-columns:1fr}}
+.sg-sum{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 12px;padding:8px 14px;border:1px dashed rgba(var(--acc-a),.4);border-radius:10px;color:#ddd;font-size:13px}
+.sg-sum b{color:var(--acc)}
+.sg-sum small{color:var(--muted);font-size:12px}
+
+/* 登録チャンネル: 区切り線の下の行(左にチャンネル名の検索、右に「候補を隠す」「すべて開く」) */
+.ch-bar2{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:0 0 14px}
+.ch-q{display:flex;align-items:center;gap:8px;flex:0 1 420px;min-width:200px;height:36px;padding:0 14px;border:1px solid #2c2c2c;border-radius:999px;background:#101010;transition:border-color .15s,box-shadow .15s}
+.ch-q:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px rgba(var(--acc-a),.16)}
+.ch-q svg{flex:none;width:18px;height:18px;color:var(--muted)}
+.ch-q input{flex:1;min-width:0;height:100%;border:0;background:none;color:#fff;font-size:14px;outline:0}
+.ch-b2r{margin-left:auto}
+.ch-b2r .s-op{height:30px}
+.ch-b2r .s-op.on{border-color:rgba(var(--acc-a),.5);color:var(--acc)}
+@media (max-width:820px){.ch-b2r{margin-left:0}.ch-q{flex-basis:100%}}
+
+/* ===== 数を選ぶリスト(列数・ランダムの個数)。ホイールでも変えられる ===== */
+.wsel{height:30px;padding:0 26px 0 12px;border:1px solid #2c2c2c;border-radius:999px;background-color:#121212;color:#fff;font-weight:700;font-size:13px;cursor:ns-resize}
+.wsel:hover,.wsel:focus{border-color:var(--acc);outline:0}
+.vcols .wsel{min-width:76px}
+.s-rnl{display:inline-flex;align-items:center;gap:6px}
+.s-rnl .s-cl{width:auto;padding:0}
+/* 「隠す」は結果の見出しの行(グリッド・リストの左) */
+.vbar .s-hide{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid #232323;border-radius:999px;background:#121212}
+.vbar .s-hide .s-cl{width:auto;padding:0 8px 0 10px;color:var(--muted);font-size:12px;font-weight:700}
+.vbar .s-hide .tab{height:28px;padding:0 12px;background:none;color:#bbb;font-size:13px}
+.vbar .s-hide .tab:hover{color:#fff}
+.vbar .s-hide .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+/* 検索の履歴は1行に。入りきらない分は横にスクロール(ホイールでも動く)。「消去」は常に右端 */
+.s-hist{flex-wrap:nowrap}
+.s-hist .s-cl{flex:none}
+.s-hl{display:flex;gap:6px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
+.s-hl::-webkit-scrollbar{display:none}
+.s-hl .s-h{flex:none}
+.s-hx{flex:none;white-space:nowrap}
+
+/* 登録補助タブ: 「候補 N」を押すと、そのフォルダの候補のチャンネルを行の下に出す */
+.kw-sb{height:24px;padding:0 10px;border:1px solid rgba(var(--acc-a),.45);border-radius:999px;background:rgba(var(--acc-a),.08);color:var(--acc);font:700 12px/1 inherit;cursor:pointer}
+.kw-sb:hover,.kw-sb.on{background:rgba(var(--acc-a),.2)}
+.kw-sgl{grid-column:1 / -1;display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:2px 0 4px;padding:10px 12px;border-radius:10px;background:#0b0b0b;border:1px solid #1f1f1f}
+.kw-sgh{margin-right:4px;color:var(--muted);font-size:12px;font-weight:700}
+.kw-sgc{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 12px;border:1px solid #2a2a2a;border-radius:999px;background:#141414}
+.kw-sgc b{max-width:240px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kw-sgok{height:22px;padding:0 9px;border:0;border-radius:999px;background:rgba(var(--acc-a),.2);color:var(--acc);font:700 11.5px/1 inherit;cursor:pointer}
+.kw-sgok:hover{background:var(--acc);color:#000}
+.kw-sgx{width:22px;height:22px;border:0;border-radius:50%;background:none;color:#888;font-size:11px;cursor:pointer}
+.kw-sgx:hover{background:#c33;color:#fff}
+
+/* 検索: 対象・種類・タグで検索を1行に。再生回数・記号は「詳しい条件」で開く */
+.s-top .s-filters .s-rnd{margin-left:0}
+.s-advb{margin-left:auto;height:32px;border-radius:999px;padding:0 14px}
+.s-advb.on{border-color:rgba(var(--acc-a),.5);color:var(--acc)}
+.s-advb.act{border-color:rgba(var(--acc-a),.5);color:var(--acc);background:rgba(var(--acc-a),.1)}
+.s-adv{display:flex;align-items:center;flex-wrap:wrap;gap:8px 24px;margin:2px 32px 0;padding:10px 12px;border:1px solid #1f1f1f;border-radius:14px;background:#0b0b0b}
+.s-adv[hidden]{display:none}
+.s-adv .s-tools{margin:0}
+.s-adv .s-chips{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:#121212;border:1px solid #232323}
+.s-adv .s-cl{width:auto;padding:0 8px 0 12px;font-size:12px}
+.s-adv .s-tools .s-cl{padding:0 6px 0 0}
+.s-adv .s-chips .tab{height:28px;padding:0 14px;background:none;color:#bbb;font-size:13px}
+.s-adv .s-chips .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+@media (max-width:820px){.s-adv{margin-left:16px;margin-right:16px}.s-advb{margin-left:0}}
+/* 設定「一般」: 就寝時間 **:**〜**:** */
+.set-bed{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.set-bed input[type=time]{width:auto;min-width:110px;color-scheme:dark}
+.set-bed input:disabled{opacity:.45}
+
+/* ===== 部品の見た目をそろえる(検索・一覧の表示切り替え) =====
+   ・grp: 名前付きのまとまり。高さ36の丸い枠の中に、名前(小さく薄い字)と、高さ28の丸いボタン・選ぶリストを並べる
+   ・選ばれているもの: 差し色の薄い塗りと細い枠
+   ・pill: まとまりに入らない単独のボタン(同じ高さ・同じ枠) */
+#main .grp{display:inline-flex;align-items:center;flex-wrap:nowrap;gap:2px;height:36px;box-sizing:border-box;padding:3px;border:1px solid #232323;border-radius:999px;background:#121212;overflow:visible;margin:0}
+#main .grp[hidden]{display:none}
+#main .grp .s-cl{width:auto;padding:0 8px 0 12px;color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
+#main .grp .tab,#main .grp button{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 14px;border:0;border-radius:999px;background:none;box-shadow:none;color:#bbb;font:700 13px/1 inherit;white-space:nowrap;cursor:pointer}
+#main .grp .tab:hover,#main .grp button:hover{color:#fff;background:#1d1d1d}
+#main .grp .tab.on,#main .grp button.on{background:rgba(var(--acc-a),.2);color:var(--acc);box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+#main .grp .s-dice{color:var(--acc)}
+#main .grp select.wsel{height:28px;min-width:72px;padding:0 26px 0 12px;border:0;border-radius:999px;background-color:#1d1d1d;color:#fff;font:700 13px/1 inherit}
+#main .grp select.wsel:hover,#main .grp select.wsel:focus{outline:0;box-shadow:inset 0 0 0 1px rgba(var(--acc-a),.55)}
+#main .pill{display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;padding:0 16px;border:1px solid #232323;border-radius:999px;background:#121212;color:#ddd;font:700 13px/1 inherit;white-space:nowrap;cursor:pointer}
+#main .pill:hover{color:#fff;border-color:#3a3a3a}
+#main .pill.on,#main .pill.act{border-color:rgba(var(--acc-a),.55);background:rgba(var(--acc-a),.12);color:var(--acc)}
+/* 並べ方 */
+#main .s-top .s-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+#main .s-advb{margin-left:auto}
+#main .s-adv{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:8px 32px 0;padding:0;border:0;background:none}
+#main .s-adv[hidden]{display:none}
+#main .vbar{gap:8px 10px}
+#main .vbar .vseg svg{width:15px;height:15px}
+@media (max-width:820px){#main .grp{height:auto;flex-wrap:wrap;border-radius:18px}#main .s-advb{margin-left:0}#main .s-adv{margin-left:16px;margin-right:16px}}
+
+/* 色の変更: 追加の色 */
+body[data-acc="blue"]{--acc:#7b8ff0;--acc-s:#5d6fc6;--acc-t:#b2bef6;--acc-f:#7a85ba;--acc-a:123,143,240}
+body[data-acc="lavender"]{--acc:#b39dff;--acc-s:#876fdb;--acc-t:#d7ccff;--acc-f:#9d8fcf;--acc-a:179,157,255}
+body[data-acc="violet"]{--acc:#a855f7;--acc-s:#8642c8;--acc-t:#c68ffa;--acc-f:#8e64b7;--acc-a:168,85,247}
+body[data-acc="pink"]{--acc:#ff4fa0;--acc-s:#ce3d80;--acc-t:#ff8cc1;--acc-f:#bb618a;--acc-a:255,79,160}
+body[data-acc="rose"]{--acc:#e8b0a8;--acc-s:#c1877f;--acc-t:#f4dad7;--acc-f:#be9b96;--acc-a:232,176,168}
+body[data-acc="mauve"]{--acc:#d0708c;--acc-s:#a75970;--acc-t:#df9eb1;--acc-f:#a0707e;--acc-a:208,112,140}
+body[data-acc="crimson"]{--acc:#ff4d5e;--acc-s:#ce3b49;--acc-t:#ff8a95;--acc-f:#bb6068;--acc-a:255,77,94}
+body[data-acc="yolk"]{--acc:#ffc857;--acc-s:#d0a142;--acc-t:#ffdc94;--acc-f:#bda065;--acc-a:255,200,87}
+body[data-acc="lime"]{--acc:#9ccc65;--acc-s:#7c9f55;--acc-t:#badb93;--acc-f:#839b68;--acc-a:156,204,101}
+body[data-acc="forest"]{--acc:#5fb38d;--acc-s:#568570;--acc-t:#88c7ab;--acc-f:#648576;--acc-a:95,179,141}
+body[data-acc="mint"]{--acc:#5ee6b0;--acc-s:#4bb98d;--acc-t:#93eeca;--acc-f:#67ac91;--acc-a:94,230,176}
+body[data-acc="cyan"]{--acc:#3cc8e6;--acc-s:#3e97aa;--acc-t:#72d7ed;--acc-f:#5594a1;--acc-a:60,200,230}
+body[data-acc="dune"]{--acc:#b9ab98;--acc-s:#958979;--acc-t:#d2c9bc;--acc-f:#989187;--acc-a:185,171,152}
+body[data-acc="white"]{--acc:#f2f2f2;--acc-s:#c2c2c2;--acc-t:#e6e6e6;--acc-f:#cecece;--acc-a:242,242,242}
+/* 色が増えたので、丸い見本は折り返して並べる */
+.acc-dots{flex-wrap:wrap;justify-content:flex-end;max-width:420px;gap:8px}
+
+/* ===== 再生リストの連続再生(playq.js) ===== */
+.pq-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 32px 14px}
+#main .pq-bar .s-cl b{color:var(--acc)}
+#main .pq-bar button:disabled{opacity:.4;cursor:default}
+@media (max-width:820px){.pq-bar{margin-left:16px;margin-right:16px}}
+
+/* ===== サムネイルの低評価率(dislike.js) ===== */
+.th .dl{position:absolute;right:6px;top:6px;z-index:2;padding:1px 7px;border-radius:4px;background:rgba(0,0,0,.78);color:#ddd;font-size:11px;font-weight:800;line-height:18px;pointer-events:auto}
+.th .dl.warn{background:#d32f2f;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
+
+/* チャンネル行の ⏭(冒頭・最後)と 🔔(新着のお知らせ) */
+.chr-bell{padding:0 7px}
+.sk-pop{width:280px}
+.sk-r{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 8px;font-size:13px;font-weight:700}
+.sk-r .wsel{min-width:100px}
+.sk-n{display:block;margin:2px 2px 0;color:var(--muted);font-size:11px;line-height:1.5}
+/* 削除・非公開の動画: Wayback Machine で探す */
+.th .wb{position:absolute;left:50%;top:50%;z-index:3;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.82);color:#fff;font-size:12.5px;font-weight:800;white-space:nowrap;cursor:pointer;border:1px solid rgba(255,255,255,.25)}
+.th .wb:hover{background:var(--acc);color:#000}
+/* 色の見本は 7個ずつ2段(14色)に、同じ数でそろえて並べる */
+.acc-dots{display:grid;grid-template-columns:repeat(7,28px);gap:8px;max-width:none;justify-content:end}
+/* 新着のお知らせ: いつも通知するタイトルの文字 */
+.nvw-row{align-items:flex-start}
+.nvw{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;max-width:520px}
+.nvw-add{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nvw .kw-in{width:230px}
+
+/* ===== 急上昇(日本)(trend.js) ===== */
+.tr-nav{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 32px 12px}
+#main .tr-nav button:disabled{opacity:.35;cursor:default}
+#main .tr-date input{height:28px;padding:0 10px;border:0;border-radius:999px;background:#1d1d1d;color:#fff;font:700 13px/1 inherit;color-scheme:dark}
+#main .tr-nav a.pill{text-decoration:none;font-weight:600;color:#aaa}
+.th .trk{position:absolute;left:6px;top:6px;z-index:2;min-width:26px;padding:1px 7px;border-radius:4px;background:var(--acc);color:#000;font-size:12px;font-weight:900;line-height:18px;text-align:center}
+.th .trk ~ .wch{top:30px}
+@media (max-width:820px){.tr-nav{margin-left:16px;margin-right:16px}}
+
+/* ===== Google の急上昇ワード(検索画面) ===== */
+.gt{margin:8px 32px 0;padding:10px 12px 12px;border:1px solid #1f1f1f;border-radius:14px;background:#0b0b0b}
+.gt[hidden]{display:none}
+.gt-h{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-bottom:10px}
+.gt-h small{color:var(--muted);font-size:12px}
+#main .gt-h .pill{height:32px;padding:0 12px}
+.gt-l{display:flex;flex-wrap:wrap;gap:6px}
+.gt-w{display:inline-flex;align-items:baseline;gap:6px;height:30px;padding:0 12px 0 8px;border:1px solid #2a2a2a;border-radius:999px;background:#141414;color:#eee;font:700 13px/28px inherit;cursor:pointer}
+.gt-w:hover{border-color:var(--acc);color:#fff}
+.gt-w i{font-style:normal;color:var(--acc);font-size:11.5px;min-width:1.4em;text-align:right}
+.gt-w small{color:var(--muted);font-weight:400;font-size:11px}
+.gt-n{color:var(--muted);font-size:13px;padding:4px 2px}
+@media (max-width:820px){.gt{margin-left:16px;margin-right:16px}}
+
+/* 急上昇ワードのニュース(マウスを乗せたとき) */
+.gn-pop{position:fixed;z-index:70;width:360px;max-width:calc(100vw - 16px);padding:10px;border:1px solid #2c2c2c;border-radius:12px;background:#161616;box-shadow:0 12px 32px rgba(0,0,0,.6)}
+.gn-h{margin:0 2px 8px;font-weight:800;font-size:13px}
+.gn-i{display:flex;gap:10px;align-items:flex-start;padding:7px 6px;border-radius:8px;color:#eee;text-decoration:none}
+.gn-i:hover{background:#222}
+.gn-i img{flex:none;width:56px;height:56px;border-radius:6px;object-fit:cover;background:#222}
+.gn-i b{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
+.gn-i small{display:block;margin-top:3px;color:var(--muted);font-size:11.5px}
+.gn-n{padding:6px;color:var(--muted);font-size:13px}
+.gn-f{margin:6px 2px 0;color:#666;font-size:11px}

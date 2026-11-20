@@ -62,12 +62,16 @@ async function paintTags() {
     : (a, b) => b.vids.length - a.vids.length || b.last - a.last);
   tg.view = list;
   const seg = (name, cur, opts) => `<div class="tg-seg">${opts.map(([v, t]) => `<button type="button" class="${cur === v ? "on" : ""}" data-tg${name}="${v}">${t}</button>`).join("")}</div>`;
+  let panel = ""; // 開いたタグの動画一覧(押したタグの行の、すぐ下に置く: tgPlacePanel)
   const rows = list.slice(0, tg.limit).map((e, i) => {
     const open = !tg.selMode && tg.open === tgKey(e), picked = tg.selMode && tg.sel.has(tgKey(e));
-    const vids = open ? e.vids.map((id) => [id, tg.log.v[id]]).filter(([, r]) => r).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)) : [];
-    return `<div class="tg-r${open ? " open" : ""}${picked ? " picked" : ""}"><button type="button" class="tg-n" data-tgopen="${i}">${tg.selMode ? `<span class="tg-ck" aria-hidden="true">${picked ? "✓" : ""}</span>` : ""}${e.kept ? `<span class="tg-pin" title="取り置き(自動では消しません)">📌</span>` : ""}<span class="tg-name ${e.kind}">${esc(tgLabel(e))}</span><span class="tg-c">${e.vids.length}</span><span class="tg-d">${tgAgo(e.last)}</span></button>`
-      + (open ? `<ul class="tg-v">${vids.map(([id, r]) => `<li><a href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">${esc(r.t || id)}</a><small>${esc(r.ch || "")}${r.ch ? " ・ " : ""}見た日: ${tgAgo(r.at || 0)}</small></li>`).join("")}</ul>` : "")
-      + `</div>`;
+    if (open) {
+      const vids = e.vids.map((id) => [id, tg.log.v[id]]).filter(([, r]) => r).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+      panel = `<div class="tg-pv" data-tgpv="${i}"><ul class="tg-v">${vids.map(([id, r]) => `<li><a href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">${esc(r.t || id)}</a><small>${esc(r.ch || "")}${r.ch ? " ・ " : ""}見た日: ${tgAgo(r.at || 0)}</small></li>`).join("")}</ul></div>`;
+    }
+    // 1つ分の取り置き(📌)・削除(✕)のボタンは、マウスを乗せたときに右端へ出す(選別中は出さない)
+    const act = tg.selMode ? "" : `<span class="tg-act"><button type="button" class="tg-ab${e.kept ? " on" : ""}" data-tgpin="${i}" title="${e.kept ? "取り置きを外す" : "取り置きにする(自動では消しません)"}" aria-label="${e.kept ? "取り置きを外す" : "取り置きにする"}">📌</button><button type="button" class="tg-ab del" data-tgrm="${i}" title="このタグを削除(今後も記録しません)" aria-label="このタグを削除">✕</button></span>`;
+    return `<div class="tg-r${open ? " open" : ""}${picked ? " picked" : ""}"><button type="button" class="tg-n" data-tgopen="${i}">${tg.selMode ? `<span class="tg-ck" aria-hidden="true">${picked ? "✓" : ""}</span>` : ""}${e.kept ? `<span class="tg-pin" title="取り置き(自動では消しません)">📌</span>` : ""}<span class="tg-name ${e.kind}">${esc(tgLabel(e))}</span><span class="tg-c">${e.vids.length}</span><span class="tg-d">${tgAgo(e.last)}</span></button>${act}</div>`;
   }).join("");
   const n = tg.sel.size;
   const selBar = tg.selMode ? `<div class="tg-selbar"><b>${n}件を選択中</b><button type="button" class="btn s" data-tgkeep ${n ? "" : "disabled"}>📌 取り置きにする</button><button type="button" class="btn s" data-tgunkeep ${n ? "" : "disabled"}>取り置きを外す</button><button type="button" class="btn s tg-delbtn" data-tgdel ${n ? "" : "disabled"}>削除(今後も記録しない)</button><span class="tg-sp"></span><button type="button" class="tg-lk" data-tgall>表示中をすべて選択</button><button type="button" class="tg-lk" data-tgnone ${n ? "" : "disabled"}>選択を解除</button><button type="button" class="btn p" data-tgsel>選別を終わる</button></div>` : "";
@@ -79,10 +83,19 @@ async function paintTags() {
     + (tg.selMode ? "" : `<button type="button" class="btn s" data-tgsel ${all.length ? "" : "disabled"} title="取り置きにするタグ・削除するタグを選びます">選別する</button>`)
     + `<button type="button" class="btn s tg-copyall" data-tgcopyall>表示中をコピー</button><button type="button" class="btn s tg-clear" data-tgclear ${nV ? "" : "disabled"}>記録をすべて消す</button></div>`
     + selBar
-    + (list.length ? `<div class="tg-list${tg.selMode ? " selmode" : ""}">${rows}</div>` + (list.length > tg.limit ? `<button type="button" class="btn s tg-more" data-tgmore>さらに表示(残り ${list.length - tg.limit}件)</button>` : "")
+    + (list.length ? `<div class="tg-list${tg.selMode ? " selmode" : ""}">${rows}${panel}</div>` + (list.length > tg.limit ? `<button type="button" class="btn s tg-more" data-tgmore>さらに表示(残り ${list.length - tg.limit}件)</button>` : "")
       : `<p class="hint">${nV ? "一致するものがありません。" : "まだ記録がありません。YouTube で動画を見ると、ここにたまっていきます。"}</p>`)
     + (blk.length ? `<details class="tg-blk"${tg.blkOpen ? " open" : ""}><summary>記録しないタグ(${blk.length})<small>削除したタグです。✕で元に戻すと、また記録します</small></summary><div class="tg-blkl">${blk.map((s, i) => { const [kind, ...r] = String(s).split(":"), e = { kind, name: r.join(":") }; return `<span class="kw-chip"><span class="tg-name ${kind}">${esc(tgLabel(e))}</span><button type="button" data-tgunblock="${i}" aria-label="「${esc(tgLabel(e))}」を元に戻す" title="元に戻す(また記録する)">✕</button></span>`; }).join("")}</div></details>` : "");
+  tgPlacePanel();
 }
+// 開いたタグの動画一覧を、押したタグと同じ「行」の終わり(右端のあと)に置く。列の数は画面の幅で変わるので、実際の列数を測る
+function tgPlacePanel() {
+  const list = document.querySelector("#set-tags .tg-list"), pv = list?.querySelector(".tg-pv"); if (!pv) return;
+  const cells = [...list.querySelectorAll(":scope > .tg-r")], i = +pv.dataset.tgpv; if (!cells[i]) return;
+  const cols = Math.max(1, getComputedStyle(list).gridTemplateColumns.split(" ").length);
+  cells[Math.min(cells.length - 1, (Math.floor(i / cols) + 1) * cols - 1)].after(pv);
+}
+addEventListener("resize", () => tgPlacePanel());
 const tgCopy = (text, what) => navigator.clipboard.writeText(text).then(() => toast(`${what}をコピーしました`), () => toast("コピーできませんでした"));
 // 選んだタグ(tg.sel)を、取り置き・取り置き解除・削除にする。保存の直前に読み直して、再生画面の側で増えた記録を消さない
 async function tgApplySel(act) {
@@ -101,6 +114,10 @@ $("set-tags").addEventListener("click", async (ev) => {
   const t = (s) => ev.target.closest(s); let b;
   if ((b = t("[data-tgkind]"))) { tg.kind = b.dataset.tgkind; tg.limit = 200; return paintTags(); }
   if ((b = t("[data-tgsort]"))) { tg.sort = b.dataset.tgsort; return paintTags(); }
+  if ((b = t("[data-tgpin],[data-tgrm]"))) { // 1つだけ、取り置き(切り替え)・削除する
+    const e = tg.view[+(b.dataset.tgpin ?? b.dataset.tgrm)]; if (!e) return;
+    tg.sel = new Set([tgKey(e)]); return tgApplySel(b.dataset.tgrm !== undefined ? "del" : e.kept ? "unkeep" : "keep");
+  }
   if ((b = t("[data-tgopen]"))) {
     const e = tg.view[+b.dataset.tgopen]; if (tgCardEl) { tgCardEl.hidden = true; tgCardFor = null; } if (!e) return;
     if (tg.selMode) { const k = tgKey(e); if (tg.sel.has(k)) tg.sel.delete(k); else tg.sel.add(k); } // 選別中: 押すと選ぶ / 外す

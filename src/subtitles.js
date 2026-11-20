@@ -64,6 +64,7 @@
     b.textContent = "";
     if (o) b.append(el("div", "tf-dsub-o", o));
     if (j) b.append(el("div", "tf-dsub-j", j));
+    if (j && i >= 0 && globalThis.tfTts?.on()) globalThis.tfTts.speak(j, (cues.o[i + 1]?.s ?? cues.o[i].e) - cues.o[i].s); // 日本語で読み上げ(ptools.js)
   }
 
   /* ---------- 切り替え ---------- */
