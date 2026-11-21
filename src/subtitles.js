@@ -132,16 +132,16 @@
   function buildPane(m) {
     const r = el("div", "tf-cmr tf-subr"), lb = el("span", "tf-cml", "字幕");
     const s = el("div", "tf-seg"), paint = () => s.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === mode));
+    // 説明は、ボタンに重ねたときだけ出す
+    const tips = { off: "TubeFolio3 の字幕を使わない", ja: "日本語の音声は字幕なし(自動字幕もオフ)。外国語の音声は、日本語の字幕を表示します", both: "外国語の原文と日本語を、同時に表示します" };
     for (const [v, t] of [["off", "オフ"], ["ja", "日本語"], ["both", "二か国語"]]) {
-      const b = el("button", null, t); b.type = "button"; b.dataset.v = v;
+      const b = el("button", null, t); b.type = "button"; b.dataset.v = v; b.title = tips[v];
       b.onclick = () => { if (mode === v) return; mode = v; chrome.storage.local.set({ [KEY]: v }); paint(); apply(); };
       s.append(b);
     }
     r.append(lb, s); m.append(r); paint();
-    const help = el("div", "tf-subh");
-    help.append(el("div", null, "日本語: 日本語の音声は字幕なし(自動字幕もオフ)。外国語の音声は、日本語の字幕を表示します。"), el("div", null, "二か国語: 外国語の原文と日本語を、同時に表示します。"));
     const st = el("div", "tf-subs"); const upd = () => (st.textContent = note); listeners.add(upd); upd();
-    m.append(help, st);
+    m.append(st);
     const mo = new MutationObserver(() => { if (!m.isConnected) { listeners.delete(upd); mo.disconnect(); } }); mo.observe(document.body, { childList: true, subtree: true });
   }
   globalThis.tfSub = { buildPane };

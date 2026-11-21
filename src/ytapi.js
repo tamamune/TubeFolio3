@@ -104,6 +104,7 @@ const YTA = (() => {
   return {
     useHtml,
     browse: (continuation) => post("browse", { continuation }), // 一覧の続きを読む
+    subsFeed: () => post("browse", { browseId: "FEsubscriptions" }), // 登録チャンネルの新着(ログイン中のアカウントとして読む。新着のお知らせで使う)
     // privacy: "PRIVATE"(非公開) / "UNLISTED"(限定公開) / "PUBLIC"(公開)。作成した再生リストのIDを返す
     create: async (title, privacy = "PRIVATE") => {
       const j = await post("playlist/create", { title, privacyStatus: privacy });
@@ -116,6 +117,23 @@ const YTA = (() => {
     // すでに入っている動画は重ねて追加しない(DEDUPE_OPTION_SKIP)
     addVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_ADD_VIDEO", addedVideoId: videoId, dedupeOption: "DEDUPE_OPTION_SKIP" }]),
     removeVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_REMOVE_VIDEO_BY_VIDEO_ID", removedVideoId: videoId }]),
+    // 再生リストに入っている動画IDの一覧(続きのページも読む。最大 limit 本)。音楽の自動登録で、同じ動画を重ねて入れないために使う
+    playlistIds: async (playlistId, limit = 2000) => {
+      const out = [], seen = new Set();
+      const walk = (n, fn) => { if (!n || typeof n !== "object") return; fn(n); (Array.isArray(n) ? n : Object.values(n)).forEach((x) => walk(x, fn)); };
+      let j = await post("browse", { browseId: "VL" + playlistId });
+      for (let page = 0; page < 40; page++) {
+        let token = "";
+        walk(j, (n) => {
+          const id = n.playlistVideoRenderer?.videoId || (n.lockupViewModel?.contentType === "LOCKUP_CONTENT_TYPE_VIDEO" ? n.lockupViewModel.contentId : "");
+          if (id && !seen.has(id)) { seen.add(id); out.push(id); }
+          if (n.continuationItemRenderer) token = n.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || token;
+        });
+        if (!token || out.length >= limit) break;
+        j = await post("browse", { continuation: token });
+      }
+      return out;
+    },
     // 動画を入れられる自分の再生リスト一覧(YouTube の「保存」メニューと同じ。containsSelectedVideos が ALL なら、その動画は入っている)
     ownPlaylists: async (videoId) => {
       const j = await post("playlist/get_add_to_playlist", { videoIds: [videoId], excludeWatchLater: false });
@@ -158,7 +176,8 @@ const YTA = (() => {
       const out = new Map();
       walk(await post("next", { videoId }), (n) => {
         const m = n.macroMarkersListItemRenderer;
-        if (m) { const s = m.onTap?.watchEndpoint?.startTimeSeconds; if (s != null && !out.has(+s)) out.set(+s, tx(m.title)); }
+        // 同じチャプターが2か所から小数の秒(85.2 など)でも返ってくるので、秒は切り捨ててそろえ、重なりを1つにする
+        if (m) { const s = m.onTap?.watchEndpoint?.startTimeSeconds; if (s != null && isFinite(+s) && !out.has(Math.floor(+s))) out.set(Math.floor(+s), tx(m.title)); }
         const c = n.chapterRenderer;
         if (c && c.timeRangeStartMillis != null) { const s = Math.floor(c.timeRangeStartMillis / 1000); if (!out.has(s)) out.set(s, tx(c.title)); }
       });

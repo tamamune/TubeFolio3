@@ -422,3 +422,12 @@ function repaintFilters(refetch = false) {
 document.addEventListener("mousedown", (e) => { if (e.target.closest("[data-sop]")) e.preventDefault(); });
 // 履歴の行の上でホイールを回すと、横にスクロールする(1行に収めているため)
 document.addEventListener("wheel", (e) => { const l = e.target.closest?.(".s-hl"); if (!l || l.scrollWidth <= l.clientWidth || e.deltaX) return; e.preventDefault(); l.scrollLeft += e.deltaY; }, { passive: false }); // 押しても入力欄の選択が外れないように
+
+// #search=キーワード で開いたら、検索のページでそのキーワードを探す(YouTube の再生画面のタグから)
+{ const m = /^#search=(.*)$/.exec(location.hash); if (m) { try { sq = decodeURIComponent(m[1]); tab = "search"; } catch { /* 文字が壊れているときは何もしない */ } } }
+addEventListener("hashchange", () => { // すでに開いているときに、YouTube のタグから検索を頼まれた
+  const m = /^#search=(.*)$/.exec(location.hash); if (!m) return;
+  try { sq = decodeURIComponent(m[1]); } catch { return; }
+  showSettings?.(false); tab = "search"; sHistAdd(sq); render(); { const i = $("s-q"); if (i) i.value = sq; sSyncBar(); }
+  setTimeout(() => runSearch(true), 0);
+});

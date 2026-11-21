@@ -370,8 +370,8 @@ function folderListView(t) {
   const crumb = f && f.parent ? `<div class="crumb"><button class="tab" data-t="${esc(f.parent)}">↑ ${esc(folderPath(f.parent))}</button></div>` : "";
   if (!S.sub.started) loadSub(true); // 新着をまだ読んでいなければ、読み始める(読むたびに paintFolderList で描き直す)
   setTimeout(paintFolderList, 0);
-  const bar = `<div class="ch-bar cs-per"><span class="cs-pl">投稿が</span><span class="cs-sw" role="group" aria-label="期間で絞り込む">${perButtons(flPer, "flper")}</span></div>`;
-  return `<section class="row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2>${crumb}${bar}<div id="fl-out"></div></section>`;
+  // 一覧: 見出しの右に「▶ 連続再生」、その下に 隠す・表示(グリッド/リスト)・列数(再生リストのページと同じ操作バー)。「投稿が〇日以内」の絞り込みは使わない
+  return `<section class="row"><div class="lh-row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2><span id="fl-pq"></span></div>${crumb}${vbar(plHideRow())}<div id="fl-out"></div></section>`;
 }
 function paintFolderList() {
   const box = $("fl-out"); if (!box || folderMode !== "list") return;
@@ -379,7 +379,8 @@ function paintFolderList() {
   let h = "";
   if (!ids.size) h = `<div class="empty" style="margin:0">このフォルダにはチャンネルがありません。「設定」にして、📁ボタンかドラッグで追加できます。</div>`;
   else {
-    const items = shown(st.list).filter((v) => { const c = v.channel ? subMap().get(subNorm(v.channel)) : null; return c && ids.has(c.id) && (flPer < 0 || (ageOf(v) ?? Infinity) <= PERIODS[flPer][1] * DAY); }).sort((a, b) => (vDate(b)?.getTime() || 0) - (vDate(a)?.getTime() || 0));
+    const items = shown(st.list).filter((v) => { const c = v.channel ? subMap().get(subNorm(v.channel)) : null; return c && ids.has(c.id) && !(plHideW && isDone(v.id, v)) && !(plHideM && v.mem); }).sort((a, b) => (vDate(b)?.getTime() || 0) - (vDate(a)?.getTime() || 0));
+    const pq = $("fl-pq"); if (pq) pq.innerHTML = items.length ? playBar(items.map((v) => [v.id, v])) : ""; // 連続再生(playq.js)
     if (st.err) h += `<div class="empty" style="margin:12px 0">${esc(st.err)}</div>`;
     if (items.length) h += mixedGrid(items);
     if (st.busy) h += `<div class="s-load">読み込み中…${items.length ? `(${items.length}本)` : ""}</div>`;

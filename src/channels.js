@@ -251,9 +251,17 @@ async function syncSubs(silent) {
       else { chs[s.id] = { ...s, folders: [], subscribed: true }; added++; }
     }
     for (const c of Object.values(chs)) if (!c.dummy && c.subscribed !== false && !ids.has(c.id)) { c.subscribed = false; gone++; }
+    // 登録を解除したチャンネルは、一覧から消す(フォルダ分け・倍速・スキップなどの設定も一緒に消える)。
+    // 取得が途中で切れたときに、まとめて消さないよう、前に登録していた数の半分以上が取れたときだけ消す
+    let removed = 0;
+    const known = Object.values(chs).filter((c) => !c.dummy && ids.has(c.id)).length, wasSub = known + gone;
+    if (subs.length >= Math.max(1, wasSub * 0.5)) {
+      for (const [id, c] of Object.entries(chs)) if (!c.dummy && c.subscribed === false && !ids.has(id)) { delete chs[id]; removed++; }
+      for (const f of data.folders || []) if (f.ignored) f.ignored = f.ignored.filter((x) => ids.has(x));
+    }
     ls.set("tf-ch-sync", String(Date.now()));
     await persist();
-    if (!silent) toast(`同期しました(新規 ${added}件 / 登録解除 ${gone}件 / 全${subs.length}件)`);
+    if (!silent) toast(`同期しました(新規 ${added}件 / 登録解除 ${gone}件${removed ? ` → 一覧から削除 ${removed}件` : ""} / 全${subs.length}件)`);
   } catch { if (!silent) toast("同期できませんでした(YouTubeへのログインやページの仕様変更が原因かもしれません)"); }
   finally { syncing = false; render(); }
 }

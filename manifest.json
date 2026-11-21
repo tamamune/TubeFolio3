@@ -10,10 +10,10 @@
     "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
   },
   "web_accessible_resources": [
-    { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*"] }
+    { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"] }
   ],
   "permissions": ["storage", "unlimitedStorage", "declarativeNetRequest", "cookies", "identity", "alarms", "notifications"],
-  "host_permissions": ["https://www.youtube.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*", "https://returnyoutubedislikeapi.com/*", "https://youtube-trending.info/*", "https://trends.google.co.jp/*", "https://www.bing.com/*", "https://news.google.com/*"],
+  "host_permissions": ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://i.ytimg.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*", "https://returnyoutubedislikeapi.com/*", "https://youtube-trending.info/*", "https://trends.google.co.jp/*", "https://www.bing.com/*", "https://news.google.com/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [
     {
@@ -23,8 +23,27 @@
       "run_at": "document_start"
     },
     {
+      "matches": ["https://m.youtube.com/*"],
+      "js": ["src/log.js", "src/mobile.js"],
+      "css": ["src/mobile.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/embed/*"],
+      "js": ["src/embed-keep.js"],
+      "world": "MAIN",
+      "all_frames": true,
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.youtube.com/embed/*"],
+      "js": ["src/embed-ads.js"],
+      "all_frames": true,
+      "run_at": "document_end"
+    },
+    {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/log.js", "src/sponsorblock.js", "src/subtitles.js", "src/endscreen.js", "src/miniplay.js", "src/chrate.js", "src/pip.js", "src/wellbeing.js", "src/ptools.js", "src/content.js"],
+      "js": ["src/log.js", "src/sponsorblock.js", "src/subtitles.js", "src/endscreen.js", "src/miniplay.js", "src/chrate.js", "src/pip.js", "src/wellbeing.js", "src/ptools.js", "src/nvtoast.js", "src/chpage.js", "src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_idle"
     }

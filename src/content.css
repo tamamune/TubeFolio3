@@ -337,3 +337,209 @@ html.tf-mini-drag ytd-watch-flexy #movie_player{transition:none!important;pointe
 .tf-tpanel .tf-mtabs{flex-wrap:wrap;border-radius:16px}
 .tf-tpanel .tf-mtabs button{flex:1 1 auto;padding:0 10px;white-space:nowrap}
 .tf-tpanel .tf-mpane{max-height:calc(100vh - 220px);overflow-y:auto}
+
+/* ===== 🛠 ツールのパネルの見た目 =====
+   ・すりガラスの背景、上はアンダーラインのタブ、中身はカードにまとめる
+   ・選んでいるもの(タブの線・切り替えボタン)は、ツールの色(色の変更)にそろえる */
+.tf-tpanel{padding:6px 16px 16px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(22,22,24,.86);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.tf-tpanel .tf-mtabs{gap:2px;padding:0;margin:0 -4px;border-radius:0;background:none;border-bottom:1px solid rgba(255,255,255,.1)}
+.tf-tpanel .tf-mtabs button{position:relative;flex:1 1 auto;height:40px;padding:0 10px;border-radius:8px 8px 0 0;background:none;color:#bbb;opacity:1;font-weight:500;transition:color .15s,background .15s}
+.tf-tpanel .tf-mtabs button:hover{color:#fff;background:rgba(255,255,255,.05)}
+.tf-tpanel .tf-mtabs button.on{background:none;color:#fff;font-weight:600}
+.tf-tpanel .tf-mtabs button.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--tf-acc,#ffb400)}
+.tf-tpanel .tf-mpane{margin-top:12px;padding:2px 14px;border-radius:12px;background:rgba(255,255,255,.045)}
+.tf-tpanel .tf-cmr + .tf-cmr{border-top-color:rgba(255,255,255,.07)}
+.tf-tpanel .tf-cml{font-size:14px}
+.tf-tpanel .tf-seg{background:rgba(255,255,255,.08)}
+.tf-tpanel .tf-seg button{transition:background .15s,color .15s,opacity .15s}
+.tf-tpanel .tf-seg button:hover{opacity:1}
+.tf-tpanel .tf-seg button.on{background:var(--tf-acc,#ffb400);color:#111;font-weight:600}
+.tf-tpanel .tf-sbh,.tf-tpanel .tf-sbf{border-top-color:rgba(255,255,255,.07)}
+/* 字幕のタブ: 説明は用語とその説明に分け、今の状態はお知らせの帯で出す */
+.tf-tpanel .tf-subh{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:2px 0 12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;line-height:1.55;opacity:1;color:#aaa}
+.tf-tpanel .tf-subh b{color:#ddd;font-weight:600;white-space:nowrap}
+.tf-tpanel .tf-subs{margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--tf-acc,#ffb400);border-radius:6px;background:rgba(var(--tf-acc-a,255,180,0),.1);color:var(--tf-acc-t,#e0b84c);font-size:12.5px;line-height:1.5}
+/* コマ送り(操作バーの左。⟲〇 と 〇⟳ の間) */
+.tf-stepb{display:inline-flex!important;align-items:center;justify-content:center;width:var(--tf-bw,48px)!important;height:var(--tf-bh,48px)!important;padding:0!important;color:#fff;opacity:.9}
+.tf-stepb svg{width:var(--tf-is,30px);height:var(--tf-is,30px);overflow:visible;pointer-events:none}
+.tf-stepb:hover{opacity:1}
+/* コマ送り・〇秒送りは、操作バーの真ん中に置く(両端がコマ送り) */
+#movie_player .ytp-chrome-controls{position:relative}
+/* YouTube の左右の操作の入れ物(.ytp-left-controls など)は z-index:59 の flex の子で、真ん中まで広がって上にかぶさるので、それより上に置く */
+#movie_player .ytp-chrome-controls > .tf-seekg{position:absolute;left:50%;top:0;height:100%;transform:translateX(-50%);z-index:60;pointer-events:auto}
+/* 「字幕・読み上げ」タブ: 字幕の下に、線で区切って読み上げ */
+.tf-tpanel .tf-ttsr{border-top:1px solid rgba(255,255,255,.07)}
+
+/* ===== 🛠 ツールのパネル: コンパクトに(文字・ボタン・余白を小さく) ===== */
+.tf-tpanel{width:min(500px,92%);padding:2px 12px 12px;font-size:12.5px;border-radius:14px}
+.tf-tpanel .tf-mtabs button{height:34px;padding:0 8px;font-size:12px}
+.tf-tpanel .tf-mtabs button.on::after{left:10px;right:10px;height:2px}
+.tf-tpanel .tf-mpane{margin-top:8px;padding:0 10px;border-radius:10px}
+.tf-tpanel .tf-cmr{min-height:36px;gap:10px}
+.tf-tpanel .tf-tr{padding:5px 0}
+.tf-tpanel .tf-tr .tf-cml{width:100px;padding-top:4px}
+.tf-tpanel .tf-cml{font-size:12.5px}
+.tf-tpanel .tf-cml small{font-size:10.5px}
+.tf-tpanel .tf-tk{gap:4px}
+.tf-tpanel .tf-tb{height:24px;padding:0 9px;font-size:11.5px;font-weight:600}
+.tf-tpanel .tf-seg{padding:2px;gap:2px}
+.tf-tpanel .tf-seg button{height:22px;padding:0 10px;font-size:11.5px}
+.tf-tpanel .tf-sw{width:36px;height:20px}
+.tf-tpanel .tf-sw i{top:2px;left:2px;width:16px;height:16px}
+.tf-tpanel .tf-sw.on i{transform:translateX(16px)}
+.tf-tpanel .tf-szr input{width:96px}
+.tf-tpanel .tf-tinfo{font-size:11px}
+.tf-tpanel .tf-tsl{font-size:11.5px}
+.tf-tpanel .tf-tsl span{width:64px}
+.tf-tpanel .tf-subs{margin:0 0 8px;padding:5px 10px;font-size:11.5px}
+.tf-tpanel .tf-sbh{padding:8px 0 2px;font-size:11px}
+.tf-tpanel .tf-sbe,.tf-tpanel .tf-sbf{font-size:11.5px}
+.tf-tpanel .tf-sbr{min-height:32px}
+.tf-tpanel .tf-sbr .tf-cml{font-size:12px}
+.tf-tpanel .tf-sbsel{height:24px;font-size:11.5px}
+
+/* ===== 🛠 ツールのパネル: 横幅を狭く。項目名を上、操作を下に置く ===== */
+.tf-tpanel{width:min(380px,92%)}
+.tf-tpanel .tf-mtabs{gap:0}
+.tf-tpanel .tf-mtabs button{padding:0 6px;font-size:11.5px}
+.tf-tpanel .tf-mtabs button.on::after{left:6px;right:6px}
+.tf-tpanel .tf-tr{flex-direction:column;align-items:stretch;gap:6px;padding:8px 0}
+.tf-tpanel .tf-tr .tf-cml{width:auto;padding-top:0;font-size:11.5px;color:#bbb}
+/* ボタンが1つだけの行(読み上げ)は、項目名の右に置く */
+.tf-tpanel .tf-tr.tf-inl{flex-direction:row;align-items:center;justify-content:space-between}
+.tf-tpanel .tf-tr.tf-inl .tf-cml{color:#fff;font-size:12.5px}
+.tf-tpanel .tf-tr.tf-inl .tf-tk{flex:none}
+/* 速さのボタンは、同じ幅でそろえて並べる */
+.tf-tpanel .tf-rates .tf-tk{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:4px}
+.tf-tpanel .tf-rates .tf-tb{padding:0}
+.tf-tpanel .tf-rates .tf-tk{grid-template-columns:repeat(6,1fr)}
+.tf-tpanel .tf-rates.tf-ttsr .tf-tk{grid-template-columns:repeat(5,1fr)} /* 動画の再生速度(9個)は 5 + 4 で並べる */
+/* 「再生・画面」タブ: A-B リピートの下に、線で区切って画面の調整 */
+.tf-tpanel .tf-tvf{border-top:1px solid rgba(255,255,255,.07)}
+/* スクロールバーが2本出ていた(パネルと中身の両方がスクロールしていた) → パネルはスクロールさせず、タブの下の中身だけをスクロールする */
+.tf-tpanel{display:flex;flex-direction:column;overflow:hidden}
+.tf-tpanel .tf-mtabs{flex:none}
+.tf-tpanel .tf-mpane{flex:0 1 auto;min-height:0;max-height:none;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.tf-tpanel .tf-mpane[hidden]{display:none}
+
+/* ===== 新着のお知らせ(nvtoast.js): 右下にサムネ+タイトル ===== */
+#tf-nvt{position:fixed;right:16px;bottom:16px;z-index:2300;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none}
+.tf-nvt{position:relative;display:flex;gap:10px;align-items:center;width:360px;max-width:calc(100vw - 32px);padding:8px 30px 8px 8px;border:1px solid rgba(255,255,255,.1);border-left:4px solid var(--tf-acc,#ffb400);border-radius:12px;background:rgba(28,28,30,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;font:13px/1.4 Roboto,"Noto Sans JP",Arial,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.5);cursor:pointer;pointer-events:auto;opacity:0;transform:translateX(24px);transition:opacity .3s,transform .3s}
+.tf-nvt.in{opacity:1;transform:none}
+.tf-nvt.live,.tf-nvt.kw{border-left-color:#ff4e45}
+.tf-nvt:hover{background:rgba(44,44,46,.96)}
+.tf-nvt img{flex:none;width:112px;aspect-ratio:16/9;border-radius:6px;object-fit:cover;background:#333}
+.tf-nvt-b{flex:1;min-width:0}
+.tf-nvt-k{font-size:11px;font-weight:600;color:var(--tf-acc-t,#e0b84c)}
+.tf-nvt.live .tf-nvt-k,.tf-nvt.kw .tf-nvt-k{color:#ff7b74}
+.tf-nvt-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600}
+.tf-nvt-c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:#aaa}
+.tf-nvt-x{position:absolute;top:4px;right:4px;width:22px;height:22px;border:0;border-radius:50%;background:none;color:#aaa;font-size:13px;cursor:pointer}
+.tf-nvt-x:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* ⋯ のメニュー(再生リスト・フォルダ・チャンネル・タグ)の見た目を、🛠 ツールのパネルにそろえる: すりガラス、アンダーラインのタブ、中身はカード。選択の色は「色の変更」 */
+.tf-menu{padding:6px 16px 16px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(22,22,24,.86);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.tf-menu .tf-mh{padding:10px 4px 6px}
+.tf-menu .tf-tabs{gap:2px;padding:0;margin:0 -4px;border-radius:0;background:none;border-bottom:1px solid rgba(255,255,255,.1)}
+.tf-menu .tf-tab{position:relative;height:40px;padding:0 6px;border-radius:8px 8px 0 0;background:none;color:#bbb;opacity:1;font-weight:500;transition:color .15s,background .15s}
+.tf-menu .tf-tab:hover{color:#fff;background:rgba(255,255,255,.05)}
+.tf-menu .tf-tab.on{background:none;color:#fff;font-weight:600}
+.tf-menu .tf-tab.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--tf-acc,#ffb400)}
+.tf-menu .tf-pane{margin-top:12px;padding:6px 8px;border-radius:12px;background:rgba(255,255,255,.045)}
+.tf-menu .tf-row:hover{background:rgba(255,255,255,.07)}
+.tf-menu .tf-sub{background:var(--tf-acc,#ffb400);color:#111;font-weight:600}
+.tf-menu .tf-sub.on{background:rgba(255,255,255,.12);color:#fff}
+html:not([dark]) .tf-menu{background:rgba(255,255,255,.92);color:#0f0f0f;border-color:rgba(0,0,0,.1)}
+html:not([dark]) .tf-menu .tf-tabs{border-bottom-color:rgba(0,0,0,.12)}
+html:not([dark]) .tf-menu .tf-tab{color:#555}
+html:not([dark]) .tf-menu .tf-tab:hover{color:#000;background:rgba(0,0,0,.05)}
+html:not([dark]) .tf-menu .tf-tab.on{color:#000;background:none}
+html:not([dark]) .tf-menu .tf-pane{background:rgba(0,0,0,.04)}
+html:not([dark]) .tf-menu .tf-row:hover{background:rgba(0,0,0,.07)}
+html:not([dark]) .tf-menu .tf-sub.on{background:rgba(0,0,0,.1);color:#0f0f0f}
+.tf-menu .tf-mt{display:inline-flex;align-items:center;gap:8px}
+.tf-menu .tf-mt img{width:20px;height:20px;border-radius:5px}
+.tf-menu .tf-tab{display:flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px}
+.tf-menu .tf-tab svg{flex:none}
+.tf-menu .tf-fi{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:8px;overflow:hidden}
+.tf-menu .tf-fi img{width:100%;height:100%;object-fit:contain}
+
+/* チャンネルのページの TubeFolio3 ボタンとメニュー(chpage.js) */
+.tf-chhide{display:none!important}
+.tf-chb-i{width:20px;height:20px;border-radius:5px;display:block}
+.tf-chbtn .yt-spec-button-shape-next__icon{margin-right:6px}
+.tf-chmenu{z-index:2147483000}
+.tf-chmenu .tf-chh{margin:12px 6px 4px;font-size:12px;font-weight:600;color:#aaa;letter-spacing:.04em}
+html:not([dark]) .tf-chmenu .tf-chh{color:#606060}
+.tf-chbtn{display:inline-flex;align-items:center}
+.tf-chb{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border:0;border-radius:18px;background:rgba(255,255,255,.1);color:#f1f1f1;font:500 14px/36px Roboto,"Noto Sans JP",Arial,sans-serif;cursor:pointer;white-space:nowrap}
+.tf-chb:hover{background:rgba(255,255,255,.2)}
+html:not([dark]) .tf-chb{background:rgba(0,0,0,.05);color:#0f0f0f}
+html:not([dark]) .tf-chb:hover{background:rgba(0,0,0,.1)}
+.tf-chb-t{line-height:1}
+
+/* ツールのパネルに「再生リスト・フォルダ・チャンネル・タグ」を統合(上の段 = 動画の登録、下の段 = 再生ツール。どちらも4つずつ) */
+.tf-tpanel .tf-mtabs{display:flex;flex-wrap:wrap;gap:0 2px}
+.tf-tpanel .tf-mtabs button{flex:1 1 calc(25% - 3px);min-width:0;padding:0 4px;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.tf-tpanel .tf-mtabs button:nth-child(-n+4){border-bottom:1px solid rgba(255,255,255,.06)}
+.tf-tpanel .tf-mtabs button:nth-child(-n+4).on::after{bottom:-1px}
+.tf-tpanel .tf-mpane{max-height:clamp(200px,calc(100vh - 330px),440px)}
+.tf-tpanel .tf-mpane .tf-row{color:#f1f1f1;min-height:42px}
+.tf-tpanel .tf-mpane .tf-row:hover{background:rgba(255,255,255,.07)}
+.tf-tpanel .tf-mpane .tf-em{color:#aaa}
+.tf-tpanel .tf-mpane .tf-chn{color:#fff}
+.tf-tpanel .tf-mpane .tf-sub{background:var(--tf-acc,#ffb400);color:#111;font-weight:600}
+.tf-tpanel .tf-mpane .tf-sub.on{background:rgba(255,255,255,.12);color:#fff}
+.tf-tpanel .tf-mpane .tf-tgh{color:#fff}
+.tf-tpanel .tf-st{min-height:18px;padding:8px 4px 0}
+
+/* コンパクトに: 再生リストのタブにチャンネル登録を1行で入れ、チャンネルのタブはなくす(上の段は 再生リスト・フォルダ・タグ の3つ) */
+.tf-tpanel .tf-mtabs button{height:34px;font-size:12.5px}
+.tf-tpanel .tf-mtabs button:nth-child(-n+4){border-bottom:0}
+.tf-tpanel .tf-mtabs button:nth-child(-n+3){flex:1 1 calc(33.33% - 2px);border-bottom:1px solid rgba(255,255,255,.06)}
+.tf-tpanel .tf-mtabs button:nth-child(4){flex:1 1 calc(25% - 3px)}
+.tf-tpanel .tf-mpane{margin-top:8px;padding:4px 8px;max-height:clamp(180px,calc(100vh - 300px),380px)}
+.tf-tpanel .tf-mpane .tf-row{min-height:32px;gap:10px;padding:0 8px;font-size:13px}
+.tf-tpanel .tf-mpane .tf-row input{width:16px;height:16px}
+.tf-tpanel .tf-mpane .tf-fi{width:22px;height:22px;border-radius:6px}
+.tf-tpanel .tf-mpane .tf-fi svg{width:16px;height:16px}
+.tf-tpanel .tf-mpane .tf-dot{width:8px;height:8px}
+.tf-tpanel .tf-mpane .tf-em{padding:8px;font-size:12.5px}
+.tf-chtop{display:flex;align-items:center;gap:10px;padding:2px 4px 6px;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,.08)}
+.tf-chtop .tf-chn{flex:1;min-width:0;padding:0;font-size:13.5px;font-weight:600}
+.tf-tpanel .tf-chtop .tf-sub{flex:none;width:auto;height:28px;padding:0 14px;font-size:12.5px}
+.tf-chtop{margin:6px 0 0;padding:8px 4px 2px;border-bottom:0;border-top:1px solid rgba(255,255,255,.08)}
+
+/* フォルダのアイコンは、メニューでもツールのパネルでも同じ大きさに(画像が大きいまま出ていた) */
+.tf-fi{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:6px;overflow:hidden}
+.tf-fi img{display:block;width:100%;height:100%;max-width:100%;object-fit:contain}
+.tf-fi svg{width:16px;height:16px}
+
+/* パネルの下の余白をなくし、中身(タグ・フォルダなど)がパネルの高さいっぱいまで広がるようにする */
+.tf-tpanel{padding-bottom:10px}
+.tf-tpanel .tf-mpane{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+.tf-tpanel .tf-st{flex:none;min-height:0;padding:0}
+.tf-tpanel .tf-st:not(:empty){padding:8px 4px 0}
+
+/* 新着のお知らせのカード: ガラス風・大きめのサムネ・種類の印・自動で閉じるまでの細い線 */
+.tf-nvt{width:392px;gap:12px;padding:10px 34px 12px 10px;border:1px solid rgba(255,255,255,.14);border-left:1px solid rgba(255,255,255,.14);border-radius:18px;background:linear-gradient(135deg,rgba(40,40,48,.92),rgba(22,22,28,.94));-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);box-shadow:0 14px 44px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.4),0 0 28px rgba(var(--tf-acc-a,255,180,0),.12);overflow:hidden}
+.tf-nvt::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:var(--tf-acc,#ffb400)}
+.tf-nvt.live::before,.tf-nvt.kw::before{background:#ff4e45;box-shadow:0 0 12px #ff4e45}
+.tf-nvt img{width:132px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.tf-nvt-k{display:inline-block;margin-bottom:4px;padding:2px 9px;border-radius:999px;background:rgba(var(--tf-acc-a,255,180,0),.18);font-size:11px;letter-spacing:.03em}
+.tf-nvt.live .tf-nvt-k,.tf-nvt.kw .tf-nvt-k{background:rgba(255,78,69,.2)}
+.tf-nvt-t{font-size:14px;font-weight:700;line-height:1.35}
+.tf-nvt-c{margin-top:3px;font-size:12px;color:#b8b8c0}
+.tf-nvt:not(.live)::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%;background:linear-gradient(90deg,var(--tf-acc,#ffb400),transparent);transform-origin:left;animation:tf-nvt-bar 12s linear forwards;opacity:.8}
+.tf-nvt:hover::after{animation-play-state:paused}
+@keyframes tf-nvt-bar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.tf-nvt.live .tf-nvt-k::before,.tf-nvt.kw .tf-nvt-k::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:#ff4e45;animation:tf-nvt-pulse 1.2s ease-in-out infinite;vertical-align:1px}
+@keyframes tf-nvt-pulse{50%{opacity:.35;transform:scale(.8)}}
+.tf-nvt-x{top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.08)}
+
+/* サムネが欠けないように: カードを縮めず、中身を切らない(overflow:hidden をやめ、下の線は内側に置く) */
+.tf-nvt{flex:none;height:auto;min-height:0;max-height:none;overflow:visible;align-items:center}
+.tf-nvt img{flex:none;display:block;width:132px;height:auto;aspect-ratio:16/9;object-fit:contain;background:#000;align-self:center}
+.tf-nvt-b{overflow:visible}
+.tf-nvt:not(.live)::after{left:16px;right:16px;width:auto;bottom:4px;height:3px;border-radius:3px}
+.tf-nvt::before{border-radius:0 4px 4px 0}

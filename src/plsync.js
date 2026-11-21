@@ -58,7 +58,9 @@ const PLLIVE = (() => {
     return t;
   }
 
-  let live = null; // YouTube から読んだ一覧(まだ読んでいなければ null)
+  // 前回読んだ一覧を覚えておき、リロードの直後はそれで表示する(読み込み中は「後で見る」などの行が消えたり、「読み込み中…」のまま残ったりするため)。読み終えたら入れ替える
+  const LKEY = "tf-pl-live";
+  let live = (() => { try { const c = JSON.parse(localStorage.getItem(LKEY) || "null"); return Array.isArray(c) && c.length ? c : null; } catch { return null; } })(); // YouTube から読んだ一覧(まだ読んでいなければ null)
   let recent = { add: [], del: [] }; // 直前の作成・削除(data.plRecent と同じ内容)
   const st = { loading: false, error: "", at: 0 };
   const subs = [];
@@ -101,6 +103,7 @@ const PLLIVE = (() => {
       // 読み込み済みの中身(動画一覧)は引き継ぐ
       const old = new Map((live || []).map((p) => [p.id, p]));
       live = [...found].map(([id, m]) => Object.assign(old.get(id) || {}, { id, title: m.title, channel: m.channel, thumb: m.thumb || old.get(id)?.thumb || "", kind: m.kind }));
+      try { localStorage.setItem(LKEY, JSON.stringify(live.map((p) => ({ id: p.id, title: p.title, channel: p.channel, thumb: p.thumb, kind: p.kind })))); } catch { /* 容量いっぱいなど */ }
       st.error = ""; st.at = Date.now();
       await readRecent();
       const t = tidyRecent();

@@ -88,7 +88,7 @@
     const box = el("div", "tf-menu"); box.setAttribute("role", "menu");
     const status = el("div", "tf-st");
     const msg = (t, bad) => { status.textContent = t; status.classList.toggle("bad", !!bad); clearTimeout(msg.t); if (t) msg.t = setTimeout(() => (status.textContent = ""), 3500); };
-    const head = el("div", "tf-mh"); head.append(el("b", null, "TubeFolio3"));
+    const head = el("div", "tf-mh"); { const ti = el("b", "tf-mt"); const im = el("img"); im.src = chrome.runtime.getURL("icons/icon-32.png"); im.alt = ""; ti.append(im, document.createTextNode("TubeFolio3")); head.append(ti); }
     const open = el("button", "tf-lnk", "管理ページ ↗"); open.onclick = () => { closeMenu(); chrome.runtime.sendMessage("tf-open-manager"); }; head.append(open);
     const plBox = el("div", "tf-pane"), foBox = el("div", "tf-pane"), chBox = el("div", "tf-pane"), tgBox = el("div", "tf-pane");
     const panes = { pl: plBox, fo: foBox, ch: chBox, tg: tgBox }, names = { pl: "再生リスト", fo: "フォルダ", ch: "チャンネル", tg: "タグ" };
@@ -113,14 +113,24 @@
     box.addEventListener("tf-close", () => { removeEventListener("scroll", place, true); removeEventListener("resize", place); });
     setTimeout(() => addEventListener("click", function h(e) { if (!box.isConnected) return removeEventListener("click", h, true); if (!box.contains(e.target)) { closeMenu(); removeEventListener("click", h, true); } }, true), 0);
 
+    show(lastTab);
+    fillPanes(vid, { plBox, foBox, chBox, tgBox }, msg);
+  }
+  // 再生リスト・フォルダ・チャンネル・タグの中身を作る(⋯ の古いメニューと、ツールのパネル(ptools.js)の両方から使う)
+  async function fillPanes(vid, { plBox, foBox, chBox, tgBox }, msg) {
     const row = (label, checked, onchange, dot) => {
       const l = el("label", "tf-row"), cb = el("input"); cb.type = "checkbox"; cb.checked = checked;
-      l.append(cb); if (dot) { const d = el("span", "tf-dot"); d.style.background = dot; l.append(d); }
+      l.append(cb);
+      if (dot && typeof dot === "object") { // フォルダ設定のアイコン(画像・背景色・フォルダの色)
+        const d = el("span", "tf-fi"); if (dot.bg) d.style.background = dot.bg;
+        if (dot.img) { const im = el("img"); im.src = dot.img; im.alt = ""; d.append(im); }
+        else d.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${(dot.color || "#ccc").replace(/[^#\w(),.% -]/g, "")}" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+        l.append(d);
+      } else if (dot) { const d = el("span", "tf-dot"); d.style.background = dot; l.append(d); }
       l.append(el("span", "tf-t", label));
       cb.onchange = () => onchange(cb);
       return l;
     };
-    show(lastTab);
     const info = await videoInfo();
 
     // 再生リスト
@@ -145,7 +155,7 @@
         v.folders = cb.checked ? [...new Set([...v.folders, f.id])] : v.folders.filter((x) => x !== f.id);
         if (!v.folders.length) delete dd.videos[vid];
         await save(dd); msg(cb.checked ? `「${f.name}」に登録しました` : `「${f.name}」から外しました`);
-      }, f.color);
+      }, f);
       l.style.paddingLeft = 10 + d * 18 + "px"; foBox.append(l); walk(f.id, d + 1);
     });
     walk("", 0);
@@ -169,7 +179,8 @@
         const wrap = el("div", "tf-tags");
         for (const t of list) {
           const a = el("a", "tf-tag" + (kind === "hash" ? " hash" : ""), kind === "hash" ? "#" + t : t); a.target = "_blank"; a.rel = "noopener";
-          if (kind === "hash") { a.href = "/hashtag/" + encodeURIComponent(t); a.title = "#" + t + " の動画を見る"; } else { a.href = "/results?search_query=" + encodeURIComponent(t); a.title = "「" + t + "」で検索"; }
+          if (kind === "hash") { a.href = "/hashtag/" + encodeURIComponent(t); a.title = "#" + t + " を TubeFolio3 で検索"; } else { a.href = "/results?search_query=" + encodeURIComponent(t); a.title = "「" + t + "」を TubeFolio3 で検索"; }
+          a.onclick = (e) => { e.preventDefault(); e.stopPropagation(); chrome.runtime.sendMessage({ tf: "open-search", q: kind === "hash" ? "#" + t : t }); }; // プレーヤーの中だと、リンクの標準の動きが YouTube に止められるので、自分で新しいタブで開く
           wrap.append(a);
         }
         tgBox.append(wrap);
@@ -192,15 +203,11 @@
       b.disabled = false;
     };
   }
+  globalThis.tfReg = { build: (panes, msg) => { const vid = vidNow(); if (vid) return fillPanes(vid, panes, msg); } };
   addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
   addEventListener("yt-navigate-start", closeMenu);
 
-  // 再生画面の「⋯」を押したら、YouTube のメニューの代わりに自分のメニューを出す(先に受け取って、YouTube には渡さない)
-  document.addEventListener("click", (e) => {
-    const b = e.target.closest?.("button");
-    if (!b || !b.closest("ytd-watch-metadata #actions") || !/その他の操作|More actions/i.test(b.getAttribute("aria-label") || "")) return;
-    e.preventDefault(); e.stopImmediatePropagation(); openMenu(b);
-  }, true);
+  // 「⋯」は YouTube の標準のまま(再生リスト・フォルダ・タグは、プレーヤーの 🛠 ツールのパネルから開く)
 
   /* ---------- コメント流し(再生画面) ----------
      ・動画のコメントを、映像の上に背景なしで、下から上へ流す。1件は「名前・♥評価・投稿日」の行と、本文
@@ -402,7 +409,7 @@
   const ex = { vid: null, gen: 0, comments: [], chapters: [] };
   const TS_RE = /(?<![\d:])((?:\d{1,2}:)?[0-5]?\d:[0-5]\d)(?![\d:])/;
   const tsSec = (s) => s.split(":").reduce((a, x) => a * 60 + +x, 0);
-  const fmtT = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
+  const fmtT = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
   // コメント1件から、時間のある行を取り出す(曲のリストのように、1件に時間が複数あれば、行ごとに分ける)
   function exComments(list) {
     const out = [];
@@ -430,14 +437,26 @@
     if (ex.vid === v) return;
     ex.vid = v; ex.comments = []; ex.chapters = []; const g = ++ex.gen; closeTsPanel(); updateTsBtn();
     if (!v) return;
-    yta("chapters", v).then((r) => { if (ex.gen === g) { ex.chapters = r; updateTsBtn(); } }).catch(() => {});
+    yta("chapters", v).then((r) => { if (ex.gen === g) { ex.chapters = r; updateTsBtn(); exTranslate(g); } }).catch(() => {});
     const tryC = async (n) => {
       let list = []; try { list = await yta("comments", v, 150, "top"); } catch { /* 取れなければ、やり直す */ }
       if (ex.gen !== g) return;
-      ex.comments = exComments(list); updateTsBtn();
+      ex.comments = exComments(list); updateTsBtn(); exTranslate(g);
       if (!list.length && n < 3) setTimeout(() => tryC(n + 1), 4000);
     };
     tryC(0);
+  }
+  // 一覧のコメントとチャプターの題名を日本語に翻訳する(コメント表示の「外国語: 日本語に翻訳」のとき。流すコメントと同じ訳の控え trRes を使う)
+  // 訳せたら一覧を描き直す。原文は、行に重ねたときのヒントに出す
+  const exLabel = (s) => (cm.tr && trRes.get(s)?.[1] ? trRes.get(s)[0] : s);
+  async function exTranslate(g) {
+    if (!cm.tr) return;
+    const todo = [...new Set([...ex.comments.map((r) => r.text), ...ex.chapters.map((r) => r.title)].filter((s) => s && needTr(s) && !trRes.get(s)?.[2]))];
+    if (!todo.length) return;
+    let out = null;
+    try { out = await Promise.race([yta("translateMany", todo), new Promise((res) => setTimeout(() => res(null), 30000))]); } catch { out = null; }
+    todo.forEach((s, i) => { const r = out?.[i]; if (r?.text) trRes.set(s, r.src !== "ja" && r.text !== s ? [r.text, true, true] : [s, false, true]); });
+    if (ex.gen === g) renderTsPanel();
   }
   document.addEventListener("durationchange", (e) => { if (e.target?.closest?.("#movie_player")) updateTsBtn(); }, true);
   function closeTsPanel() { document.querySelector(".tf-tsp")?.remove(); }
@@ -446,7 +465,7 @@
   function renderTsPanel() {
     const m = document.querySelector(".tf-tsp"); if (!m) return;
     const { c, h } = exItems();
-    const sig = JSON.stringify([c.map((r) => [r.sec, r.text, r.name]), h.map((r) => [r.sec, r.title])]);
+    const sig = JSON.stringify([c.map((r) => [r.sec, exLabel(r.text), r.name]), h.map((r) => [r.sec, exLabel(r.title)])]); // 訳が届いたら描き直す
     if (m.dataset.sig === sig) return;
     m.dataset.sig = sig;
     const top = m.scrollTop; m.textContent = "";
@@ -454,10 +473,10 @@
       const hd = el("div", "tf-tsh", `${title}(${rows.length})`); m.append(hd);
       for (const r of rows) {
         const d = el("div", "tf-tsr"), t = el("button", "tf-tst", fmtT(r.sec)); t.type = "button";
-        const label = r.text || r.title || ""; // コメントは text、チャプター(ytapi.js の chapters)は title
+        const orig = r.text || r.title || "", label = exLabel(orig); // コメントは text、チャプター(ytapi.js の chapters)は title。訳があれば訳を出す
         const tx = el("div", "tf-tsx"); tx.append(el("span", null, label || "(題名なし)"));
         if (kind === "c" && r.name) tx.append(el("small", null, r.name.replace(/^@/, "")));
-        d.append(t, tx); d.title = (r.name ? r.name.replace(/^@/, "") + ": " : "") + label; d.dataset.sec = r.sec; m.append(d); // 押したときの処理は、一覧の箱(toggleTsPanel)でまとめて行う
+        d.append(t, tx); d.title = (r.name ? r.name.replace(/^@/, "") + ": " : "") + label + (label !== orig ? "\n原文: " + orig : ""); d.dataset.sec = r.sec; m.append(d); // 押したときの処理は、一覧の箱(toggleTsPanel)でまとめて行う
       }
     };
     if (c.length) sect("コメントの時間", c, "c");
