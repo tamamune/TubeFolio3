@@ -1619,3 +1619,9 @@ body.mu-on #totop{bottom:90px}
 #totop{right:6px;bottom:6px}
 body.mu-on #totop{bottom:84px}
 @media (max-width:820px){#totop{right:6px;bottom:calc(58px + env(safe-area-inset-bottom,0px))}body.mu-on #totop{bottom:calc(122px + env(safe-area-inset-bottom,0px))}}
+
+/* 一番上へ戻るボタン: 右下の角に隙間なく。プレーヤーを開いているときだけその上に出す */
+#totop{right:0;bottom:0}
+body.mu-on #totop{bottom:0}
+body:has(#mu-dock.mu-open) #totop{bottom:84px}
+@media (max-width:820px){#totop{right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px))}body.mu-on #totop{bottom:calc(56px + env(safe-area-inset-bottom,0px))}body:has(#mu-dock.mu-open) #totop{bottom:calc(122px + env(safe-area-inset-bottom,0px))}}
