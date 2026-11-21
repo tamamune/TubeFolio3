@@ -264,6 +264,13 @@ let pvN = +ls.get("tf-ch-pvn", "1"); if (!(pvN >= 0 && pvN <= 6)) pvN = 1;
 $("set-pvn").value = String(pvN);
 $("set-pvn").onchange = () => { pvN = +$("set-pvn").value; ls.set("tf-ch-pvn", String(pvN)); hidePv(); };
 const PV_SECTIONS = [["video", "最新の動画"], ["live", "最新のライブ配信"], ["short", "最新のショート"], ["pop", "おすすめの動画(人気順)"]];
+// 出す種類(設定): チェックを外した種類は出さない。全部外したら、プレビュー自体を出さない
+const pvKinds = new Set((ls.get("tf-ch-pvk", "video,live,short,pop") || "").split(",").filter(Boolean));
+for (const cb of $("set-pvk").querySelectorAll("input")) {
+  cb.checked = pvKinds.has(cb.value);
+  cb.onchange = () => { cb.checked ? pvKinds.add(cb.value) : pvKinds.delete(cb.value); ls.set("tf-ch-pvk", PV_SECTIONS.map(([k]) => k).filter((k) => pvKinds.has(k)).join(",")); hidePv(); };
+}
+const pvOff = () => pvN === 0 || !pvKinds.size;
 const pvCache = new Map(); // チャンネルID -> { at, data | promise }
 let pvTimer = 0, pvHide = 0, pvId = "";
 
@@ -290,8 +297,9 @@ function pvCard(v, c) {
   return `<button type="button" class="pv-c ${v.kind === "short" ? "sh" : ""}" data-v="${esc(v.id)}" title="${esc(v.title)}"><span class="pv-th"><img loading="lazy" src="${thumb(v.id)}" alt="">${v.duration ? `<em>${esc(v.duration)}</em>` : ""}</span><span class="pv-x"><span class="pv-t">${esc(v.title)}</span>${v.pub ? `<small>${esc(v.pub)}</small>` : ""}</span></button>`;
 }
 function pvHtml(c, d) {
-  const cols = PV_SECTIONS.map(([k, n]) => `<div class="pv-s"><h4>${n}</h4>${d ? (d[k].length ? d[k].slice(0, pvN).map((v) => pvCard(v, c)).join("") : `<p class="pv-e">ありません</p>`) : `<p class="pv-e">読み込み中…</p>`}</div>`).join("");
-  return `<div class="pv-h"><b>${esc(c.name)}</b></div><div class="pv-g">${cols}</div>`;
+  const secs = PV_SECTIONS.filter(([k]) => pvKinds.has(k));
+  const cols = secs.map(([k, n]) => `<div class="pv-s"><h4>${n}</h4>${d ? (d[k].length ? d[k].slice(0, pvN).map((v) => pvCard(v, c)).join("") : `<p class="pv-e">ありません</p>`) : `<p class="pv-e">読み込み中…</p>`}</div>`).join("");
+  return `<div class="pv-h"><b>${esc(c.name)}</b></div><div class="pv-g" style="--pvc:${secs.length};--pvc2:${Math.min(2, secs.length)}">${cols}</div>`;
 }
 // 表示の大きさ(設定で 1〜100%)
 // マウスを乗せてから表示するまでの時間(秒): チャンネルのプレビューにも、サムネイル上の動画再生(thumbpv.js)にも使う
@@ -334,7 +342,7 @@ function pvTarget(e) { // チャンネル一覧の行にマウスを乗せたと
   return c ? { key: c.id, ck: c.id, c, anchor: h, side: "right" } : null;
 }
 async function showPv(t) {
-  if (!t || pvN === 0) return;
+  if (!t || pvOff()) return;
   const { c, key, anchor, side } = t;
   hidePv(); pvId = key; t.rect = anchor.getBoundingClientRect();
   const el = document.createElement("div"); el.id = "pv"; el.setAttribute("role", "tooltip"); document.body.append(el);
@@ -346,7 +354,7 @@ async function showPv(t) {
 }
 function hidePv() { clearTimeout(pvTimer); clearTimeout(pvHide); $("pv")?.remove(); pvId = ""; }
 document.addEventListener("mouseover", (e) => {
-  if (pvN === 0) return;
+  if (pvOff()) return;
   if (e.target.closest("#pv")) { clearTimeout(pvHide); return; }
   const t = pvTarget(e);
   if (t) {
@@ -408,14 +416,21 @@ document.addEventListener("click", (e) => { // サイドバーの「設定 / 一
 /* ---------- 期間で絞り込む(「3日以内」など) ----------
    ・設定モードのチャンネル一覧: 「最新の投稿が 〇〇 以内」のチャンネルだけを出す(調べ済みのチャンネルが対象。動画・ライブ・ショートのどれかが期間内)
    ・一覧モードの動画: 投稿から 〇〇 以内の動画だけを出す(期間が長いときは、新着をさかのぼって読み込む) */
-let chPer = +ls.get("tf-ch-per", "-1"); if (!(chPer >= 0 && chPer < PERIODS.length)) chPer = -1;
+let chPer = +ls.get("tf-ch-per", "-1"); if (!(chPer >= 0 && chPer <= PERIODS.length)) chPer = -1; // PERIODS.length(7) = 1年以上
 let chKind = ls.get("tf-ch-kind", "all"); if (!["all", "video", "live", "short"].includes(chKind)) chKind = "all"; // 絞り込みで見る投稿の種類
 let flPer = +ls.get("tf-fl-per", "-1"); if (!(flPer >= 0 && flPer < PERIODS.length)) flPer = -1;
-const chPassPer = (c) => !!c.stats && STAT_KINDS.filter(([k]) => chKind === "all" || chKind === k).some(([k]) => { const li = lastInfo(c.stats, k); return li.idx >= 0 && (chPer < 0 || li.idx <= chPer); });
-const perButtons = (cur, attr) => `<button type="button" class="tab ${cur < 0 ? "on" : ""}" data-${attr}="-1">すべて</button>` + PERIODS.map(([n], i) => `<button type="button" class="tab ${cur === i ? "on" : ""}" data-${attr}="${i}">${n}</button>`).join("");
+const chPassPer = (c) => {
+  if (!c.stats) return false;
+  const idx = STAT_KINDS.filter(([k]) => chKind === "all" || chKind === k).map(([k]) => lastInfo(c.stats, k).idx).filter((i) => i >= 0);
+  if (!idx.length) return false;
+  if (chPer === PERIODS.length) return idx.every((i) => i === PERIODS.length); // 1年以上: いちばん新しい投稿でも1年より前
+  return chPer < 0 || idx.some((i) => i <= chPer);
+};
+const perButtons = (cur, attr, over) => `<button type="button" class="tab ${cur < 0 ? "on" : ""}" data-${attr}="-1">すべて</button>` + PERIODS.map(([n], i) => `<button type="button" class="tab ${cur === i ? "on" : ""}" data-${attr}="${i}">${n}</button>`).join("")
+  + (over ? `<button type="button" class="tab ${cur === PERIODS.length ? "on" : ""}" data-${attr}="${PERIODS.length}">1年以上</button>` : "");
 // 絞り込み: 「最新の投稿が」〔種類〕「の」〔期間〕以内(検索の「対象」「種類」と同じ見た目)
 const chPerBar = (part) => (part === 2 ? "" : `<span class="s-chips" role="group" aria-label="投稿の種類"><span class="s-cl">種類</span>${[["all", "すべて"], ...STAT_KINDS].map(([k, n]) => `<button type="button" class="tab ${chKind === k ? "on" : ""}" data-chkind="${k}">${k === "all" ? "すべて" : n}</button>`).join("")}</span>`)
-  + (part === 1 ? "" : `<span class="s-chips" role="group" aria-label="最新の投稿の期間で絞り込む"><span class="s-cl">最新の投稿</span>${perButtons(chPer, "chper")}</span>`);
+  + (part === 1 ? "" : `<span class="s-chips" role="group" aria-label="最新の投稿の期間で絞り込む"><span class="s-cl">最新の投稿</span>${perButtons(chPer, "chper", true)}</span>`);
 // 絞り込み中の件数(調べていないチャンネルは対象外)
 function chPerNote(all, list) {
   if (chPer < 0 && chKind === "all") return "";

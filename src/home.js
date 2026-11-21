@@ -206,6 +206,16 @@ function openV(id, start) { // start: 再生を始める秒(ブックマーク�
   $("pl-bm").dataset.bm = id; $("pl-bm").classList.toggle("on", isBm(id));
   $("pl").showModal();
 }
+// マウスの中クリック: YouTube を裏のタブで開き、この画面はそのまま(再生方法の設定に関係なく)
+document.addEventListener("mousedown", (e) => { if (e.button === 1 && e.target.closest("[data-v]")) e.preventDefault(); }); // 自動スクロールのアイコンを出さない
+document.addEventListener("auxclick", (e) => {
+  if (e.button !== 1) return;
+  const b = e.target.closest("[data-v]"); if (!b) return;
+  e.preventDefault();
+  const id = b.dataset.v, v = data.videos[id] || vmap.get(id);
+  const u = v?.kind === "short" ? `https://www.youtube.com/shorts/${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  if (chrome.tabs?.create) chrome.tabs.create({ url: u, active: false }); else window.open(u, "_blank", "noopener");
+});
 $("pl").addEventListener("close", () => { $("pl-f").src = "about:blank"; });
 $("pl-x").onclick = () => $("pl").close();
 $("pl").addEventListener("click", (e) => { if (e.target === $("pl")) $("pl").close(); });
