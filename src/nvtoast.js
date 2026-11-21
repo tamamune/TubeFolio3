@@ -17,7 +17,13 @@
       t.append(img, body, x);
       const close = () => { t.classList.remove("in"); setTimeout(() => t.remove(), 350); };
       x.onclick = (e) => { e.stopPropagation(); close(); };
-      t.onclick = () => { close(); if (it.url) location.assign(it.url); else if (it.id) location.assign("/watch?v=" + encodeURIComponent(it.id)); };
+      t.onclick = () => {
+        close();
+        const path = it.url || (it.id ? "/watch?v=" + encodeURIComponent(it.id) : "");
+        if (!path) return;
+        if (location.protocol === "chrome-extension:") chrome.tabs.create({ url: path.startsWith("http") ? path : "https://www.youtube.com" + path }); // TubeFolio3 の画面では、新しいタブで開く
+        else location.assign(path);
+      };
       box.append(t);
       requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("in")));
       if (it.kind !== "live") { let tm = setTimeout(close, 12000); t.onmouseenter = () => clearTimeout(tm); t.onmouseleave = () => { tm = setTimeout(close, 4000); }; }

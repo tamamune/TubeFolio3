@@ -117,6 +117,23 @@ const YTA = (() => {
     // すでに入っている動画は重ねて追加しない(DEDUPE_OPTION_SKIP)
     addVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_ADD_VIDEO", addedVideoId: videoId, dedupeOption: "DEDUPE_OPTION_SKIP" }]),
     removeVideo: (playlistId, videoId) => edit(playlistId, [{ action: "ACTION_REMOVE_VIDEO_BY_VIDEO_ID", removedVideoId: videoId }]),
+    // 再生リストに入っている動画IDの一覧(続きのページも読む。最大 limit 本)。音楽の自動登録で、同じ動画を重ねて入れないために使う
+    playlistIds: async (playlistId, limit = 2000) => {
+      const out = [], seen = new Set();
+      const walk = (n, fn) => { if (!n || typeof n !== "object") return; fn(n); (Array.isArray(n) ? n : Object.values(n)).forEach((x) => walk(x, fn)); };
+      let j = await post("browse", { browseId: "VL" + playlistId });
+      for (let page = 0; page < 40; page++) {
+        let token = "";
+        walk(j, (n) => {
+          const id = n.playlistVideoRenderer?.videoId || (n.lockupViewModel?.contentType === "LOCKUP_CONTENT_TYPE_VIDEO" ? n.lockupViewModel.contentId : "");
+          if (id && !seen.has(id)) { seen.add(id); out.push(id); }
+          if (n.continuationItemRenderer) token = n.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || token;
+        });
+        if (!token || out.length >= limit) break;
+        j = await post("browse", { continuation: token });
+      }
+      return out;
+    },
     // 動画を入れられる自分の再生リスト一覧(YouTube の「保存」メニューと同じ。containsSelectedVideos が ALL なら、その動画は入っている)
     ownPlaylists: async (videoId) => {
       const j = await post("playlist/get_add_to_playlist", { videoIds: [videoId], excludeWatchLater: false });

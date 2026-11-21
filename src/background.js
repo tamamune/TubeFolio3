@@ -34,13 +34,13 @@ chrome.runtime.onStartup.addListener(setupEmbedReferer);
 // モバイルのときだけ、この拡張機能自身が出す youtube.com へのリクエストを、PC 版として送る(YouTube のタブには影響しない)
 const isMobile = () => !!navigator.userAgentData?.mobile || /Android|Mobile|iPhone|iPad/i.test(navigator.userAgent);
 async function setupDesktopUa() {
-  if (!isMobile()) { await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [2] }); return; }
+  if (!isMobile()) { await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [3] }); return; }
   const ver = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || "140";
   const ua = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ver}.0.0.0 Safari/537.36`;
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [2],
+    removeRuleIds: [3],
     addRules: [{
-      id: 2, priority: 1,
+      id: 3, priority: 1,
       action: { type: "modifyHeaders", requestHeaders: [
         { header: "User-Agent", operation: "set", value: ua },
         { header: "Sec-CH-UA-Mobile", operation: "set", value: "?0" },
@@ -55,6 +55,7 @@ chrome.runtime.onInstalled.addListener(setupDesktopUa);
 chrome.runtime.onStartup.addListener(setupDesktopUa);
 setupDesktopUa().catch((e) => tfLog?.("error", "モバイル", `PC 版として読む設定に失敗: ${e?.message || e}`));
 
+// (ルールの番号: 1=埋め込みの Referer / 2=youtubei の Origin / 3=モバイルのとき PC 版として送る。番号が重なると、後から入れたルールが前のルールを消してしまう)
 // おすすめのカテゴリ(音楽・ニュースなど)の切り替え:
 // YouTubeの内部API(youtubei)へのリクエストを、youtube.com のページから送ったものと同じ扱いにするため
 // この拡張機能自身が送るリクエストにだけ Origin / Referer を付ける。
@@ -105,6 +106,18 @@ chrome.action.onClicked.addListener(async () => {
 
 // ヘッダーのボタンから管理ページを開く / YouTube のページから、再生リスト・チャンネル登録の操作を受け付ける
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg === "tf-open-music") { chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") + "#music" }); return; }
+  if (msg?.tf === "open-search") { // タグを押したとき: すでに開いている TubeFolio3 のタブで検索する(なければ新しく開く)。タブが増えないように
+    (async () => {
+      const url = chrome.runtime.getURL("manager.html"), hash = "#search=" + encodeURIComponent(String(msg.q || "").slice(0, 200));
+      const tabs = await chrome.tabs.query({ url: url + "*" }).catch(() => []);
+      const t = tabs.find((x) => x.active) || tabs[0];
+      if (!t) return void chrome.tabs.create({ url: url + hash });
+      await chrome.tabs.update(t.id, { url: url + hash, active: true }).catch(() => {}); // 同じページの中身(#以降)だけが変わる。ページは読み込み直さない
+      chrome.windows.update(t.windowId, { focused: true }).catch(() => {});
+    })();
+    return;
+  }
   if (msg === "tf-open-manager") { chrome.tabs.create({ url: chrome.runtime.getURL("manager.html") }); return; }
   // SponsorBlock: 動画IDのハッシュの先頭4文字で問い合わせ、返ってきた候補から、その動画の区間だけを返す
   if (msg?.tf === "sb") {
@@ -198,6 +211,7 @@ async function nvCheck(manual = false) {
       if (seen.has(v.id)) continue; seen.add(v.id);
       if (first || v.upcoming) continue;
       const kw = nvHit(v.title, words);
+      if (kw) seen.add("L:" + v.id); // タイトルのキーワードで知らせた動画は、あとで配信中の印が付いても、もう一度は知らせない(⚡ と 🔴 の二重通知になっていた)
       if (kw || c?.notify) out.push({ ...v, kind: kw ? "kw" : "new", bell: !!c?.notify });
     }
     await chrome.storage.local.set({ "tf-nv-seen": [...seen].slice(-1500), "tf-nv-last": Date.now() });
@@ -231,6 +245,9 @@ async function nvDeliver(items, why = "") {
   // YouTube のタブの右下(サムネ+タイトル)。開いているタブのうち、いちばん最近使ったものに出す
   const tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })).sort((a, b) => (b.active - a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
   for (const t of tabs) { try { const r = await chrome.tabs.sendMessage(t.id, { tf: "nv-toast", items }); if (r?.ok) break; } catch { /* 拡張機能を入れ直す前に開いたタブなど */ } }
+  // TubeFolio3 の管理ページが開いていれば、そちらの右下にも出す(拡張機能のページ全部に送る。開いていなければ、エラーになるので無視する)
+  try { await chrome.runtime.sendMessage({ tf: "nv-toast", items }); } catch { /* 管理ページが開いていない */ }
+  if ((await chrome.storage.local.get("tf-notify-os"))["tf-notify-os"] === "off") return; // 設定「PC の通知」を使わないとき
   // PC の通知(YouTube を見ていないときにも気づけるように、いつも出す)
   const urgent = items.filter((x) => x.kind !== "new"), rest = items.filter((x) => x.kind === "new");
   const single = async (it) => {
@@ -364,4 +381,89 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     reply({ ok: true, news });
   })();
   return true;
+});
+
+/* ===== 音楽の自動登録(急上昇の「音楽」を、決めた再生リストに入れる) =====
+   ・1日1回、新しく急上昇に入った音楽の動画を探して、再生リストに入れる(パソコンの起動が不規則なので、3時間ごと+ブラウザの起動時に「前回から20時間たっていたら確認」する)
+   ・取り方を切り替えられる: scrape = youtube-trending.info(日本・ジャンル Music) / api = YouTube Data API(mostPopular・音楽。APIキーが必要)
+   ・すでに再生リストにある動画・削除した動画は入れない。「削除した」= 自動で入れた動画が再生リストから無くなっていたとき(手動の削除)と、期限で消したとき
+   ・自動で入れた動画は、登録から days 日(既定30日)たったら再生リストから外す。取り置き(keep)にした動画は残す
+   ・手動で入れた動画は自動では消さない。登録を見つけてから ask 日(既定60日)たったものは、管理ページで「削除するか」を確認する
+   ・設定は tf-ta-set(ドライブ同期の対象)、記録(入れた動画・削除した動画・取り置き)は tf-ta-led(同期の対象)。APIキーは tf-ta-key(同期しない) */
+const TA_SET = "tf-ta-set", TA_LED = "tf-ta-led", TA_KEY = "tf-ta-key";
+const TA_DEF = { on: false, src: "scrape", pid: "", days: 30, ask: 60 };
+const DAY = 86400000;
+async function taGet() {
+  const r = await chrome.storage.local.get([TA_SET, TA_LED, TA_KEY]);
+  return { set: { ...TA_DEF, ...(r[TA_SET] || {}) }, led: { added: {}, removed: {}, seen: {}, keep: {}, last: 0, lastOk: 0, msg: "", ...(r[TA_LED] || {}) }, key: r[TA_KEY] || "" };
+}
+const taSaveLed = (led) => chrome.storage.local.set({ [TA_LED]: led });
+// 候補の動画(順位の高い順)
+async function taCandidates(set, key) {
+  if (set.src === "api") {
+    if (!key) throw new Error("APIキーが入力されていません");
+    const r = await fetch("https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&videoCategoryId=10&regionCode=JP&maxResults=50&key=" + encodeURIComponent(key));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error("API: " + (j.error?.message || r.status));
+    return (j.items || []).map((x) => ({ id: x.id, title: x.snippet?.title || "" }));
+  }
+  let last = null;
+  for (let back = 0; back < 3; back++) { // 今日の分がまだなければ、前の日へさかのぼる
+    const d = ymd(new Date(Date.now() - back * DAY));
+    try { const v = await trendDay(d); const m = v.filter((x) => /^Music$/i.test(x.cat)); if (m.length) return m.map((x) => ({ id: x.id, title: x.title })); last = new Error("この日の急上昇に音楽がありません"); }
+    catch (e) { last = e; }
+  }
+  throw last || new Error("取得できませんでした");
+}
+let taBusy = false;
+async function taRun(manual = false) {
+  if (taBusy) return { ok: false, error: "確認中です" };
+  taBusy = true;
+  const { set, led, key } = await taGet();
+  const done = async (ok, msg, extra = {}) => { led.last = Date.now(); if (ok) led.lastOk = Date.now(); led.msg = msg; await taSaveLed(led); tfLog(ok ? "info" : "error", "音楽の自動登録", msg); return { ok, msg, ...extra }; };
+  try {
+    if (!set.pid) return await done(false, "対象の再生リストが決まっていません");
+    if (!set.on && !manual) return { ok: true, off: true };
+    let ids;
+    try { ids = await YTA.playlistIds(set.pid); } catch (e) { return await done(false, `再生リストを読めませんでした: ${e?.message || e}`); }
+    if (!ids.length) return await done(false, "再生リストの中身を読めませんでした(空の再生リストか、読み込みの失敗です。念のため何もしません)");
+    const inList = new Set(ids), now = Date.now();
+    // 手動の削除: 自動で入れた動画が再生リストに無ければ、削除したものとして覚える(あとで入れ直さない)
+    for (const id of Object.keys(led.added)) if (!inList.has(id)) { led.removed[id] = now; delete led.added[id]; }
+    // 手動で入れた動画を見つけた日(確認の目安に使う)
+    for (const id of ids) if (!led.added[id] && !led.seen[id]) led.seen[id] = now;
+    for (const id of Object.keys(led.seen)) if (!inList.has(id)) delete led.seen[id];
+    for (const id of Object.keys(led.keep)) if (!inList.has(id)) delete led.keep[id];
+    for (const id of Object.keys(led.removed)) if (now - led.removed[id] > 400 * DAY) delete led.removed[id];
+    // 期限: 自動で入れてから days 日たったら外す(取り置きは残す)
+    let expired = 0;
+    for (const [id, a] of Object.entries(led.added)) {
+      if (led.keep[id] || now - a.at < set.days * DAY) continue;
+      try { await YTA.removeVideo(set.pid, id); led.removed[id] = now; delete led.added[id]; inList.delete(id); expired++; } catch (e) { tfLog("warn", "音楽の自動登録", `期限の動画を外せませんでした: ${e?.message || e}`); }
+    }
+    // 新着を入れる
+    let cands;
+    try { cands = await taCandidates(set, key); } catch (e) { return await done(false, `候補を取れませんでした(${set.src === "api" ? "API" : "スクレイピング"}): ${e?.message || e}`, { expired }); }
+    let added = 0, skipped = 0;
+    for (const c of cands.slice(0, 60)) {
+      if (inList.has(c.id) || led.removed[c.id]) { skipped++; continue; }
+      try { await YTA.addVideo(set.pid, c.id); led.added[c.id] = { at: now, t: c.title }; inList.add(c.id); delete led.seen[c.id]; added++; }
+      catch (e) { tfLog("warn", "音楽の自動登録", `入れられませんでした「${c.title}」: ${e?.message || e}`); }
+    }
+    return await done(true, `確認しました: 候補${cands.length}本 → 追加${added}本・すでにある/削除済み${skipped}本・期限で外した${expired}本`, { added, expired });
+  } catch (e) { return await done(false, `失敗しました: ${e?.message || e}`); }
+  finally { taBusy = false; }
+}
+const taDue = async () => { const { set, led } = await taGet(); if (set.on && set.pid && Date.now() - (led.lastOk || 0) > 20 * 3600 * 1000) taRun(false); };
+const taSetup = () => chrome.alarms?.create("tf-ta", { periodInMinutes: 180, delayInMinutes: 2 });
+chrome.runtime.onInstalled.addListener(taSetup);
+chrome.runtime.onStartup.addListener(() => { taSetup(); setTimeout(taDue, 30000); });
+chrome.alarms?.onAlarm.addListener((a) => { if (a.name === "tf-ta") taDue(); });
+chrome.alarms?.get("tf-ta").then((a) => { if (!a) taSetup(); }).catch(() => {});
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.tf === "ta-run") { taRun(true).then(reply, (e) => reply({ ok: false, error: e?.message || String(e) })); return true; }
+  if (msg?.tf === "ta-del") { // 管理ページの「削除」: 再生リストから外し、削除した動画として覚える
+    (async () => { const { set, led } = await taGet(); await YTA.removeVideo(set.pid, msg.id); led.removed[msg.id] = Date.now(); delete led.added[msg.id]; delete led.seen[msg.id]; delete led.keep[msg.id]; await taSaveLed(led); })().then(() => reply({ ok: true }), (e) => reply({ ok: false, error: e?.message || String(e) })); return true;
+  }
+  if (msg?.tf === "ta-keep") { taGet().then(async ({ led }) => { if (msg.on) led.keep[msg.id] = 1; else delete led.keep[msg.id]; await taSaveLed(led); reply({ ok: true }); }); return true; }
 });

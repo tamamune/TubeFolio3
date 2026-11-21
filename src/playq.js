@@ -33,14 +33,15 @@ function pqPlay(ids, msg) {
 }
 
 // 一覧の上に出す操作の行
+let pqBarOpen = false; // 連続再生のボタン類の開閉(ふだんは閉じておく)
 function playBar(items) {
   pqItems = items;
   const un = pqUnwatched(items).length;
-  return `<div class="pq-bar">`
+  return `<div class="pq-wrap"><div class="pq-bar" ${pqBarOpen ? "" : "hidden"}>`
     + `<span class="grp"><span class="s-cl">▶ 未視聴を連続再生 <b>${un}</b>本</span><button type="button" data-pq="new" ${un ? "" : "disabled"} title="最後まで見ていない動画を、新しく登録した順に続けて再生">新しい順</button><button type="button" data-pq="old" ${un ? "" : "disabled"} title="最後まで見ていない動画を、古く登録した順に続けて再生">古い順</button></span>`
     + `<span class="grp"><span class="s-cl">⏱ 空き時間</span><select class="wsel" data-pqfree aria-label="空き時間" title="この時間に収まる未視聴の動画を選んで続けて再生します(ホイールでも変えられます)">${PQ_FREE.map((m) => `<option value="${m}" ${m === pqFree ? "selected" : ""}>${pqMin(m * 60)}</option>`).join("")}</select><button type="button" data-pq="free" ${un ? "" : "disabled"}>▶ ぴったり再生</button></span>`
     + `<button type="button" class="pill" data-pq="bed" ${un ? "" : "disabled"} title="今から就寝時間(設定「一般」の就寝のお知らせ)までに見終わるように選んで、続けて再生します">🌙 就寝時間までに見終わる</button>`
-    + `</div>`;
+    + `</div><button type="button" class="pill pq-main ${pqBarOpen ? "on" : ""}" data-pq="bartoggle" aria-expanded="${pqBarOpen}" title="連続再生・空き時間・就寝までのボタンを開く・閉じる">▶ 連続再生 <span class="pq-car">${pqBarOpen ? "▴" : "▾"}</span></button></div>`;
 }
 async function pqBedMinutes() {
   const r = await chrome.storage.local.get(["tf-bed", "tf-bed-from", "tf-bed-to"]);
@@ -54,6 +55,7 @@ document.addEventListener("change", (e) => { if (!e.target.matches?.("[data-pqfr
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-pq]"); if (!b) return;
   const un = pqUnwatched(pqItems), a = b.dataset.pq;
+  if (a === "bartoggle") { pqBarOpen = !pqBarOpen; const bar = b.previousElementSibling; if (bar?.classList.contains("pq-bar")) bar.hidden = !pqBarOpen; b.classList.toggle("on", pqBarOpen); b.setAttribute("aria-expanded", String(pqBarOpen)); const c = b.querySelector(".pq-car"); if (c) c.textContent = pqBarOpen ? "▴" : "▾"; return; }
   if (a === "new" || a === "old") { // 画面の並び(登録順の切り替え)に関係なく、登録した順で並べ直す
     const asc = plOrd === "new" ? [...un].reverse() : un; // plOrd・plOrdered は home.js
     const list = a === "old" ? asc : [...asc].reverse();

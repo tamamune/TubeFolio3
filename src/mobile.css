@@ -1,0 +1,18 @@
+/* m.youtube.com の下のツールバー(src/mobile.js)。YouTube の下のメニューの上に重ねる */
+:root{--tfm-bg:#212121;--tfm-fg:#f1f1f1;--tfm-acc:#ffb400;--tfm-pivot:0px;--tfm-safe:env(safe-area-inset-bottom,0px)}
+:root[data-tf-acc=green]{--tfm-acc:#3ddc84}:root[data-tf-acc=purple]{--tfm-acc:#b388ff}:root[data-tf-acc=gray]{--tfm-acc:#d0d0d0}
+.tfm-bar{position:fixed;left:0;right:0;bottom:var(--tfm-pivot);z-index:2147483000;display:flex;align-items:center;gap:4px;padding:4px 8px 4px;background:var(--tfm-bg);color:var(--tfm-fg);border-top:1px solid #3a3a3a;font:13px/1 system-ui,sans-serif;overflow-x:auto;scrollbar-width:none}
+.tfm-bar[hidden]{display:none}
+.tfm-bar::-webkit-scrollbar{display:none}
+.tfm-tools{display:flex;align-items:center;gap:2px;margin-right:auto}
+.tfm-home{margin-left:auto}
+.tfm-tools[hidden]{display:none}
+.tfm-b{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;height:44px;padding:0 8px;border:0;border-radius:22px;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tfm-b:active{background:#ffffff22}
+.tfm-b.on{color:var(--tfm-acc)}
+.tfm-t{font-size:13px}
+.tfm-home span{white-space:nowrap}
+/* 下の分だけ、ページの内容が隠れないようにする */
+:root.tfm-on body{padding-bottom:56px}
+
+.tfm-tf{color:var(--tfm-fg)}.tfm-tf-ic{display:block}

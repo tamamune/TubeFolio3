@@ -79,6 +79,7 @@ function renderNav() {
   let h = `<button class="ni ${tab === "all" || tab.startsWith("list:") ? "on" : ""}" data-t="all" title="ホーム">${home}<span class="lbl">ホーム</span></button>`;
   h += `<button class="ni ${tab === "search" ? "on" : ""}" data-t="search" title="検索"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">検索</span></button>`;
   h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
+  h += typeof musicNav === "function" ? musicNav(tab) : "";
   h += `<div class="nav-h nav-hh"><span>フォルダ</span><span class="fmode" role="group" aria-label="フォルダを押したときの表示"><button type="button" class="${folderMode === "manage" ? "on" : ""}" data-fmode="manage" title="チャンネルを管理する画面を開く">設定</button><button type="button" class="${folderMode === "list" ? "on" : ""}" data-fmode="list" title="登録されているチャンネルの一覧を開く">一覧</button></span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
   h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
   const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
@@ -167,13 +168,18 @@ function render() {
     h += renderHero();
     for (const k of fullOrder()) if (k.startsWith("pl:") ? !hpl.has(k.slice(3)) : on(k)) h += secHtml(k);
   } else {
-    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "bookmarks" ? bookmarksView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
+    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "bookmarks" ? bookmarksView() : tab === "music" ? musicView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
   }
   // 描き直しても、横スクロールの行の位置はそのままにする(×で外したときなど)。行は見出しの名前で見分ける(件数は変わるので含めない)
   const rowKey = (r) => (r.querySelector("h2 .h2l") || r.querySelector("h2"))?.firstChild?.textContent || "";
   const pos = new Map([...$("main").querySelectorAll(".row")].map((r) => [rowKey(r), r.querySelector(".track")?.scrollLeft || 0]));
+  // ヒーローが前回と同じ動画なら作り直さない(起動直後に何度も描き直されて、上のサムネが一瞬読み込み直されるのを防ぐ)
+  const oldHero = tab === "all" ? $("main").querySelector(".hero") : null;
   $("main").innerHTML = h;
-  fixHeroBg();
+  const newHero = oldHero && $("main").querySelector(".hero");
+  const heroSig = (e) => (e.querySelector(".hero-bg")?.dataset.hv || "") + e.querySelector(".hero-in")?.innerHTML + e.querySelector(".dots")?.innerHTML;
+  if (newHero && heroSig(oldHero) === heroSig(newHero)) newHero.replaceWith(oldHero);
+  else fixHeroBg();
   for (const r of $("main").querySelectorAll(".row")) { const x = pos.get(rowKey(r)), tr = r.querySelector(".track"); if (x && tr) tr.scrollLeft = x; }
   clearInterval(heroT);
   if ($("main").querySelector(".hero")) heroT = setInterval(() => { if (!$("pl").open) { heroI++; swapHero(); } }, 8000);
@@ -181,12 +187,18 @@ function render() {
 
 // 再生方法(設定): "embed" = このページ内の埋め込み / "yt" = YouTubeを新しいタブで開く(YouTubeの履歴に残る)
 // 設定はクリックのたびに読むので、変えるとすぐに反映される
-const playOnYt = () => ls.get("tf-play-mode", "embed") === "yt";
+// スマホ(タッチ操作だけの端末)とパソコンで、別々に決められる(スマホ: tf-play-mode-m / パソコン: tf-play-mode)。どちらもドライブ同期の対象
+const touchOnly = () => { try { return matchMedia("(pointer:coarse)").matches && !matchMedia("(pointer:fine)").matches; } catch { return false; } };
+const playKey = () => (touchOnly() ? "tf-play-mode-m" : "tf-play-mode");
+const playOnYt = () => ls.get(playKey(), "embed") === "yt";
 function openV(id, start) { // start: 再生を始める秒(ブックマークのメモから)
   const v = data.videos[id] || vmap.get(id), short = v?.kind === "short"; // ショートは縦長のプレイヤーで再生する
   const at = start > 0 ? Math.floor(start) : 0;
   const ytUrl = short && !at ? `https://www.youtube.com/shorts/${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}${at ? `&t=${at}s` : ""}`;
-  if (playOnYt()) return void window.open(ytUrl, "_blank", "noopener");
+  if (playOnYt()) { // 新しいタブで再生。スマホは m.youtube.com を拡張機能から開く(window.open だと YouTube アプリに飛んでしまう)
+    const u = touchOnly() ? ytUrl.replace("https://www.youtube.com", "https://m.youtube.com") : ytUrl;
+    return void (chrome.tabs?.create ? chrome.tabs.create({ url: u }) : window.open(u, "_blank", "noopener"));
+  }
   if (!v) return;
   $("pl").classList.toggle("short", short);
   $("pl-f").src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${at ? "&start=" + at : ""}${short ? "&loop=1&playlist=" + encodeURIComponent(id) : ""}`; // ショートは YouTube と同じく繰り返し再生
@@ -473,7 +485,7 @@ function listView(k) {
     if (p) loadPl(p); // 保存した再生リストなど、まだ中身を持っていなければ取りに行く(開くたびに最新にする)
     const msg = !p ? "再生リストが見つかりません。" : cache.plErr?.[p.id] || (cache.pl?.[p.id] ? "表示できる項目がありません。" : "読み込み中…");
     const vis = plVis(plOrdered(items));
-    return `<section class="row">${back}<h2>${esc(p ? plTitle(p) : "再生リスト")}<small>${plCnt(vis, items)}本</small></h2>${items.length ? vbar(ordSeg() + plHideRow()) + playBar(plOrdered(items)) + (vis.length ? vgrid(vis.map((e) => cardWith(e, rmBtn(p, e[0]) + wbBtn(e))).join("")) : plAllHidden()) : `<div class="empty" style="margin-top:0">${esc(msg)}</div>`}</section>`;
+    return `<section class="row">${back}<div class="lh-row"><h2>${esc(p ? plTitle(p) : "再生リスト")}<small>${plCnt(vis, items)}本</small></h2>${items.length ? playBar(plOrdered(items)) : ""}</div>${typeof taBar === "function" ? taBar(p) : ""}${items.length ? vbar(ordSeg() + plHideRow()) + (vis.length ? vgrid(vis.map((e) => cardWith(e, rmBtn(p, e[0]) + wbBtn(e) + (typeof taBadge === "function" ? taBadge(p, e[0]) : ""))).join("")) : plAllHidden()) : `<div class="empty" style="margin-top:0">${esc(msg)}</div>`}</section>`;
   }
   let lp = null;
   if (k === "resume") items = resumeItems();
@@ -484,7 +496,7 @@ function listView(k) {
   else if (k === "saved") items = all();
   if (k === "pl" || k === "savedpl") { const l = plsOf(k); cards = l.map(plCard).join(""); items = l; unit = "件"; }
   else cards = items.map((e) => cardWith(e, (k === "later" ? rmBtn(lp, e[0]) : k === "resume" ? rsBtn(e[0]) : "") + (isPl ? wbBtn(e) : ""))).join("");
-  if (isPl) return `<section class="row">${back}<h2>${esc(T[k] || "一覧")}<small>${plCnt(items, all0)}本</small></h2>${all0.length ? vbar(ordSeg() + plHideRow()) + playBar(all0) + (items.length ? vgrid(cards) : plAllHidden()) : `<div class="empty" style="margin-top:0">表示できる項目がありません。</div>`}</section>`;
+  if (isPl) return `<section class="row">${back}<div class="lh-row"><h2>${esc(T[k] || "一覧")}<small>${plCnt(items, all0)}本</small></h2>${all0.length ? playBar(all0) : ""}</div>${all0.length ? vbar(ordSeg() + plHideRow()) + (items.length ? vgrid(cards) : plAllHidden()) : `<div class="empty" style="margin-top:0">表示できる項目がありません。</div>`}</section>`;
   return `<section class="row">${back}<h2>${esc(T[k] || "一覧")}<small>${items.length}${unit}</small></h2>${items.length ? vbar() + vgrid(cards) : `<div class="empty" style="margin-top:0">表示できる項目がありません。</div>`}</section>`;
 }
 /* 再生リストの一覧: 「視聴済み・メン限を隠す」(押すたびに切り替え。tf-pl-hidew / tf-pl-hidem。ドライブ同期の対象) */
@@ -743,7 +755,7 @@ $("set-list").addEventListener("click", (e) => {
   order = [...fo, ...order.filter((x) => x.startsWith("pl:") && !fo.includes(x))]; // 今は読み込めていない再生リストの位置も残す
   ls.set("tf-home-order", JSON.stringify(order)); paintSettings(); render();
 });
-$("set-play").onchange = () => ls.set("tf-play-mode", $("set-play").value);
+$("set-play").onchange = () => ls.set(playKey(), $("set-play").value);
 $("set-reload").onclick = () => { showSettings(false); refreshHome(true); };
 document.addEventListener("change", (e) => { if (e.target.id !== "set-dummy") return; useDummy = e.target.checked; ls.set("tf-home-dummy", useDummy ? "1" : "0"); render(); if (!useDummy) refreshHome(true); });
 

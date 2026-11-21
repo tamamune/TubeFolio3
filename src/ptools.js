@@ -111,17 +111,19 @@
     if (ts) ts.after(b); else (right.querySelector(".ytp-right-controls-left") || right).prepend(b);
   }
   // 機能ごとのタブ: 再生・画面(A-B リピート・画面の調整) / 字幕・読み上げ / コメント表示 / SponsorBlock(前回開いていたタブを覚える)
-  let toolTab = "play";
+  let toolTab = "play", regTab = "pl";
+  globalThis.tfTools = { open(k) { if (!player()) return false; toolTab = k || regTab; document.querySelector(".tf-tpanel")?.remove(); panel(); return true; } }; // content.js の ⋯ から呼ぶ
   function panel() {
     const p = player(); if (!p) return;
     document.querySelector(".tf-cmenu")?.remove();
     const box = el("div", "tf-tpanel tf-cmenu");
     ["click", "mousedown", "dblclick", "wheel", "contextmenu", "keydown"].forEach((t) => box.addEventListener(t, (e) => e.stopPropagation())); // 後ろの映像の操作にしない
-    const NAMES = [["play", "再生・画面"], ["su", "字幕・読み上げ"], ["cm", "コメント表示"], ["sb", "SponsorBlock"]];
+    const NAMES = [["pl", "再生リスト"], ["fo", "フォルダ"], ["tg", "タグ"], ["cm", "コメント表示"], ["su", "字幕・読み上げ"], ["play", "再生・画面"], ["sb", "SponsorBlock"]];
     const tabs = el("div", "tf-mtabs"), panes = {};
     for (const [k, n] of NAMES) { panes[k] = el("div", "tf-mpane"); const b = el("button", null, n); b.type = "button"; b.dataset.k = k; b.onclick = () => show(k); tabs.append(b); }
-    const show = (k) => { toolTab = k; for (const [key, pn] of Object.entries(panes)) pn.hidden = key !== k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === k)); };
-    box.append(tabs, ...Object.values(panes));
+    const show = (k) => { toolTab = k; if ("pl fo tg".includes(k)) regTab = k; for (const [key, pn] of Object.entries(panes)) pn.hidden = key !== k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === k)); };
+    const stat = el("div", "tf-st"), msg = (t, bad) => { stat.textContent = t; stat.classList.toggle("bad", !!bad); clearTimeout(msg.t); if (t) msg.t = setTimeout(() => (stat.textContent = ""), 3500); };
+    box.append(tabs, ...Object.values(panes), stat);
     let m = panes.play;
     const row = (label, ...kids) => { const r = el("div", "tf-cmr tf-tr"); r.append(el("span", "tf-cml", label)); const k = el("div", "tf-tk"); k.append(...kids); r.append(k); m.append(r); return r; };
     const btn = (t, f, title) => { const b = el("button", "tf-tb", t); b.type = "button"; if (title) b.title = title; b.onclick = f; return b; };
@@ -151,7 +153,6 @@
     // 「字幕・読み上げ」タブ: 上に字幕(subtitles.js が作る)、その下に読み上げ
     const buildSu = () => {
       panes.su.textContent = "";
-      globalThis.tfSub?.buildPane(panes.su);
       m = panes.su;
       const ttsB = btn("", () => {
         const on = S["tf-tts"] !== "on"; S["tf-tts"] = on ? "on" : "off"; chrome.storage.local.set({ "tf-tts": S["tf-tts"] });
@@ -162,7 +163,6 @@
       const paintTts = () => { ttsB.textContent = S["tf-tts"] === "on" ? "🔊 読み上げ中(押すと止める)" : "🔇 オフ(押すと読み上げる)"; ttsB.classList.toggle("on", S["tf-tts"] === "on"); };
       paintTts();
       ttsB.title = "外国語の動画で、日本語訳の字幕を音声で読みます(字幕は「日本語」か「二か国語」で使います)"; // 説明は、重ねたときだけ出す
-      row("日本語で読み上げ", ttsB).classList.add("tf-ttsr", "tf-inl"); // 横に並べる(ボタン1つなので)
       // 動画の再生速度(切り替えは ytpage.js が YouTube のプレーヤーに頼む。2x より速いときは video に直接かける)
       const vrates = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
       const vrBs = vrates.map((r) => btn(r + "x", async () => { const res = await ask({ tf: "rate", rate: r }); if (!res) { const v = video(); if (v) v.playbackRate = r; } paintVr(); }, `動画を ${r}x で再生します`));
@@ -176,10 +176,14 @@
       const paintRate = () => rateBs.forEach((b, i) => b.classList.toggle("on", String(S["tf-tts-rate"] ?? "auto") === rates[i][0]));
       paintRate();
       row("読み上げの速さ", ...rateBs).classList.add("tf-rates");
+      row("日本語で読み上げ", ttsB).classList.add("tf-ttsr", "tf-inl"); // 横に並べる(ボタン1つなので)
+      globalThis.tfSub?.buildPane(panes.su); // 字幕は、いちばん下
     };
     // コメント表示・SponsorBlock・字幕は、それぞれの機能(content.js・sponsorblock.js・subtitles.js)が中身を作る
     // (SponsorBlock は画面に置かれた枠にしか中身を作らないので、先にパネルを置いてから作る)
     p.append(box);
+    const chTop = el("div", "tf-chtop"), plList = el("div", "tf-pllist"); panes.pl.append(plList, chTop); // 再生リストの下に、チャンネル登録を1行で置く
+    globalThis.tfReg?.build({ plBox: plList, foBox: panes.fo, chBox: chTop, tgBox: panes.tg }, msg); // 再生リスト・フォルダ・チャンネル・タグ(content.js)
     globalThis.tfCm?.buildPane(panes.cm);
     globalThis.tfSB?.buildPane(panes.sb);
     buildSu();

@@ -9,7 +9,7 @@
 const DS_TAGLOG = "tf-taglog"; // tags.js の TAGLOG と同じ
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
-const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache"]);
+const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache", "tf-mu-state", "tf-pl-live"]);
 let dsConnLost = false; // ログインが切れて、自動同期が止まっているか
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
@@ -24,7 +24,7 @@ const dsMarkLocal = () => { if (!dsApplying) ls.set("tf-sync-dirty", "1"); }; //
   chrome.storage.onChanged.addListener((c) => { if (!c[KEY]) return; if (dsSkipStore) { dsSkipStore = false; return; } if (!dsApplying) { dsMarkLocal(); dsSoon(); } });
 })();
 // YouTube の再生画面のコメント表示の設定(chrome.storage の tf-cm-…)。拡張機能のどのページからも読み書きされるので、localStorage ではなくこちらに持つ
-const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode", "tf-mini", "tf-mini-size", "tf-mini-pos", "tf-pip-btn", "tf-pip-auto", "tf-break", "tf-bed", "tf-bed-from", "tf-bed-to", "tf-seek", "tf-step", "tf-vf", "tf-tts", "tf-tts-rate", "tf-sub-mode", "tf-adff", "tf-quality", "tf-h264", "tf-pubdate", "tf-notify", "tf-nv-words", "tf-rel-mode", "tf-end-mode", "tf-end-tf", "tf-end-slots", "tf-end-at", ...["on", "bar", "notice", "cats"].map((k) => "tf-sb-" + k)];
+const DS_CMKEYS = [...["on", "side", "size", "hs", "width", "name", "icon", "sort", "tr", "loop", "auto"].map((k) => "tf-cm-" + k), "tf-cm-hidemode", "tf-mini", "tf-mini-size", "tf-mini-pos", "tf-pip-btn", "tf-pip-auto", "tf-break", "tf-bed", "tf-bed-from", "tf-bed-to", "tf-seek", "tf-step", "tf-vf", "tf-tts", "tf-tts-rate", "tf-sub-mode", "tf-adff", "tf-quality", "tf-h264", "tf-pubdate", "tf-notify", "tf-notify-os", "tf-accent", "tf-mu-adff", "tf-chp-watched", "tf-chp-members", "tf-ta-set", "tf-ta-led", "tf-nv-words", "tf-rel-mode", "tf-end-mode", "tf-end-tf", "tf-end-slots", "tf-end-at", ...["on", "bar", "notice", "cats"].map((k) => "tf-sb-" + k)];
 let dsCmSkipUntil = 0;
 chrome.storage.onChanged.addListener((c) => { if (Date.now() < dsCmSkipUntil || dsApplying) return; if (DS_CMKEYS.some((k) => k in c)) { dsMarkLocal(); dsSoon(); } });
 const dsSoon = (ms = 3000) => { clearTimeout(dsTimer); dsTimer = setTimeout(() => { dsTimer = 0; dsSync("auto", false); }, ms); };
@@ -286,7 +286,7 @@ async function dsSync(mode = "auto", user = false) {
 
 /* ---------- 同期の内容を見る(何が同期され、何が同期されないか) ---------- */
 const DS_NAMES = { "コメント表示の設定": "YouTube の再生画面の設定(コメント表示・SponsorBlock・字幕・読み上げ・ツール・ワイプ・休憩など)", "タグの記録": "設定「タグ」の記録(見た動画のタグ。取り置き・削除も同期)", folders: "フォルダ", videos: "保存した動画", bookmarks: "ブックマーク", channels: "チャンネル(フォルダ分け・調査結果)", playlists: "再生リストの控え",
-  "tf-home-cache": "ホームの一覧のキャッシュ", "tf-accent": "色の変更", "tf-sub-style": "登録済みチャンネルの見分け方", "tf-date-mode": "日付の表記", "tf-home-hidden": "ホームで非表示の行", "tf-home-hpl": "非表示の再生リスト",
+  "tf-home-cache": "ホームの一覧のキャッシュ", "tf-play-mode": "サムネクリック時の再生(パソコン)", "tf-ta-set": "音楽の自動登録の設定", "tf-ta-led": "音楽の自動登録の記録(入れた・削除した・取り置き)", "tf-play-mode-m": "サムネクリック時の再生(スマホ)", "tf-chp-watched": "チャンネルページ: 視聴済み動画を消す", "tf-chp-members": "チャンネルページ: メンバー限定動画を消す", "tf-mu-set": "ミュージック: シャッフル・リピート・音量・動画で再生", "tf-mu-fold": "ミュージック: 閉じているフォルダ", "tf-mu-open": "ミュージック: 開いている再生リスト", "tf-mu-adff": "ミュージック: 広告の早送り", "tf-accent": "色の変更", "tf-sub-style": "登録済みチャンネルの見分け方", "tf-date-mode": "日付の表記", "tf-home-hidden": "ホームで非表示の行", "tf-home-hpl": "非表示の再生リスト",
   "tf-acct": "YouTubeアカウントの控え", "tf-ch-sync": "登録チャンネルの取得状況", "tf-watched": "視聴済みの印", "tf-home-dummy": "ダミー表示", "tf-sync-cid": "同期のクライアントID", "tf-sync-conn": "同期のログイン状態", "tf-sync-tok": "同期のトークン", "tf-sync-acct": "同期(ドライブ)のアカウント" };
 const dsName = (k) => DS_NAMES[k] || k;
 const dsSize = (v) => { try { return (typeof v === "string" ? v : JSON.stringify(v ?? "")).length; } catch { return 0; } };
