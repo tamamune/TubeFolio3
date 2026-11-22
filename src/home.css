@@ -1678,7 +1678,8 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 #settings svg{transition:transform .5s}
 #settings:hover svg{transform:rotate(90deg)}
 #test-nav:hover svg{transform:rotate(-12deg) scale(1.15)}
-.ni .n.has{animation:tf-pulse 2.2s infinite}
+@keyframes tf-soft{0%,100%{opacity:1}50%{opacity:.72}}
+.ni .n.has{animation:tf-soft 4s ease-in-out infinite} /* 新着の件数: ごくゆっくり明るさが変わるだけ */
 .tab{transition:background .2s,color .2s,transform .15s}.tab:active{transform:scale(.95)}
 #totop{transition:transform .2s,opacity .2s}#totop:hover{transform:translateY(-4px)}
 
