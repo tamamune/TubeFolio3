@@ -11,7 +11,7 @@ const kids = (id) => data.folders.filter((f) => f.parent === id);
 const desc = (id, seen = new Set()) => { if (seen.has(id)) return []; seen.add(id); return [id, ...kids(id).flatMap((k) => desc(k.id, seen))]; }; // 入れ子の子孫すべて
 const depthOf = (f) => { let d = 0, p = f, n = 0; while (p?.parent && n++ < 20) { p = data.folders.find((x) => x.id === p.parent); d++; } return d; };
 const inF = (v, id) => desc(id).some((x) => v.folders.includes(x));
-const SECTIONS = [["resume", "視聴を再開"], ["later", "TubeFolio2 後で見る"], ["ytlater", "YouTube の後で見る"], ["trend", "急上昇(日本)"], ["pl", "再生リスト"], ["savedpl", "ライブラリ"], ["saved", "ライブラリ: 保存した動画"]];
+const SECTIONS = [["resume", "続きから"], ["later", "TubeFolio2 後で見る"], ["ytlater", "YouTube の後で見る"], ["trend", "急上昇(日本)"], ["pl", "再生リスト"], ["savedpl", "ライブラリ"]];
 let hidden = new Set((() => { try { return JSON.parse(ls.get("tf-home-hidden", "[]")); } catch { return []; } })());
 const on = (k) => !hidden.has(k);
 const KEYS = SECTIONS.map(([k]) => k);
@@ -114,8 +114,9 @@ function heroList() {
   const real = (l) => (l || []).filter(([, v]) => v && !v.dummy);
   const later = laterPl(), own = plsOf("pl");
   const pick = ls.get("tf-hero-src", "auto"); // 設定で選んだ再生リスト(auto = 下の順に自動で選ぶ)
+  if (pick === "resume") return [real(resumeItems()), "続きから"];
   if (pick !== "auto") {
-    const p = pls().find((x) => plId(x) === pick);
+    const p = pls().find((x) => plId(x) === pick && kindOf(x) === "own"); // 選べるのは自分で作成した再生リストだけ
     if (p) {
       const l = real(p.dummy ? dummyPlItems(p) : (later && p.id === later.id ? cache.later?.[p.id] : cache.pl?.[p.id]) || cache.pl?.[p.id] || cache.later?.[p.id]);
       if (!l.length && !p.dummy && !plFetched.has(p.id)) fetchPl(p).then(() => { saveCache(); swapHero(); });
@@ -124,7 +125,7 @@ function heroList() {
   }
   const srcs = [
     [all(), "最近保存"],
-    [resumeItems(), "視聴を再開"],
+    [resumeItems(), "続きから"],
     [later ? cache.later?.[later.id] : [], "後で見る"],
     [own.flatMap((p) => cache.pl?.[p.id] || []), "再生リスト"],
   ];
@@ -421,7 +422,7 @@ function collectPlVideos(root) {
   })(root);
   return [...out.entries()];
 }
-/* 視聴を再開: ×で外した動画は覚えておき、YouTube の視聴履歴に残っていても二度と出さない */
+/* 続きから(旧: 視聴を再開): ×で外した動画は覚えておき、YouTube の視聴履歴に残っていても二度と出さない */
 const rsHidden = new Set((() => { try { return JSON.parse(ls.get("tf-resume-hidden", "[]")); } catch { return []; } })());
 const resumeItems = () => { const l = (useDummy ? DUMMY.resume : cache.resume || []).filter(([id]) => !rsHidden.has(id)); needDet(l); return withDet(l); };
 
@@ -460,13 +461,13 @@ async function runDet() {
     }
   } finally { detRun = false; }
 }
-const rsBtn = (vid) => `<span class="rm" data-rsrm="${esc(vid)}" role="button" title="視聴を再開から外す(今後も表示しません)" aria-label="視聴を再開から外す">✕</span>`;
+const rsBtn = (vid) => `<span class="rm" data-rsrm="${esc(vid)}" role="button" title="続きからから外す(今後も表示しません)" aria-label="続きからから外す">✕</span>`;
 function hideResume(vid) {
   rsHidden.add(vid);
   ls.set("tf-resume-hidden", JSON.stringify([...rsHidden].slice(-1000)));
-  render(); toast("視聴を再開から外しました(今後も表示しません)");
+  render(); toast("続きからから外しました(今後も表示しません)");
 }
-const RS_T = "視聴を再開(途中まで見た動画)";
+const RS_T = "続きから(途中まで見た動画)";
 const resumeRow = () => { const l = resumeItems(); return l.length ? row(RS_T, l, "list:resume", rsBtn) : note(RS_T, !useDummy && !cache.resume ? cache.resumeErr || "読み込み中…" : cache.resumeErr || "途中まで見た動画はありません"); };
 function laterRow() {
   if (useDummy) return row("TubeFolio2 後で見る", DUMMY.later, "list:later");
@@ -683,12 +684,11 @@ function paintSettings() {
   // 見出しごとに閉じたり開いたりできる(閉じている見出しは tf-set-home-fold に覚える。ドライブ同期の対象)
   const shut = new Set((() => { try { return JSON.parse(ls.get("tf-set-home-fold", "[]")); } catch { return []; } })());
   const sec = (id, title, body) => `<div class="set-sec ${shut.has(id) ? "shut" : ""}" data-sec="${id}"><button type="button" class="set-h set-hb" data-secb="${id}" aria-expanded="${!shut.has(id)}"><i>▾</i>${title}</button><div class="set-sb">${body}</div></div>`;
-  let h = sec("hero", "ホームのピックアップ動画", `<label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 視聴を再開 → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
+  let h = sec("hero", "ホームのピックアップ動画", `<label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 続きから → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
     + `<option value="auto">自動(おまかせ)</option>`
-    + pls().map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`);
+    + `<option value="resume" ${hs === "resume" ? "selected" : ""}>続きから</option>`
+    + pls().filter((p) => !LATER(p) && kindOf(p) === "own").map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`);
   h += sec("order", "ホームの並び順と表示 <small>(行をドラッグして並べ替え)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row" data-ok="${esc(k)}"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label></div>`).join("") + `</div>`);
-  const ps = pls().filter((p) => !LATER(p) && kindOf(p) !== "own"); // 自分の再生リストは上の並び順で切り替える
-  if (ps.length) h += sec("pls", "再生リストの表示(ホーム・一覧)", ps.map((p) => `<label class="set-row"><span>${esc(p.title)} <small>${kindOf(p) === "own" ? "作成" : "保存"}</small></span><input type="checkbox" data-p="${esc(plId(p))}" ${hpl.has(plId(p)) ? "" : "checked"}></label>`).join(""));
   $("set-list").innerHTML = h;
 }
 // 就寝のお知らせを使わないときは、時刻の欄を薄くする
