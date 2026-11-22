@@ -1670,8 +1670,7 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 #nav{animation:tf-in-l .5s cubic-bezier(.2,.8,.2,1) both}
 .nav-head{animation:tf-drop .5s .1s cubic-bezier(.2,.8,.2,1) both}
 .brand{background:linear-gradient(110deg,#fff 40%,var(--acc) 50%,#fff 60%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:tf-sheen 6s 1.2s ease-in-out infinite}
-body.nav-intro #nav-list>*{animation:tf-in-l .45s cubic-bezier(.2,.8,.2,1) both}
-body.nav-intro #nav-list>*:nth-child(1){animation-delay:.15s}body.nav-intro #nav-list>*:nth-child(2){animation-delay:.2s}body.nav-intro #nav-list>*:nth-child(3){animation-delay:.25s}body.nav-intro #nav-list>*:nth-child(4){animation-delay:.3s}body.nav-intro #nav-list>*:nth-child(5){animation-delay:.35s}body.nav-intro #nav-list>*:nth-child(6){animation-delay:.4s}body.nav-intro #nav-list>*:nth-child(n+7){animation-delay:.45s}
+#nav-list>.ni-in{animation:tf-in-l .45s calc(var(--ni,0)*50ms + 150ms) cubic-bezier(.2,.8,.2,1) backwards}
 .acct{animation:tf-in-l .5s .5s cubic-bezier(.2,.8,.2,1) both}
 .ni{position:relative;transition:background .18s,color .18s,transform .18s}
 .ni:hover{transform:translateX(4px)}
@@ -1702,8 +1701,11 @@ body.nav-intro #nav-list>*:nth-child(1){animation-delay:.15s}body.nav-intro #nav
 .c .bm,.c .rm,.c .wl,.c .more{transition:opacity .2s,transform .2s}
 .c:not(:hover) .bm:not(.on),.c:not(:hover) .rm,.c:not(:hover) .wl:not(.on),.c:not(:hover) .more{transform:translateY(-4px) scale(.9)}
 @media (prefers-reduced-motion:reduce){
-  #nav,.nav-head,.acct,.brand,body.nav-intro #nav-list>*,.th,.ni.on::before,.c:hover .th::after{animation:none!important}
+  #nav,.nav-head,.acct,.brand,#nav-list>.ni-in,.th,.ni.on::before,.c:hover .th::after{animation:none!important}
   .brand{color:#fff;background:none}
   .th img{opacity:1;filter:none;transform:none}
   .ni,.ni svg,.ib{transition:none!important}.ni:hover,.ni:hover svg{transform:none}
 }
+
+.th img.nf{transition:none!important}
+.th:has(img.nf){animation:none}

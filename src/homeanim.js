@@ -4,10 +4,19 @@
    ・動きを減らす設定(prefers-reduced-motion)のときは何もしない */
 (() => {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  // 起動直後の1.5秒だけ、サイドバーの項目を順に出す(描き直しのたびには動かさない)
-  document.body.classList.add("nav-intro"); setTimeout(() => document.body.classList.remove("nav-intro"), 1500);
-  // サムネ: 読み込めたら、ぼかしから くっきり表示
-  const ld = (im) => { if (im.tagName === "IMG" && im.closest(".th")) im.classList.add("ld"); };
+  // サイドバー: 最初に項目が入ったときだけ順に出す(描き直しのたびには動かさない)
+  const nl = document.getElementById("nav-list");
+  if (nl) {
+    const nmo = new MutationObserver(() => {
+      if (!nl.children.length) return;
+      nmo.disconnect();
+      [...nl.children].forEach((c, i) => { c.style.setProperty("--ni", Math.min(i, 14)); c.classList.add("ni-in"); });
+    });
+    nmo.observe(nl, { childList: true });
+  }
+  // サムネ: 初めて読み込めた画像だけ、ぼかしからくっきり表示。一度読めた画像は、描き直しでも最初から表示(ちらつき防止)
+  const loaded = new Set();
+  const ld = (im) => { if (im.tagName === "IMG" && im.closest(".th")) { loaded.add(im.currentSrc || im.src); im.classList.add("ld"); } };
   document.addEventListener("load", (e) => ld(e.target), true);
   const main = document.getElementById("main"); if (!main) return;
   const seen = new Set();
@@ -27,7 +36,9 @@
     }
   };
   let t = 0;
-  new MutationObserver(() => { if (!t) t = requestAnimationFrame(() => { t = 0; prep(); }); }).observe(main, { childList: true });
+  new MutationObserver((ms) => {
+    for (const m of ms) for (const n of m.addedNodes) if (n.querySelectorAll) n.querySelectorAll(".th img").forEach((i) => { if (loaded.has(i.src)) i.classList.add("ld", "nf"); });
+    if (!t) t = requestAnimationFrame(() => { t = 0; prep(); }); }).observe(main, { childList: true, subtree: true });
   prep();
   main.querySelectorAll(".th img").forEach((i) => i.complete && ld(i));
 })();
