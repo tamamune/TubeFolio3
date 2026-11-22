@@ -1626,3 +1626,38 @@ body.mu-on #totop{bottom:84px}
 body.mu-on #totop{bottom:0}
 body:has(#mu-dock.mu-open) #totop{bottom:84px}
 @media (max-width:820px){#totop{right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px))}body.mu-on #totop{bottom:calc(56px + env(safe-area-inset-bottom,0px))}body:has(#mu-dock.mu-open) #totop{bottom:calc(122px + env(safe-area-inset-bottom,0px))}}
+
+/* ===== ホームのアニメーション(src/homeanim.js と対) ===== */
+@keyframes tf-kb{from{transform:scale(1.02) translate(0,0)}to{transform:scale(1.14) translate(-1.5%,-1%)}}
+@keyframes tf-up{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes tf-fade{from{opacity:0}to{opacity:1}}
+@keyframes tf-pop{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes tf-shine{from{background-position:-120% 0}to{background-position:220% 0}}
+@keyframes tf-pulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--acc-a),.55)}50%{box-shadow:0 0 0 9px rgba(var(--acc-a),0)}}
+@keyframes tf-line{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.hero-bg{animation:tf-fade .8s ease-out both,tf-kb 18s ease-in-out .2s infinite alternate;will-change:transform}
+.hero-in .badge{animation:tf-up .6s .15s cubic-bezier(.2,.8,.2,1) both;background-image:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.65) 50%,transparent 70%);background-size:60% 100%;background-repeat:no-repeat;background-color:var(--acc)}
+.hero-in .badge{animation:tf-up .6s .15s cubic-bezier(.2,.8,.2,1) both,tf-shine 3.6s 1s ease-in-out infinite}
+.hero-in h1{animation:tf-up .7s .3s cubic-bezier(.2,.8,.2,1) both}
+.hero-in p{animation:tf-up .7s .45s cubic-bezier(.2,.8,.2,1) both}
+.hero-in .btns{animation:tf-up .7s .6s cubic-bezier(.2,.8,.2,1) both}
+.hero .btn.p{animation:tf-pulse 2.4s 1.5s ease-out infinite;transition:transform .18s}
+.hero .btn.p:hover{transform:scale(1.07);animation:none}
+.dots button{transition:transform .2s,opacity .2s,border-color .2s;animation:tf-pop .5s both}
+.dots button:nth-child(2){animation-delay:.1s}.dots button:nth-child(3){animation-delay:.2s}.dots button:nth-child(4){animation-delay:.3s}.dots button:nth-child(5){animation-delay:.4s}
+.dots button:hover{transform:translateY(-4px) scale(1.1);opacity:1}
+.dots button.on{transform:scale(1.12)}
+.row.rv{opacity:0;transform:translateY(28px);transition:opacity .6s ease-out,transform .6s cubic-bezier(.2,.8,.2,1)}
+.row.rv.in{opacity:1;transform:none}
+.row.rv .track .c{opacity:0;transform:translateY(18px) scale(.94)}
+.row.rv.in .track .c{opacity:1;transform:none;animation:tf-pop .55s calc(var(--i,0)*70ms + 120ms) cubic-bezier(.2,.8,.2,1) backwards}
+.row.rv.in .track .c:hover{transform:scale(1.05)}
+.row h2{position:relative}
+.row.rv h2::after{content:"";position:absolute;left:0;bottom:-4px;width:44px;height:3px;border-radius:2px;background:var(--acc);transform:scaleX(0);transform-origin:left}
+.row.rv.in h2::after{animation:tf-line .6s .3s ease-out forwards}
+.row.in .th img,.row .c .th img{transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.c:hover .th img{transform:scale(1.08)}
+@media (prefers-reduced-motion:reduce){
+  .hero-bg,.hero-in .badge,.hero-in h1,.hero-in p,.hero-in .btns,.hero .btn.p,.dots button{animation:none!important}
+  .row.rv,.row.rv .track .c{opacity:1!important;transform:none!important;transition:none!important}
+}
