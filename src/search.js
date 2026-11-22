@@ -368,6 +368,7 @@ async function sRandomTags() {
 let sFold = false; // 狭い・縦長の画面では、開くたびに閉じた状態から(覚えない)
 const foldBtn = () => { const n = filterNote().length; return `<button type="button" class="btn s s-fold ${sFold ? "on" : ""}" data-act="s-fold" aria-expanded="${sFold}">${sFold ? "項目を閉じる" : "項目を開く"}${!sFold && n ? ` (${n})` : ""}</button>`; };
 function searchView() {
+  sFold = false; // 検索を開くたびに、項目は閉じた状態から
   setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); gtPaint(); if (gtOpen) gtLoad(false); }, 0);
   return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button><button class="btn p" type="submit">検索</button><button type="button" class="btn s s-clear" data-act="s-clear">クリア</button>${foldBtn()}</form>`
     + `<div class="s-filters">${filtersHtml()}</div>${advHtml()}${gtPanel()}<div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
