@@ -1726,3 +1726,16 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
   .s-top .s-hist::-webkit-scrollbar{display:none}
   .s-top .s-h{flex:none}
 }
+
+/* ===== 設定「ホームの表示」: 見出しの開閉と、並び順のドラッグ ===== */
+.set-hb{display:flex;align-items:center;gap:6px;width:100%;margin:16px 0 2px;padding:6px 4px;border:0;border-radius:6px;background:none;color:var(--muted);font:inherit;font-weight:700;font-size:13px;text-align:left;cursor:pointer}
+.set-hb:hover{background:rgba(255,255,255,.06);color:#fff}
+.set-hb i{font-style:normal;display:inline-block;width:14px;transition:transform .2s}
+.set-hb small{font-weight:500}
+.set-sec.shut .set-hb i{transform:rotate(-90deg)}
+.set-sec.shut .set-sb{display:none}
+.grip{flex:none;display:grid;place-items:center;width:26px;height:28px;margin-right:4px;color:var(--muted);font-size:18px;cursor:grab;touch-action:none;user-select:none;border-radius:6px}
+.grip:hover{background:rgba(255,255,255,.1);color:#fff}
+#set-ord .set-row.drag{background:#2a2a2a;box-shadow:0 4px 16px rgba(0,0,0,.6);position:relative;z-index:2}
+#set-ord .set-row.drag .grip{cursor:grabbing}
+#set-ord .set-row label{flex:1;min-width:0}

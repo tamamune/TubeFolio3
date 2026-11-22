@@ -680,12 +680,15 @@ function paintSettings() {
   const chk = (k) => k.startsWith("pl:") ? `data-p="${esc(k.slice(3))}" ${hpl.has(k.slice(3)) ? "" : "checked"}` : `data-k="${esc(k)}" ${on(k) ? "checked" : ""}`;
   const name = (k) => k.startsWith("pl:") ? plTitle(plByKey(k)) : T[k];
   const hs = ls.get("tf-hero-src", "auto");
-  let h = `<div class="set-h">ホームのピックアップ動画</div><label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 視聴を再開 → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
+  // 見出しごとに閉じたり開いたりできる(閉じている見出しは tf-set-home-fold に覚える。ドライブ同期の対象)
+  const shut = new Set((() => { try { return JSON.parse(ls.get("tf-set-home-fold", "[]")); } catch { return []; } })());
+  const sec = (id, title, body) => `<div class="set-sec ${shut.has(id) ? "shut" : ""}" data-sec="${id}"><button type="button" class="set-h set-hb" data-secb="${id}" aria-expanded="${!shut.has(id)}"><i>▾</i>${title}</button><div class="set-sb">${body}</div></div>`;
+  let h = sec("hero", "ホームのピックアップ動画", `<label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 視聴を再開 → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
     + `<option value="auto">自動(おまかせ)</option>`
-    + pls().map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`
-    + `<div class="set-h">ホームの並び順と表示</div>` + fo.map((k, i) => `<div class="set-row"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label><span class="mv"><button type="button" class="btn s" data-mv="${esc(k)}|-1" ${i === 0 ? "disabled" : ""} aria-label="上へ">▲</button><button type="button" class="btn s" data-mv="${esc(k)}|1" ${i === fo.length - 1 ? "disabled" : ""} aria-label="下へ">▼</button></span></div>`).join("");
+    + pls().map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`);
+  h += sec("order", "ホームの並び順と表示 <small>(つまみ ⠿ をドラッグして並べ替え)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row" data-ok="${esc(k)}"><span class="grip" title="ドラッグで並べ替え" aria-label="ドラッグで並べ替え">⠿</span><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label><span class="mv"><button type="button" class="btn s" data-mv="${esc(k)}|-1" ${i === 0 ? "disabled" : ""} aria-label="上へ">▲</button><button type="button" class="btn s" data-mv="${esc(k)}|1" ${i === fo.length - 1 ? "disabled" : ""} aria-label="下へ">▼</button></span></div>`).join("") + `</div>`);
   const ps = pls().filter((p) => !LATER(p) && kindOf(p) !== "own"); // 自分の再生リストは上の並び順で切り替える
-  if (ps.length) h += `<div class="set-h">再生リストの表示(ホーム・一覧)</div>` + ps.map((p) => `<label class="set-row"><span>${esc(p.title)} <small>${kindOf(p) === "own" ? "作成" : "保存"}</small></span><input type="checkbox" data-p="${esc(plId(p))}" ${hpl.has(plId(p)) ? "" : "checked"}></label>`).join("");
+  if (ps.length) h += sec("pls", "再生リストの表示(ホーム・一覧)", ps.map((p) => `<label class="set-row"><span>${esc(p.title)} <small>${kindOf(p) === "own" ? "作成" : "保存"}</small></span><input type="checkbox" data-p="${esc(plId(p))}" ${hpl.has(plId(p)) ? "" : "checked"}></label>`).join(""));
   $("set-list").innerHTML = h;
 }
 // 就寝のお知らせを使わないときは、時刻の欄を薄くする
@@ -758,12 +761,42 @@ $("set-list").addEventListener("change", (e) => {
   render();
 });
 $("set-list").addEventListener("click", (e) => {
+  const sb = e.target.closest("[data-secb]");
+  if (sb) { // 見出しを押して、閉じる・開く
+    const sc = sb.closest(".set-sec"), id = sb.dataset.secb, now = sc.classList.toggle("shut");
+    sb.setAttribute("aria-expanded", String(!now));
+    let l = []; try { l = JSON.parse(ls.get("tf-set-home-fold", "[]")); } catch {}
+    l = l.filter((x) => x !== id); if (now) l.push(id); ls.set("tf-set-home-fold", JSON.stringify(l));
+    return;
+  }
   const b = e.target.closest("[data-mv]"); if (!b) return;
   const [k, d] = b.dataset.mv.split("|"), fo = fullOrder(), i = fo.indexOf(k), j = i + +d;
   if (i < 0 || j < 0 || j >= fo.length) return;
   [fo[i], fo[j]] = [fo[j], fo[i]];
   order = [...fo, ...order.filter((x) => x.startsWith("pl:") && !fo.includes(x))]; // 今は読み込めていない再生リストの位置も残す
   ls.set("tf-home-order", JSON.stringify(order)); paintSettings(); render();
+});
+// 並び順の行を、つまみ(⠿)をつかんで上下にドラッグして入れ替える(マウス・タッチ両方)
+$("set-list").addEventListener("pointerdown", (e) => {
+  const g = e.target.closest(".grip"); if (!g) return;
+  const row = g.closest(".set-row"), box = $("set-ord"); if (!row || !box) return;
+  e.preventDefault(); g.setPointerCapture(e.pointerId); row.classList.add("drag");
+  const move = (ev) => {
+    const rows = [...box.children].filter((r) => r !== row);
+    const nx = rows.find((r) => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    if (nx) { if (row.nextElementSibling !== nx) box.insertBefore(row, nx); } else if (box.lastElementChild !== row) box.append(row);
+    const bb = box.getBoundingClientRect(); // 端に近づいたら、ページをスクロール
+    if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+  };
+  const up = () => {
+    g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); g.removeEventListener("pointercancel", up);
+    row.classList.remove("drag");
+    const ks = [...box.children].map((r) => r.dataset.ok);
+    if (ks.join() === fullOrder().join()) return;
+    order = [...ks, ...order.filter((x) => x.startsWith("pl:") && !ks.includes(x))]; // 今は読み込めていない再生リストの位置も残す
+    ls.set("tf-home-order", JSON.stringify(order)); paintSettings(); render();
+  };
+  g.addEventListener("pointermove", move); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
 });
 $("set-play").onchange = () => ls.set(playKey(), $("set-play").value);
 $("set-reload").onclick = () => { showSettings(false); refreshHome(true); };
