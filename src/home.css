@@ -1734,8 +1734,6 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 .set-hb small{font-weight:500}
 .set-sec.shut .set-hb i{transform:rotate(-90deg)}
 .set-sec.shut .set-sb{display:none}
-.grip{flex:none;display:grid;place-items:center;width:26px;height:28px;margin-right:4px;color:var(--muted);font-size:18px;cursor:grab;touch-action:none;user-select:none;border-radius:6px}
-.grip:hover{background:rgba(255,255,255,.1);color:#fff}
+#set-ord .set-row{cursor:grab;user-select:none;-webkit-user-select:none}
 #set-ord .set-row.drag{background:#2a2a2a;box-shadow:0 4px 16px rgba(0,0,0,.6);position:relative;z-index:2}
-#set-ord .set-row.drag .grip{cursor:grabbing}
 #set-ord .set-row label{flex:1;min-width:0}

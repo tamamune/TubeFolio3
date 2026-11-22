@@ -686,7 +686,7 @@ function paintSettings() {
   let h = sec("hero", "ホームのピックアップ動画", `<label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 視聴を再開 → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
     + `<option value="auto">自動(おまかせ)</option>`
     + pls().map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`);
-  h += sec("order", "ホームの並び順と表示 <small>(つまみ ⠿ をドラッグして並べ替え)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row" data-ok="${esc(k)}"><span class="grip" title="ドラッグで並べ替え" aria-label="ドラッグで並べ替え">⠿</span><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label><span class="mv"><button type="button" class="btn s" data-mv="${esc(k)}|-1" ${i === 0 ? "disabled" : ""} aria-label="上へ">▲</button><button type="button" class="btn s" data-mv="${esc(k)}|1" ${i === fo.length - 1 ? "disabled" : ""} aria-label="下へ">▼</button></span></div>`).join("") + `</div>`);
+  h += sec("order", "ホームの並び順と表示 <small>(行をドラッグして並べ替え)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row" data-ok="${esc(k)}"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label></div>`).join("") + `</div>`);
   const ps = pls().filter((p) => !LATER(p) && kindOf(p) !== "own"); // 自分の再生リストは上の並び順で切り替える
   if (ps.length) h += sec("pls", "再生リストの表示(ホーム・一覧)", ps.map((p) => `<label class="set-row"><span>${esc(p.title)} <small>${kindOf(p) === "own" ? "作成" : "保存"}</small></span><input type="checkbox" data-p="${esc(plId(p))}" ${hpl.has(plId(p)) ? "" : "checked"}></label>`).join(""));
   $("set-list").innerHTML = h;
@@ -769,34 +769,37 @@ $("set-list").addEventListener("click", (e) => {
     l = l.filter((x) => x !== id); if (now) l.push(id); ls.set("tf-set-home-fold", JSON.stringify(l));
     return;
   }
-  const b = e.target.closest("[data-mv]"); if (!b) return;
-  const [k, d] = b.dataset.mv.split("|"), fo = fullOrder(), i = fo.indexOf(k), j = i + +d;
-  if (i < 0 || j < 0 || j >= fo.length) return;
-  [fo[i], fo[j]] = [fo[j], fo[i]];
-  order = [...fo, ...order.filter((x) => x.startsWith("pl:") && !fo.includes(x))]; // 今は読み込めていない再生リストの位置も残す
-  ls.set("tf-home-order", JSON.stringify(order)); paintSettings(); render();
 });
-// 並び順の行を、つまみ(⠿)をつかんで上下にドラッグして入れ替える(マウス・タッチ両方)
+// 並び順の行を、行のどこでもつかんで上下にドラッグして入れ替える
+// (マウス: 少し動かすと始まる / タッチ: 少し長押ししてから。チェックボックスを押すだけなら、これまでどおり表示の切り替え)
 $("set-list").addEventListener("pointerdown", (e) => {
-  const g = e.target.closest(".grip"); if (!g) return;
-  const row = g.closest(".set-row"), box = $("set-ord"); if (!row || !box) return;
-  e.preventDefault(); g.setPointerCapture(e.pointerId); row.classList.add("drag");
+  const row = e.target.closest("#set-ord .set-row"), box = $("set-ord"); if (!row || !box || e.button > 0) return;
+  const y0 = e.clientY, touch = e.pointerType === "touch"; let on = false, timer = 0, moved = false;
+  const start = () => { on = true; row.classList.add("drag"); try { row.setPointerCapture(e.pointerId); } catch {} };
+  if (touch) timer = setTimeout(start, 280);
   const move = (ev) => {
+    if (!on) { if (Math.abs(ev.clientY - y0) > 5) { if (touch) return end(false); start(); } else return; }
+    moved = true; ev.preventDefault();
     const rows = [...box.children].filter((r) => r !== row);
     const nx = rows.find((r) => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
     if (nx) { if (row.nextElementSibling !== nx) box.insertBefore(row, nx); } else if (box.lastElementChild !== row) box.append(row);
-    const bb = box.getBoundingClientRect(); // 端に近づいたら、ページをスクロール
-    if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+    if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12); // 端に近づいたら、ページをスクロール
   };
-  const up = () => {
-    g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); g.removeEventListener("pointercancel", up);
+  const tm = (ev) => { if (on) ev.preventDefault(); }; // 長押しで始まったあとは、ページを動かさない
+  const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); }; // ドラッグしたあとの「クリック」で、チェックが切り替わらないように
+  function end(commit = true) {
+    clearTimeout(timer);
+    document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up); document.removeEventListener("pointercancel", cancel); document.removeEventListener("touchmove", tm);
     row.classList.remove("drag");
+    if (moved) { document.addEventListener("click", swallow, { capture: true, once: true }); setTimeout(() => document.removeEventListener("click", swallow, true), 50); }
+    if (!commit || !moved) return;
     const ks = [...box.children].map((r) => r.dataset.ok);
     if (ks.join() === fullOrder().join()) return;
     order = [...ks, ...order.filter((x) => x.startsWith("pl:") && !ks.includes(x))]; // 今は読み込めていない再生リストの位置も残す
     ls.set("tf-home-order", JSON.stringify(order)); paintSettings(); render();
-  };
-  g.addEventListener("pointermove", move); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+  }
+  const up = () => end(true), cancel = () => end(false);
+  document.addEventListener("pointermove", move); document.addEventListener("pointerup", up); document.addEventListener("pointercancel", cancel); document.addEventListener("touchmove", tm, { passive: false });
 });
 $("set-play").onchange = () => ls.set(playKey(), $("set-play").value);
 $("set-reload").onclick = () => { showSettings(false); refreshHome(true); };
