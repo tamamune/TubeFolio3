@@ -1738,3 +1738,8 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 #set-ord .set-row{cursor:grab;user-select:none;-webkit-user-select:none}
 #set-ord .set-row.drag{background:#2a2a2a;box-shadow:0 4px 16px rgba(0,0,0,.6);position:relative;z-index:2}
 #set-ord .set-row label{flex:1;min-width:0}
+
+/* 設定「一般」のサブタブ(src/setcats.js) */
+.gsub{margin:4px 0 10px;gap:6px}
+.gsub .tab{height:30px;padding:0 13px;font-size:13px;background:#141414;border:1px solid #262626}
+.gsub .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);border-color:rgba(var(--acc-a),.55)}
