@@ -364,9 +364,12 @@ async function sRandomTags() {
   sHistAdd(q); sSyncBar();
   const f = $("s-form"); if (f?.requestSubmit) f.requestSubmit(); else runSearch(true); // 検索ボタンを押したのと同じ
 }
+// 狭い画面(スマホ・折りたたみ端末)では、絞り込み・履歴を「絞り込み」ボタンの中に畳む(CSS は home.css の @media)。開いたかどうかは覚える
+let sFold = ls.get("tf-s-fold", "0") === "1";
+const foldBtn = () => { const n = filterNote(); return `<button type="button" class="s-fold ${sFold ? "on" : ""}" data-act="s-fold" aria-expanded="${sFold}">⚙ 絞り込み${n.length ? `<small>${esc(n.join("・"))}</small>` : ""}<i>${sFold ? "▴" : "▾"}</i></button>`; };
 function searchView() {
   setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); gtPaint(); if (gtOpen) gtLoad(false); }, 0);
-  return `<div class="s-top"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button><button class="btn p" type="submit">検索</button></form>`
+  return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button><button class="btn p" type="submit">検索</button></form>${foldBtn()}`
     + `<div class="s-filters">${filtersHtml()}</div>${advHtml()}${gtPanel()}<div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
 }
 
@@ -401,6 +404,7 @@ document.addEventListener("click", (e) => {
   }
   if ((b = t("[data-sop]"))) return sInsert(b.dataset.sop);
   if (t('[data-act="s-rand"]')) return sRandomTags();
+  if (t('[data-act="s-fold"]')) { sFold = !sFold; ls.set("tf-s-fold", sFold ? "1" : "0"); $("s-top")?.classList.toggle("fold-open", sFold); const b = document.querySelector(".s-fold"); if (b) b.outerHTML = foldBtn(); return; }
   if (t('[data-act="s-adv"]')) { sAdv = !sAdv; ls.set("tf-s-adv", sAdv ? "1" : "0"); return repaintFilters(); }
   if (t("#s-clr")) { const i = $("s-q"); i.value = ""; i.focus(); if (sq) { sq = ""; runSearch(); } return sSyncBar(); }
   if ((b = t("[data-shist]"))) { sq = b.dataset.shist; $("s-q").value = sq; sHistAdd(sq); sSyncBar(); return runSearch(true); }
@@ -412,6 +416,7 @@ function repaintFilters(refetch = false) {
   const f = document.querySelector(".s-filters");
   if (f) f.innerHTML = filtersHtml();
   const a = document.querySelector(".s-adv"); if (a) a.outerHTML = advHtml();
+  const fb = document.querySelector(".s-fold"); if (fb) fb.outerHTML = foldBtn(); // 絞り込みの要約を更新
   if (refetch) return runSearch();
   const mode = sMode();
   if (mode !== "kw" && !S[mode].started) return runSearch();
