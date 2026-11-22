@@ -1707,7 +1707,8 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 .th:has(img.nf){animation:none}
 
 /* ===== 検索: [検索][クリア][項目を開く]。縦長・狭い画面では項目(絞り込み・履歴)を畳む(src/search.js の foldBtn)。広い横長の画面では常に開く ===== */
-.s-fold{display:none}
+.s-fold{display:inline-flex}
+.s-top:not(.fold-open) .s-filters,.s-top:not(.fold-open) .s-adv,.s-top:not(.fold-open) .gt,.s-top:not(.fold-open) .s-hist{display:none!important}
 .s-top .s-form .s-clear,.s-top .s-form .s-fold{height:42px;padding:0 16px;border-radius:999px;white-space:nowrap}
 .s-top .s-form .s-fold.on{background:rgba(var(--acc-a),.2);color:var(--acc)}
 .s-top .s-form .s-clr{display:none}
@@ -1716,8 +1717,6 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
   .s-top .s-form{flex-wrap:wrap;gap:6px;margin-top:10px;margin-bottom:8px;padding:6px 8px 8px 16px;border-radius:22px}
   .s-top .s-form input{flex:1 1 150px;height:38px;font-size:16px}
   .s-top .s-form .btn,.s-top .s-form .s-clear,.s-top .s-form .s-fold{height:36px;padding:0 14px;font-size:13px}
-  .s-fold{display:inline-flex}
-  .s-top:not(.fold-open) .s-filters,.s-top:not(.fold-open) .s-adv,.s-top:not(.fold-open) .gt,.s-top:not(.fold-open) .s-hist{display:none!important}
   .s-top.fold-open{max-height:62dvh;overflow-y:auto;overscroll-behavior:contain}
   .s-top .s-filters{margin:8px 16px 0;gap:8px}
   .s-top .s-filters .grp,.s-top .s-chips{flex-wrap:wrap;max-width:100%;border-radius:14px}

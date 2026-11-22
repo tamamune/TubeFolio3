@@ -365,10 +365,11 @@ async function sRandomTags() {
   const f = $("s-form"); if (f?.requestSubmit) f.requestSubmit(); else runSearch(true); // 検索ボタンを押したのと同じ
 }
 // 狭い画面(スマホ・折りたたみ端末)では、絞り込み・履歴を「絞り込み」ボタンの中に畳む(CSS は home.css の @media)。開いたかどうかは覚える
+const narrowS = () => matchMedia("(max-width:820px),(orientation:portrait)").matches;
 let sFold = false; // 狭い・縦長の画面では、開くたびに閉じた状態から(覚えない)
 const foldBtn = () => { const n = filterNote().length; return `<button type="button" class="btn s s-fold ${sFold ? "on" : ""}" data-act="s-fold" aria-expanded="${sFold}">${sFold ? "項目を閉じる" : "項目を開く"}${!sFold && n ? ` (${n})` : ""}</button>`; };
 function searchView() {
-  sFold = false; // 検索を開くたびに、項目は閉じた状態から
+  sFold = !narrowS(); // 検索を開くたびに、広い横長の画面は項目を開いた状態、狭い・縦長の画面は閉じた状態から
   setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); gtPaint(); if (gtOpen) gtLoad(false); }, 0);
   return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button><button class="btn p" type="submit">検索</button><button type="button" class="btn s s-clear" data-act="s-clear">クリア</button>${foldBtn()}</form>`
     + `<div class="s-filters">${filtersHtml()}</div>${advHtml()}${gtPanel()}<div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
@@ -380,6 +381,8 @@ document.addEventListener("submit", (e) => {
   if (!sq) sResetFilters(); // キーワードなしの検索は、対象・種類・再生回数をすべてにして検索する
   sSyncBar(); runSearch(true);
 });
+// 画面の向き・幅が変わったら、その画面の初期状態(広い=開く / 狭い=閉じる)に合わせる
+matchMedia("(max-width:820px),(orientation:portrait)").addEventListener("change", () => { sFold = !narrowS(); $("s-top")?.classList.toggle("fold-open", sFold); const b = document.querySelector(".s-fold"); if (b) b.outerHTML = foldBtn(); });
 function sResetFilters() {
   sTarget = "all"; sType = "all"; sViews = -1;
   ls.set("tf-s-target", sTarget); ls.set("tf-s-type", sType); ls.set("tf-s-views", String(sViews));
