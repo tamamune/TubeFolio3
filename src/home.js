@@ -115,6 +115,8 @@ function heroList() {
   const later = laterPl(), own = plsOf("pl");
   const pick = ls.get("tf-hero-src", "auto"); // 設定で選んだ再生リスト(auto = 下の順に自動で選ぶ)
   if (pick === "resume") return [real(resumeItems()), "続きから"];
+  if (pick === "later") return [real(later ? (useDummy ? dummyPlItems(later) : cache.later?.[later.id]) : []), "TubeFolio2 後で見る"];
+  if (pick === "ytlater") return [real(ytLaterItems()), "YouTube の後で見る"];
   if (pick !== "auto") {
     const p = pls().find((x) => plId(x) === pick && kindOf(x) === "own"); // 選べるのは自分で作成した再生リストだけ
     if (p) {
@@ -686,7 +688,7 @@ function paintSettings() {
   const sec = (id, title, body) => `<div class="set-sec ${shut.has(id) ? "shut" : ""}" data-sec="${id}"><button type="button" class="set-h set-hb" data-secb="${id}" aria-expanded="${!shut.has(id)}"><i>▾</i>${title}</button><div class="set-sb">${body}</div></div>`;
   let h = sec("hero", "ホームのピックアップ動画", `<label class="set-row"><span>参照する場所 <small>上部の大きなプレビューに出す動画の取得元。自動は、最近保存 → 続きから → 後で見る → 再生リストの順に探します</small></span><select class="sel" data-hero>`
     + `<option value="auto">自動(おまかせ)</option>`
-    + `<option value="resume" ${hs === "resume" ? "selected" : ""}>続きから</option>`
+    + `<option value="resume" ${hs === "resume" ? "selected" : ""}>続きから</option><option value="later" ${hs === "later" ? "selected" : ""}>TubeFolio2 後で見る</option><option value="ytlater" ${hs === "ytlater" ? "selected" : ""}>YouTube の後で見る</option>`
     + pls().filter((p) => !LATER(p) && kindOf(p) === "own").map((p) => `<option value="${esc(plId(p))}" ${hs === plId(p) ? "selected" : ""}>${esc(plTitle(p))}</option>`).join("") + `</select></label>`);
   h += sec("order", "ホームの並び順と表示 <small>(行をドラッグして並べ替え)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row" data-ok="${esc(k)}"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label></div>`).join("") + `</div>`);
   $("set-list").innerHTML = h;
