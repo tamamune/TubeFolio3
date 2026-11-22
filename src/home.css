@@ -1661,3 +1661,49 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
   .hero-bg,.hero-in .badge,.hero-in h1,.hero-in p,.hero-in .btns,.hero .btn.p,.dots button{animation:none!important}
   .row.rv,.row.rv .track .c{opacity:1!important;transform:none!important;transition:none!important}
 }
+
+/* ===== ツールバー(サイドバー)のアニメーション ===== */
+@keyframes tf-in-l{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+@keyframes tf-drop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes tf-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes tf-sheen{from{background-position:-150% 0}to{background-position:250% 0}}
+#nav{animation:tf-in-l .5s cubic-bezier(.2,.8,.2,1) both}
+.nav-head{animation:tf-drop .5s .1s cubic-bezier(.2,.8,.2,1) both}
+.brand{background:linear-gradient(110deg,#fff 40%,var(--acc) 50%,#fff 60%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:tf-sheen 6s 1.2s ease-in-out infinite}
+body.nav-intro #nav-list>*{animation:tf-in-l .45s cubic-bezier(.2,.8,.2,1) both}
+body.nav-intro #nav-list>*:nth-child(1){animation-delay:.15s}body.nav-intro #nav-list>*:nth-child(2){animation-delay:.2s}body.nav-intro #nav-list>*:nth-child(3){animation-delay:.25s}body.nav-intro #nav-list>*:nth-child(4){animation-delay:.3s}body.nav-intro #nav-list>*:nth-child(5){animation-delay:.35s}body.nav-intro #nav-list>*:nth-child(6){animation-delay:.4s}body.nav-intro #nav-list>*:nth-child(n+7){animation-delay:.45s}
+.acct{animation:tf-in-l .5s .5s cubic-bezier(.2,.8,.2,1) both}
+.ni{position:relative;transition:background .18s,color .18s,transform .18s}
+.ni:hover{transform:translateX(4px)}
+.ni:active{transform:scale(.97)}
+.ni svg{transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+.ni:hover svg{transform:scale(1.18) rotate(-6deg)}
+.ni.on::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:3px;border-radius:2px;background:var(--acc);transform-origin:center;animation:tf-bar .3s ease-out}
+.ib{transition:background .18s,transform .18s}
+.ib:hover{transform:scale(1.1)}.ib:active{transform:scale(.9)}
+#settings svg{transition:transform .5s}
+#settings:hover svg{transform:rotate(90deg)}
+#test-nav:hover svg{transform:rotate(-12deg) scale(1.15)}
+.ni .n.has{animation:tf-pulse 2.2s infinite}
+.tab{transition:background .2s,color .2s,transform .15s}.tab:active{transform:scale(.95)}
+#totop{transition:transform .2s,opacity .2s}#totop:hover{transform:translateY(-4px)}
+
+/* ===== サムネのアニメーション ===== */
+.th{background:linear-gradient(100deg,#1c1c1c 30%,#2c2c2c 50%,#1c1c1c 70%) 0 0/250% 100%;animation:tf-sheen 1.4s linear infinite}
+.th:has(img.ld){animation:none;background:#222}
+.th img{opacity:0;filter:blur(10px);transform:scale(1.08)}
+.th img.ld{opacity:1;filter:none;transform:none;transition:opacity .5s,filter .6s,transform .7s cubic-bezier(.2,.8,.2,1)}
+.c:hover .th img.ld{transform:scale(1.08);transition-duration:.5s}
+.th::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%) -150% 0/250% 100% no-repeat}
+.c:hover .th::after{animation:tf-sheen .8s ease-out}
+.th{transition:box-shadow .25s,outline-color .25s,border-radius .25s}
+.c:hover .th{border-radius:10px}
+.c b{transition:color .2s}.c:hover b{color:var(--acc)}
+.c .bm,.c .rm,.c .wl,.c .more{transition:opacity .2s,transform .2s}
+.c:not(:hover) .bm:not(.on),.c:not(:hover) .rm,.c:not(:hover) .wl:not(.on),.c:not(:hover) .more{transform:translateY(-4px) scale(.9)}
+@media (prefers-reduced-motion:reduce){
+  #nav,.nav-head,.acct,.brand,body.nav-intro #nav-list>*,.th,.ni.on::before,.c:hover .th::after{animation:none!important}
+  .brand{color:#fff;background:none}
+  .th img{opacity:1;filter:none;transform:none}
+  .ni,.ni svg,.ib{transition:none!important}.ni:hover,.ni:hover svg{transform:none}
+}
