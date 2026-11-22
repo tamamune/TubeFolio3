@@ -241,6 +241,11 @@ const nvCreate = (id, opt) => new Promise((res) => {
 });
 const nvUrl = new Map(); // 通知ID → 押したときに開くURL
 async function nvDeliver(items, why = "") {
+  // 通知の履歴(TubeFolio3 のサイドバーのベルで見られる。新しい順に100件まで。このパソコンだけ・同期しない)
+  try {
+    const now = Date.now(), add = items.map((x) => ({ id: x.id || "", title: x.title || "", ch: x.ch || "", kind: x.kind || "new", url: x.url || "", t: now }));
+    if (add.length) { const h = (await chrome.storage.local.get("tf-nv-hist"))["tf-nv-hist"]; await chrome.storage.local.set({ "tf-nv-hist": [...add, ...(Array.isArray(h) ? h : [])].slice(0, 100) }); }
+  } catch {}
   tfLog("info", "新着", `${why ? why + ": " : ""}${items.length}本を知らせます ` + items.slice(0, 5).map((x) => `${NV_KIND[x.kind] || ""}${x.ch}「${x.title}」`).join("、"));
   // YouTube のタブの右下(サムネ+タイトル)。開いているタブのうち、いちばん最近使ったものに出す
   const tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })).sort((a, b) => (b.active - a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0));

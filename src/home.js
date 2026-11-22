@@ -81,7 +81,7 @@ function renderNav() {
   h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
   h += typeof musicNav === "function" ? musicNav(tab) : "";
   h += `<div class="nav-h nav-hh"><span>フォルダ</span><span class="fmode" role="group" aria-label="フォルダを押したときの表示"><button type="button" class="${folderMode === "manage" ? "on" : ""}" data-fmode="manage" title="チャンネルを管理する画面を開く">設定</button><button type="button" class="${folderMode === "list" ? "on" : ""}" data-fmode="list" title="登録されているチャンネルの一覧を開く">一覧</button></span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
-  h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
+  h += item("channels", people, "すべて", (typeof nvBellHtml === "function" ? nvBellHtml() : "") + cnt("channels")).replace('data-drop=""', "");
   const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
   // フォルダの「⋯」(名前の変更・サブフォルダ・並べ替え・削除のメニュー。右クリックでも開く。channels.js)
   const fmore = (f) => `<span class="fmore lbl" data-fmenu="${esc(f.id)}" role="button" title="フォルダの操作" aria-label="フォルダの操作">⋯</span>`;

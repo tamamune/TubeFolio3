@@ -1743,3 +1743,31 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 .gsub{margin:4px 0 10px;gap:6px}
 .gsub .tab{height:30px;padding:0 13px;font-size:13px;background:#141414;border:1px solid #262626}
 .gsub .tab.on{background:rgba(var(--acc-a),.2);color:var(--acc);border-color:rgba(var(--acc-a),.55)}
+
+/* ===== サイドバーのベル(通知の履歴)と、新着で鳴るアニメーション(src/nvhist.js) ===== */
+@keyframes tf-ring{0%,100%{transform:rotate(0)}10%{transform:rotate(22deg)}20%{transform:rotate(-20deg)}30%{transform:rotate(16deg)}40%{transform:rotate(-14deg)}50%{transform:rotate(9deg)}60%{transform:rotate(-6deg)}70%{transform:rotate(3deg)}80%{transform:rotate(0)}}
+.nvbell{position:relative;flex:none;display:grid;place-items:center;width:30px;height:28px;margin-left:auto;border-radius:8px;color:var(--muted);transition:background .15s,color .15s}
+.nvbell:hover{background:rgba(255,255,255,.12);color:#fff}
+.nvbell svg{transform-origin:50% 8%}
+.nvbell.has{color:var(--acc)}
+.nvbell.ring svg{animation:tf-ring 1.2s ease-in-out}
+.nvbell b{position:absolute;top:-3px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5484d;color:#fff;font:800 10px/16px inherit;text-align:center}
+.ni .nvbell + .n{margin-left:6px}
+body.rail .nvbell{display:none}
+.nvp{position:fixed;z-index:2147483000;display:flex;flex-direction:column;background:#181818;border:1px solid #333;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.7);overflow:hidden;animation:tf-pop .18s ease-out}
+.nvp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid #2a2a2a;font-size:14px}
+.nvp-h span{display:flex;gap:6px}
+.nvp-h button{height:26px;padding:0 10px;border:0;border-radius:6px;background:#262626;color:#ddd;font-size:12px;cursor:pointer}
+.nvp-h button:hover{background:#333;color:#fff}
+.nvp-l{overflow-y:auto;overscroll-behavior:contain}
+.nvp-i{display:flex;gap:10px;width:100%;padding:8px 14px;border:0;border-bottom:1px solid #222;background:none;color:inherit;text-align:left;cursor:pointer}
+.nvp-i:hover{background:#242424}
+.nvp-i.new{background:rgba(var(--acc-a),.08)}
+.nvp-i img,.nvp-i i{flex:none;width:96px;height:54px;border-radius:6px;object-fit:cover;background:#222}
+.nvp-b{min-width:0;display:flex;flex-direction:column;gap:2px}
+.nvp-b small{color:var(--muted);font-size:11px}
+.nvp-i.live small{color:#ff6b6b}
+.nvp-b b{font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nvp-b em{font-style:normal;color:#aaa;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nvp-e{margin:0;padding:28px 14px;color:var(--muted);text-align:center;font-size:13px}
+@media (prefers-reduced-motion:reduce){.nvbell.ring svg,.nvp{animation:none!important}}

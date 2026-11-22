@@ -9,7 +9,7 @@
 const DS_TAGLOG = "tf-taglog"; // tags.js の TAGLOG と同じ
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
-const DS_SKIP = new Set(["tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache", "tf-mu-state", "tf-pl-live"]);
+const DS_SKIP = new Set(["tf-nv-hist", "tf-nv-readat", "tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache", "tf-mu-state", "tf-pl-live"]);
 let dsConnLost = false; // ログインが切れて、自動同期が止まっているか
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
