@@ -1673,7 +1673,7 @@ body:has(#mu-dock.mu-open) #totop{bottom:84px}
 .ni:active{transform:scale(.97)}
 .ni svg{transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
 .ni:hover svg{transform:scale(1.18) rotate(-6deg)}
-.ni.on::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:3px;border-radius:2px;background:var(--acc);transform-origin:center;animation:tf-bar .3s ease-out}
+#nav-list .ni.on::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:3px;border-radius:2px;background:var(--acc);transform-origin:center;animation:tf-bar .3s ease-out}
 .ib{transition:background .18s,transform .18s}
 .ib:hover{transform:scale(1.1)}.ib:active{transform:scale(.9)}
 #settings svg{transition:transform .5s}
