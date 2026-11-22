@@ -7,9 +7,10 @@
    ・書き換える前の内容は tubefolio-sync.prev.json に残す
    ・ログインは chrome.identity.launchWebAuthFlow を使う(Chrome・Vivaldi・Edge など)。クライアントIDは、設定の「同期」で入力する */
 const DS_TAGLOG = "tf-taglog"; // tags.js の TAGLOG と同じ
+const DS_NVH = "tf-nv-hist"; // 通知の履歴(background.js の nvDeliver が書く。nvhist.js のベルで見る)。端末ごとの履歴を合わせて共有する
 const DS_FILE = "tubefolio-sync.json", DS_PREV = "tubefolio-sync.prev.json";
 const DS_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
-const DS_SKIP = new Set(["tf-nv-hist", "tf-nv-readat", "tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache", "tf-mu-state", "tf-pl-live"]);
+const DS_SKIP = new Set(["tf-nv-hist", "tf-sync-nhash", "tf-acct", "tf-ch-sync", "tf-watched", "tf-home-dummy", "tf-sync-dirty", "tf-sync-base", "tf-sync-rat", "tf-sync-dev", "tf-sync-last", "tf-sync-conn", "tf-sync-tok", "tf-sync-hash", "tf-sync-thash", "tf-sync-fid", "tf-sync-acct", "tf-ryd-cache", "tf-mu-state", "tf-pl-live"]);
 let dsConnLost = false; // ログインが切れて、自動同期が止まっているか
 let dsSkipStore = false, dsBusy = false, dsApplying = false, dsMsg = "", dsTimer = 0, dsWarned = false;
 let dsView = "", dsToken = null; // { v: アクセストークン, exp: 期限(ms) }
@@ -31,6 +32,11 @@ const dsSoon = (ms = 3000) => { clearTimeout(dsTimer); dsTimer = setTimeout(() =
 // 設定「タグ」の記録(chrome.storage の tf-taglog)。YouTube で動画を見るたびに増えるので、変更の1分後にまとめて書き出す
 let dsTagSkipUntil = 0;
 chrome.storage.onChanged.addListener((c) => { if (!c[DS_TAGLOG] || dsApplying || Date.now() < dsTagSkipUntil) return; dsSoon(60000); }); // 変更の3秒後に自動で同期する(画面を閉じる・切り替えるときは、待たずにすぐ)
+// 通知の履歴(chrome.storage の tf-nv-hist)。通知が来るたびに増えるので、変更の数秒後に書き出す
+let dsNvSkipUntil = 0;
+chrome.storage.onChanged.addListener((c) => { if (!c[DS_NVH] || dsApplying || Date.now() < dsNvSkipUntil) return; dsSoon(8000); });
+// 通知の履歴は、両方の端末の分を合わせる(同じ通知は1つに。新しい順に100件まで)。決まった順に並べるので、合わせた結果はどの端末でも同じになる
+const dsMergeNv = (a, b, clearAt = 0) => { const m = new Map(); for (const x of [...(a || []), ...(b || [])]) { if (x && x.t > clearAt) m.set(`${x.id || ""}|${x.t}|${x.kind || ""}`, x); } return [...m.entries()].sort((p, q) => (q[1].t - p[1].t) || (p[0] < q[0] ? -1 : 1)).map((e) => e[1]).slice(0, 100); };
 // 保存データの指紋。最後に同期したときと違えば、このページを開いていない間の変更(YouTube の画面でのメモやフォルダ登録など)があったとわかる
 const dsHash = (o) => { const s = JSON.stringify(o || {}); let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + "." + s.length; };
 
@@ -155,7 +161,8 @@ async function dsSnapshot(savedAt, rev) {
   const stored = (await chrome.storage.local.get(KEY))[KEY] || {};
   let dev = ls.get("tf-sync-dev", ""); if (!dev) { dev = Math.random().toString(36).slice(2, 6); ls.set("tf-sync-dev", dev); }
   const tags = (await chrome.storage.local.get(DS_TAGLOG))[DS_TAGLOG] || null;
-  return { app: "TubeFolio3", v: 1, savedAt, rev, device: dev, data: stored, settings, cm: cmSettings, tags };
+  const nvh = (await chrome.storage.local.get(DS_NVH))[DS_NVH] || [];
+  return { app: "TubeFolio3", v: 1, savedAt, rev, device: dev, data: stored, settings, cm: cmSettings, tags, nvh };
 }
 function dsParse(text) {
   if (text == null) return null;
@@ -171,7 +178,7 @@ async function dsPush(oldText, user) {
   if (oldText) await dsWriteText(DS_PREV, oldText, user); // 上書きする前の内容を残す
   const snap = await dsSnapshot(savedAt, rev);
   await dsWriteText(DS_FILE, JSON.stringify(snap), user);
-  ls.set("tf-sync-hash", dsHash(snap.data)); ls.set("tf-sync-thash", dsHash(snap.tags));
+  ls.set("tf-sync-hash", dsHash(snap.data)); ls.set("tf-sync-thash", dsHash(snap.tags)); ls.set("tf-sync-nhash", dsHash(snap.nvh));
   tfLog("info", "同期", `ドライブへ書き出し: 版${rev}・${Math.round(JSON.stringify(snap).length / 1024)}KB・フォルダ ${(snap.data.folders || []).length}個`);
   dsApplying = true; ls.set("tf-sync-base", String(rev)); ls.set("tf-sync-rat", String(savedAt)); ls.set("tf-sync-dirty", "0"); ls.set("tf-sync-last", String(Date.now())); dsApplying = false;
 }
@@ -209,6 +216,12 @@ async function dsPull(remote) {
     dsTagSkipUntil = Date.now() + 2000; await chrome.storage.local.set({ [DS_TAGLOG]: mt });
     tagsDiffer = dsHash(mt) !== dsHash(remote.tags);
     ls.set("tf-sync-thash", dsHash(remote.tags)); // このパソコンにだけある記録があれば、次の同期で書き出される
+  }
+  if (Array.isArray(remote.nvh)) { // 通知の履歴も、ドライブの内容とこのパソコンの内容を合わせる(このパソコンだけにある通知は残し、あとで書き出す)
+    const clr = Math.max(+ls.get("tf-nv-clearat", "0"), +remote.settings?.["tf-nv-clearat"] || 0); // 「履歴を消す」を押した時刻より前の通知は、戻さない
+    const mn = dsMergeNv(remote.nvh, (await chrome.storage.local.get(DS_NVH))[DS_NVH], clr);
+    dsNvSkipUntil = Date.now() + 2000; await chrome.storage.local.set({ [DS_NVH]: mn });
+    ls.set("tf-sync-nhash", dsHash(remote.nvh)); // このパソコンにだけある通知があれば、次の同期で書き出される
   }
   const local = (await chrome.storage.local.get(KEY))[KEY] || {};
   try { await chrome.storage.local.set({ "tf-sync-backup": { at: Date.now(), data: local } }); } catch {} // 読み込む前の内容を、このパソコンに1つ残す(設定の「同期」から戻せる)
@@ -261,6 +274,8 @@ async function dsSync(mode = "auto", user = false) {
     // ドライブの内容が、このパソコンが最後に同期したものと違うか(版が進んだ、または別のファイルに切り替わった)
     const tagCur = (await chrome.storage.local.get(DS_TAGLOG))[DS_TAGLOG], ths = ls.get("tf-sync-thash", "");
     const tagDirty = !!tagCur && Object.keys(tagCur.v || {}).length + (tagCur.keep || []).length + (tagCur.block || []).length > 0 && (ths ? ths !== dsHash(tagCur) : !remote?.tags); // タグの記録だけが変わっていても、書き出す
+    const nvCur = (await chrome.storage.local.get(DS_NVH))[DS_NVH] || [], nhs = ls.get("tf-sync-nhash", "");
+    const nvDirty = nhs ? nhs !== dsHash(nvCur) : nvCur.length > 0 && !Array.isArray(remote?.nvh); // 通知の履歴だけが変わっていても、書き出す
     const rat = +ls.get("tf-sync-rat", "0"), newer = !!remote && ((remote.rev || 0) > base || (rat > 0 && remote.savedAt !== rat));
     let act = mode;
     if (mode === "auto") {
@@ -270,7 +285,7 @@ async function dsSync(mode = "auto", user = false) {
         act = await askDlg("ドライブとこのパソコンの両方が変更されています", "どちらの内容を使いますか?\n・ドライブの内容を使う: このパソコンの変更は消えます\n・このパソコンの内容を使う: ドライブを上書きします(前の内容は tubefolio-sync.prev.json に残ります)", [["pull", "ドライブの内容を使う", "p"], ["push", "このパソコンの内容を使う", "s"], ["", "やめる", "s"]]);
         if (!act) { dsMsg = "同期をやめました"; return; }
       } else if (newer) act = "pull";
-      else if (dirty || tagDirty) act = "push";
+      else if (dirty || tagDirty || nvDirty) act = "push";
       else act = "none";
     }
     tfLog("info", "同期", `${user ? "手動" : "自動"}の同期(${mode}): ドライブ 版${remote ? remote.rev ?? 0 : "なし"}${remote?.savedAt ? "・" + new Date(remote.savedAt).toLocaleString("ja-JP") : ""}${remote?.device ? "・端末 " + remote.device : ""} / このパソコン 版${base}・変更${dirty ? "あり" : "なし"}${newer ? "・ドライブが新しい" : ""} → ${{ pull: "読み込み", push: "書き出し", none: "何もしない" }[act] || act}`);
@@ -286,7 +301,7 @@ async function dsSync(mode = "auto", user = false) {
 
 /* ---------- 同期の内容を見る(何が同期され、何が同期されないか) ---------- */
 const DS_NAMES = { "コメント表示の設定": "YouTube の再生画面の設定(コメント表示・SponsorBlock・字幕・読み上げ・ツール・ワイプ・休憩など)", "タグの記録": "設定「タグ」の記録(見た動画のタグ。取り置き・削除も同期)", folders: "フォルダ", videos: "保存した動画", bookmarks: "ブックマーク", channels: "チャンネル(フォルダ分け・調査結果)", playlists: "再生リストの控え",
-  "tf-home-cache": "ホームの一覧のキャッシュ", "tf-play-mode": "サムネクリック時の再生(パソコン)", "tf-ta-set": "音楽の自動登録の設定", "tf-ta-led": "音楽の自動登録の記録(入れた・削除した・取り置き)", "tf-play-mode-m": "サムネクリック時の再生(スマホ)", "tf-chp-watched": "チャンネルページ: 視聴済み動画を消す", "tf-chp-members": "チャンネルページ: メンバー限定動画を消す", "tf-mu-set": "ミュージック: シャッフル・リピート・音量・動画で再生", "tf-mu-fold": "ミュージック: 閉じているフォルダ", "tf-mu-open": "ミュージック: 開いている再生リスト", "tf-mu-adff": "ミュージック: 広告の早送り", "tf-accent": "色の変更", "tf-sub-style": "登録済みチャンネルの見分け方", "tf-date-mode": "日付の表記", "tf-home-hidden": "ホームで非表示の行", "tf-set-home-fold": "設定(ホームの表示): 閉じている見出し", "tf-set-gcat": "設定(一般): 開いている項目", "tf-home-hpl": "非表示の再生リスト",
+  "tf-home-cache": "ホームの一覧のキャッシュ", "tf-play-mode": "サムネクリック時の再生(パソコン)", "tf-ta-set": "音楽の自動登録の設定", "tf-ta-led": "音楽の自動登録の記録(入れた・削除した・取り置き)", "tf-play-mode-m": "サムネクリック時の再生(スマホ)", "tf-chp-watched": "チャンネルページ: 視聴済み動画を消す", "tf-chp-members": "チャンネルページ: メンバー限定動画を消す", "tf-mu-set": "ミュージック: シャッフル・リピート・音量・動画で再生", "tf-mu-fold": "ミュージック: 閉じているフォルダ", "tf-mu-open": "ミュージック: 開いている再生リスト", "tf-mu-adff": "ミュージック: 広告の早送り", "tf-accent": "色の変更", "tf-sub-style": "登録済みチャンネルの見分け方", "tf-date-mode": "日付の表記", "tf-home-hidden": "ホームで非表示の行", "tf-nv-readat": "通知の履歴: 既読の時刻", "tf-nv-clearat": "通知の履歴: 消した時刻", "tf-set-home-fold": "設定(ホームの表示): 閉じている見出し", "tf-set-gcat": "設定(一般): 開いている項目", "tf-home-hpl": "非表示の再生リスト",
   "tf-acct": "YouTubeアカウントの控え", "tf-ch-sync": "登録チャンネルの取得状況", "tf-watched": "視聴済みの印", "tf-home-dummy": "ダミー表示", "tf-sync-cid": "同期のクライアントID", "tf-sync-conn": "同期のログイン状態", "tf-sync-tok": "同期のトークン", "tf-sync-acct": "同期(ドライブ)のアカウント" };
 const dsName = (k) => DS_NAMES[k] || k;
 const dsSize = (v) => { try { return (typeof v === "string" ? v : JSON.stringify(v ?? "")).length; } catch { return 0; } };

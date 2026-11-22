@@ -40,7 +40,7 @@
     const r = anchor.getBoundingClientRect(), pw = Math.min(380, innerWidth - 16);
     panel.style.width = pw + "px"; panel.style.left = Math.max(8, Math.min(r.left, innerWidth - pw - 8)) + "px";
     panel.style.top = Math.min(r.bottom + 6, innerHeight - 160) + "px"; panel.style.maxHeight = Math.max(200, innerHeight - r.bottom - 20) + "px";
-    localStorage.setItem(RK, String(Date.now())); // 開いたら既読にする(ベルの赤い数は閉じたときに消える)
+    ls.set(RK, String(Date.now())); // 開いたら既読にする(ベルの赤い数は閉じたときに消える)
   }
   function close() { if (!panel) return; panel.remove(); panel = null; repaintBell(); }
   document.addEventListener("click", (e) => {
@@ -49,7 +49,7 @@
     if (!panel) return;
     const it = e.target.closest("[data-nvi]"), a = e.target.closest("[data-nvp]");
     if (it) { const x = hist[+it.dataset.nvi]; const u = x?.url || (x?.id ? "/watch?v=" + encodeURIComponent(x.id) : ""); if (u) chrome.tabs.create({ url: u.startsWith("http") ? u : "https://www.youtube.com" + u }); return; }
-    if (a) { if (a.dataset.nvp === "clear") { hist = []; chrome.storage.local.set({ [HK]: [] }); } else { localStorage.setItem(RK, String(Date.now())); seenAt = Date.now(); } paintPanel(); return; }
+    if (a) { if (a.dataset.nvp === "clear") { hist = []; ls.set("tf-nv-clearat", String(Date.now())); chrome.storage.local.set({ [HK]: [] }); } else { ls.set(RK, String(Date.now())); seenAt = Date.now(); } paintPanel(); return; }
     if (!e.target.closest(".nvp")) close();
   }, true);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel) close(); else if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-nvbell]")) { e.preventDefault(); e.target.click(); } });
