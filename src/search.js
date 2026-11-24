@@ -412,16 +412,17 @@ const narrowS = () => matchMedia("(max-width:820px),(orientation:portrait)").mat
 let sFold = false; // 狭い・縦長の画面では、開くたびに閉じた状態から(覚えない)
 const foldBtn = () => { const n = filterNote().length; return `<button type="button" class="btn s s-fold ${sFold ? "on" : ""}" data-act="s-fold" aria-expanded="${sFold}">${sFold ? "項目を閉じる" : "項目を開く"}${!sFold && n ? ` (${n})` : ""}</button>`; };
 function searchView() {
-  sFold = !narrowS(); // 検索を開くたびに、広い横長の画面は項目を開いた状態、狭い・縦長の画面は閉じた状態から
-  setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); gtPaint(); if (gtOpen) gtLoad(false); }, 0);
-  return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><div class="s-frow"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button></form><button class="btn p s-go" type="submit" form="s-form">検索</button><button type="button" class="btn s s-clear" data-act="s-clear">クリア</button>${foldBtn()}</div>`
-    + `<div class="s-filters">${filtersHtml()}</div>${advHtml()}${gtPanel()}<div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
+  sFold = !narrowS();
+  setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); tbsPaint(); }, 0);
+  return `<div class="s-top" id="s-top"><div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
 }
 
 document.addEventListener("submit", (e) => {
   if (e.target.id !== "s-form") return;
   e.preventDefault(); sq = $("s-q").value.trim(); sHistAdd(sq);
   if (!sq) sResetFilters(); // キーワードなしの検索は、対象・種類・再生回数をすべてにして検索する
+  tbsClose();
+  if (tab !== "search") { showSettings?.(false); tab = "search"; scrollTo(0, 0); render(); sSyncBar(); setTimeout(() => runSearch(true), 0); return; } // 上のバーの検索は、どの画面からでも使える
   sSyncBar(); runSearch(true);
 });
 // 画面の向き・幅が変わったら、その画面の初期状態(広い=開く / 狭い=閉じる)に合わせる
@@ -429,6 +430,7 @@ matchMedia("(max-width:820px),(orientation:portrait)").addEventListener("change"
 function sResetFilters() {
   sTarget = "all"; sType = "all"; sViews = -1; sRel = false;
   ls.set("tf-s-target", sTarget); ls.set("tf-s-type", sType); ls.set("tf-s-views", String(sViews));
+  tbsPaint();
   const f = document.querySelector(".s-filters"); if (f) f.innerHTML = filtersHtml();
   const a = document.querySelector(".s-adv"); if (a) a.outerHTML = advHtml();
   const fb = document.querySelector(".s-fold"); if (fb) fb.outerHTML = foldBtn();
@@ -472,6 +474,7 @@ document.addEventListener("click", (e) => {
   if (t('[data-act="s-reload"]')) return runSearch(true);
 });
 function repaintFilters(refetch = false) {
+  tbsPaint();
   const f = document.querySelector(".s-filters");
   if (f) f.innerHTML = filtersHtml();
   const a = document.querySelector(".s-adv"); if (a) a.outerHTML = advHtml();
@@ -495,3 +498,62 @@ addEventListener("hashchange", () => { // すでに開いているときに、Yo
   showSettings?.(false); tab = "search"; sHistAdd(sq); render(); { const i = $("s-q"); if (i) i.value = sq; sSyncBar(); }
   setTimeout(() => runSearch(true), 0);
 });
+
+
+/* ===== 上のバーの検索(manager.html の #s-form) =====
+   対象・種類のメニュー / 「検索」の下のしずく(再生回数・記号・急上昇ワード・登録の関連) / サイコロ(タグ検索。マウスを少し乗せるか押すと個数が出る)
+   押したボタンは、これまでの検索と同じ data- 属性(data-starget / data-stype / data-sviews …)なので、上のクリック処理がそのまま状態を変える */
+let tbsOpenK = "", tbsHoverT = 0, tbsHoverOpen = false;
+const tbsWrap = (k) => k === "target" ? $("tbs-b-target")?.parentElement : k === "type" ? $("tbs-b-type")?.parentElement : k === "more" ? document.querySelector(".tbs-gow") : k === "tag" ? document.querySelector(".tbs-tagw") : null;
+function tbsClose() {
+  clearTimeout(tbsHoverT); tbsHoverOpen = false; tbsOpenK = "";
+  document.querySelectorAll("#s-form .open").forEach((x) => x.classList.remove("open"));
+  document.querySelectorAll("#s-form [data-tbs]").forEach((x) => x.setAttribute("aria-expanded", "false"));
+}
+function tbsOpen(k) {
+  tbsClose(); tbsOpenK = k;
+  const w = tbsWrap(k); if (!w) return;
+  w.classList.add("open"); w.querySelector("[data-tbs]")?.setAttribute("aria-expanded", "true");
+  if (k === "more") { gtOpen = true; gtPaint(); gtLoad(false); } // 急上昇ワードは、しずくを開いたときに読む
+}
+function tbsPaint() {
+  const put = (id, h) => { const el = $(id); if (el) el.innerHTML = h; };
+  const opt = (attr, k, n, cur) => { const on = String(cur) === String(k); return `<button type="button" class="tbs-o ${on ? "on" : ""}" ${attr}="${esc(String(k))}" aria-pressed="${on}">${esc(n)}</button>`; };
+  put("tbs-m-target", `<div class="tbs-oo">${S_TARGETS.map(([k, n]) => opt("data-starget", k, n, sTarget)).join("")}</div>`);
+  put("tbs-m-type", `<div class="tbs-oo">${S_TYPES.map(([k, n]) => opt("data-stype", k, n, sType)).join("")}</div>`);
+  put("tbs-m-tag", `<div class="tbs-oo">${[2, 3, 4].map((n) => `<button type="button" class="tbs-o ${sRn === n ? "on" : ""}" data-tbn="${n}" aria-pressed="${sRn === n}">${n}個で検索</button>`).join("")}</div>`);
+  const hadGt = $("gt");
+  put("tbs-m-more", `<div class="tbs-h">再生回数</div><div class="tbs-oo">${S_VIEWS.map(([k, n]) => opt("data-sviews", k, n, sViews)).join("")}</div>`
+    + `<div class="tbs-h">登録の関連</div><div class="tbs-oo">${relBtn()}</div>`
+    + `<div class="tbs-h">急上昇ワード</div>${gtPanel()}`
+    + `<div class="tbs-h">記号</div>${opsHtml()}`);
+  if (gtOpen) gtPaint();
+  // 選んでいる条件を、ボタンに出す(「すべて」のときはアイコンだけ)
+  const tg = S_TARGETS.find(([k]) => k === sTarget)?.[1] || "", ty = S_TYPES.find(([k]) => k === sType)?.[1] || "";
+  const bt = $("tbs-b-target"), by = $("tbs-b-type"), bd = $("tbs-drop");
+  if (bt) { bt.classList.toggle("chg", sTarget !== "all"); bt.querySelector(".tbs-tx").textContent = sTarget !== "all" ? tg : ""; }
+  if (by) { by.classList.toggle("chg", sType !== "all"); by.querySelector(".tbs-tx").textContent = sType !== "all" ? ty : ""; }
+  if (bd) bd.classList.toggle("chg", sViews >= 0 || sRel);
+}
+document.addEventListener("click", (e) => {
+  const path = e.composedPath(), inId = (id) => path.some((n) => n.id === id), inCls = (c) => path.some((n) => n.classList?.contains(c));
+  const tb = e.target.closest?.("[data-tbs]");
+  if (tb) { const k = tb.dataset.tbs; return k === tbsOpenK && !tbsHoverOpen ? tbsClose() : tbsOpen(k); }
+  const tn = e.target.closest?.("[data-tbn]");
+  if (tn) { sRn = +tn.dataset.tbn; ls.set("tf-s-rn", String(sRn)); tbsClose(); tbsPaint(); return sRandomTags(); }
+  if (inId("tbs-m-target") || inId("tbs-m-type")) return tbsClose(); // 選んだら閉じる(状態は上の click が変えている)
+  if (inCls("tbs-more") || inCls("tbs-menu")) return; // しずくのメニューは、選んでも開いたまま
+  tbsClose();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tbsOpenK) tbsClose(); });
+// サイコロ: マウスを少し(0.45秒)乗せると個数が出る。離すと閉じる
+document.addEventListener("mouseover", (e) => {
+  if (!e.target.closest?.(".tbs-tagw") || tbsOpenK === "tag") return;
+  clearTimeout(tbsHoverT); tbsHoverT = setTimeout(() => { tbsOpen("tag"); tbsHoverOpen = true; }, 450);
+});
+document.addEventListener("mouseout", (e) => {
+  const w = e.target.closest?.(".tbs-tagw"); if (!w || w.contains(e.relatedTarget)) return;
+  clearTimeout(tbsHoverT); if (tbsOpenK === "tag" && tbsHoverOpen) tbsClose();
+});
+tbsPaint();
+{ const i = $("s-q"); if (i && sq) { i.value = sq; sSyncBar(); } }

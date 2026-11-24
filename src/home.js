@@ -76,11 +76,7 @@ function renderNav() {
   // 新着動画の件数(登録チャンネルの新着のうち、このフォルダのチャンネルのもの。newvids.js)
   const nw = (id) => { const k = typeof newCnt === "function" ? newCnt(id) : 0; return `<span class="n nw lbl ${k ? "has" : ""}" title="新着動画(直近${typeof NEW_DAYS === "number" ? NEW_DAYS : 3}日): ${k}本">${k}</span>`; };
   const item = (id, ico, name, extra = "") => `<button class="ni ${tab === id ? "on" : ""}" data-t="${id}" data-drop="${id === "channels" ? "" : id}" title="${esc(name)}">${ico}<span class="lbl">${esc(name)}</span>${extra}</button>`;
-  let h = `<button class="ni ${tab === "all" || tab.startsWith("list:") ? "on" : ""}" data-t="all" title="ホーム">${home}<span class="lbl">ホーム</span></button>`;
-  h += `<button class="ni ${tab === "search" ? "on" : ""}" data-t="search" title="検索"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">検索</span></button>`;
-  h += `<button class="ni ${tab === "vhist" ? "on" : ""}" data-t="vhist" title="視聴履歴"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="lbl">視聴履歴</span></button>`;
-  h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
-  h += typeof musicNav === "function" ? musicNav(tab) : "";
+  let h = ""; // ホーム・検索・視聴履歴・ブックマーク・ミュージックは、上のバー(renderTbNav)へ移した。ここはフォルダだけ
   h += `<div class="nav-h nav-hh"><span>フォルダ</span><span class="fmode" role="group" aria-label="フォルダを押したときの表示"><button type="button" class="${folderMode === "manage" ? "on" : ""}" data-fmode="manage" title="チャンネルを管理する画面を開く">設定</button><button type="button" class="${folderMode === "list" ? "on" : ""}" data-fmode="list" title="登録されているチャンネルの一覧を開く">一覧</button></span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
   h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
   const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
@@ -106,7 +102,69 @@ function renderNav() {
   if (fe) { fe.focus(); if (fEdit.selectAll) { fe.select(); fEdit.selectAll = false; } else fe.setSelectionRange(fe.value.length, fe.value.length); }
   $("test-nav").classList.toggle("on", tab === "test" && $("set").hidden); // テストの印(アカウント欄の設定の左)
   if (!$("set").hidden) $("nav-list").querySelectorAll(".on").forEach((x) => x.classList.remove("on")); // 設定を開いている間は設定だけを選択中にする
-  // 上部のタブバーは廃止(サイドバーで切り替える)
+  renderTbNav();
+}
+
+
+/* ===== 上のバー・下ナビ(新しいホーム) =====
+   デスクトップ: 上のバー [TF メニュー][ホーム / 再生リスト / フォルダ / ブックマーク / ミュージック] + 検索(search.js)
+   モバイル(幅820px以下): 上のバーは [TF メニュー] + 検索。ナビは画面の下(#bnav)
+   フォルダは、押すと左からドロワー(旧サイドバー)が開く(フォルダの並べ替え・ドラッグはそのまま使える) */
+const TB_ICO = {
+  all: '<path d="M3 11l9-8 9 8M5 10v10h14V10"/>',
+  plhub: '<path d="M4 6h12M4 11h12M4 16h7M16 13l5 3.5-5 3.5z"/>',
+  drawer: '<path d="M3 6h6l2 2h10v11H3z"/>',
+  bookmarks: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+  music: '<path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0a3 3 0 0 1 6 0M20 16a3 3 0 1 1-6 0a3 3 0 0 1 6 0"/>',
+};
+function tbItems() {
+  const folderTab = tab === "channels" || tab === "uncat" || data.folders.some((f) => f.id === tab);
+  return [
+    ["all", "ホーム", tab === "all" || (tab.startsWith("list:") && !tab.startsWith("list:pl:") && tab !== "list:savedpl")],
+    ["plhub", "再生リスト", tab === "plhub" || tab.startsWith("list:pl:") || tab === "list:savedpl"],
+    ["drawer", "フォルダ", folderTab || document.body.classList.contains("nav-on")],
+    ["bookmarks", "ブックマーク", tab === "bookmarks"],
+    ["music", "ミュージック", tab === "music"],
+  ];
+}
+function renderTbNav() {
+  const svg = (k, w) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TB_ICO[k]}</svg>`;
+  const attr = (k) => k === "drawer" ? 'data-act="drawer"' : `data-t="${k}"`;
+  const items = tbItems();
+  const top = $("tb-nav"), bot = $("mnav");
+  if (top) top.innerHTML = items.map(([k, n, on]) => `<button type="button" class="tbn ${on ? "on" : ""}" ${attr(k)} title="${n}" aria-label="${n}" ${on ? 'aria-current="page"' : ""}>${svg(k, 18)}<span class="tbn-t">${n}</span></button>`).join("");
+  if (bot) bot.innerHTML = items.map(([k, n, on]) => `<button type="button" class="bn ${on ? "on" : ""}" ${attr(k)} aria-label="${n}" ${on ? 'aria-current="page"' : ""}>${svg(k, 22)}<span>${n}</span></button>`).join("");
+}
+const drawerOpen = (on) => { document.body.classList.toggle("nav-on", on); renderTbNav(); };
+// TF メニュー(視聴履歴・設定・アカウント)
+function tfMenu(on) {
+  const pop = $("tf-pop"), btn = $("tf-btn"); if (!pop) return;
+  pop.classList.toggle("open", on); btn.setAttribute("aria-expanded", on ? "true" : "false");
+}
+$("tf-btn").onclick = (e) => { e.stopPropagation(); tfMenu(!$("tf-pop").classList.contains("open")); };
+$("tf-pop").addEventListener("click", (e) => {
+  if (e.target.closest("#tf-set")) { tfMenu(false); $("settings").click(); return; }
+  if (e.target.closest("#tf-acct")) { tfMenu(false); $("acct").click(); return; }
+  if (e.target.closest("[data-t]")) tfMenu(false); // 画面の切り替えは、下の document の click(data-t)が行う
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("#tf-pop,#tf-btn")) tfMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { tfMenu(false); if (document.body.classList.contains("nav-on")) drawerOpen(false); } });
+$("nav-bd").onclick = () => drawerOpen(false);
+// アカウント欄(ドロワーの下)の表示を、TF メニューへ写す
+(function syncTfAcct() {
+  const src = $("acct"); if (!src) return;
+  const copy = () => { $("tf-name").textContent = $("acct-name").textContent; $("tf-sub").textContent = $("acct-sub").textContent; const im = $("acct-img"); $("tf-img").src = im.src || ""; $("tf-img").hidden = im.hidden || !im.src; $("tf-ph").hidden = !im.hidden && !!im.src; };
+  new MutationObserver(copy).observe(src, { subtree: true, childList: true, characterData: true, attributes: true });
+  copy();
+})();
+
+// 再生リストの一覧ページ(自分の再生リスト + ライブラリ)。カードを押すと、中の動画の一覧が開く
+function plhubView() {
+  const own = pls().filter((p) => !LATER(p) && kindOf(p) === "own"), other = pls().filter((p) => !LATER(p) && kindOf(p) !== "own");
+  const loading = !useDummy && !PLLIVE.loaded();
+  const sec = (title, l, msg) => `<section class="row"><h2>${esc(title)}<small>${l.length}件</small></h2>${l.length ? vgrid(l.map(plCard).join("")) : `<div class="empty${loading ? " ld" : ""}" style="margin:6px 32px 14px">${msg}</div>`}</section>`;
+  return sec("再生リスト", own, loading ? "読み込み中…" : "自分で作成した再生リストはありません")
+    + (other.length ? sec("ライブラリ(保存した再生リスト)", other, "") : "");
 }
 
 // ホーム上部の大きなプレビュー(ヒーロー)に出す動画。保存した動画がなければ、視聴を再開・後で見る・自分の再生リストから選ぶ
@@ -174,7 +232,7 @@ function render() {
     h += renderHero();
     for (const k of fullOrder()) if (k.startsWith("pl:") ? !hpl.has(k.slice(3)) : on(k)) h += secHtml(k);
   } else {
-    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "vhist" ? vhistView() : tab === "bookmarks" ? bookmarksView() : tab === "music" ? musicView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
+    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "plhub" ? plhubView() : tab === "search" ? searchView() : tab === "vhist" ? vhistView() : tab === "bookmarks" ? bookmarksView() : tab === "music" ? musicView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
   }
   // 描き直しても、横スクロールの行の位置はそのままにする(×で外したときなど)。行は見出しの名前で見分ける(件数は変わるので含めない)
   const rowKey = (r) => (r.querySelector("h2 .h2l") || r.querySelector("h2"))?.firstChild?.textContent || "";
@@ -234,7 +292,13 @@ document.addEventListener("click", (e) => {
   if ((b = t("[data-plrm]"))) { e.preventDefault(); const [pl, vid] = b.dataset.plrm.split("|"); return removeFromPl(pl, vid, b); }
   if ((b = t("[data-bm]"))) { e.preventDefault(); return bmToggle(b.dataset.bm); }
   if ((b = t("[data-v]"))) return openV(b.dataset.v);
-  if ((b = t("[data-t]"))) { showSettings(false); tab = b.dataset.t; scrollTo(0, 0); if (innerWidth <= 820) document.body.classList.remove("nav-on"); return render(); }
+  if ((b = t('[data-act="drawer"]'))) { tfMenu(false); return drawerOpen(!document.body.classList.contains("nav-on")); }
+  if ((b = t("[data-t]"))) {
+    if (b.closest("#mnav") || b.closest("#tb-nav")) { // ミュージックのプレーヤー(スマホでは下から開く)の扱いは、これまでの下のツールバーと同じ
+      if (b.dataset.t !== "music" && typeof muOpenSheet === "function") muOpenSheet(false);
+      if (b.dataset.t === "music" && typeof muWantOpen !== "undefined") muWantOpen = true;
+    }
+    showSettings(false); tab = b.dataset.t; scrollTo(0, 0); document.body.classList.remove("nav-on"); return render(); }
   if ((b = t("[data-h]"))) { heroI = +b.dataset.h; return swapHero(); }
   if ((b = t("[data-s]"))) { const tr = b.parentElement.querySelector(".track"); railScroll(tr, +b.dataset.s * tr.clientWidth * 0.8); }
 });
@@ -264,11 +328,7 @@ document.addEventListener("wheel", (e) => {
   railHold.set(tr, performance.now() + 1500); // ホイールで動かしている間も、自動の横スクロールは止める
   tr.scrollLeft += d * 1.5;
 }, { passive: false });
-$("menu").onclick = () => {
-  if (innerWidth <= 820) document.body.classList.toggle("nav-on");
-  else { document.body.classList.toggle("rail"); ls.set("tf-home-rail", document.body.classList.contains("rail") ? "1" : "0"); }
-};
-if (ls.get("tf-home-rail", "0") === "1") document.body.classList.add("rail");
+$("menu").onclick = () => drawerOpen(false);
 
 chrome.storage.local.get(KEY).then(async (r) => { if (r[KEY]) data = r[KEY]; await removeSamples(); render(); });
 // 初回インストール時に入れていたサンプルの動画(【サンプル】…)としおりを一度だけ消す。フォルダは使っているかもしれないので残す
