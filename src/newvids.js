@@ -26,6 +26,7 @@ function newCounts() {
     if (seen.has(v.id)) continue; seen.add(v.id);
     const d = vDate(v); if (!d || d.getTime() < cutoff) continue;
     const c = v.channel ? subMap().get(subNorm(v.channel)) : null; // subMap / subNorm は subtest.js
+    if (!c) continue; // 登録チャンネルの一覧に無いチャンネル(名前が合わない・登録解除など)は数えない(空の「未分類」に件数が出てしまうため)
     add("channels");
     const fs = (c?.folders || []).filter((id) => byId.has(id));
     if (!fs.length) add("uncat"); else for (const id of new Set(fs.flatMap(ancestors))) add(id);

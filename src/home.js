@@ -11,11 +11,11 @@ const kids = (id) => data.folders.filter((f) => f.parent === id);
 const desc = (id, seen = new Set()) => { if (seen.has(id)) return []; seen.add(id); return [id, ...kids(id).flatMap((k) => desc(k.id, seen))]; }; // 入れ子の子孫すべて
 const depthOf = (f) => { let d = 0, p = f, n = 0; while (p?.parent && n++ < 20) { p = data.folders.find((x) => x.id === p.parent); d++; } return d; };
 const inF = (v, id) => desc(id).some((x) => v.folders.includes(x));
-const SECTIONS = [["resume", "続きから"], ["later", "TubeFolio2 後で見る"], ["ytlater", "YouTube の後で見る"], ["trend", "急上昇(日本)"], ["pl", "再生リスト"], ["savedpl", "ライブラリ"]];
+const SECTIONS = [["resume", "続きから"], ["later", "TubeFolio2 後で見る"], ["ytlater", "YouTube の後で見る"], ["trend", "急上昇(日本)"], ["chreel", "日本の登録者数 TOP50"], ["pl", "再生リスト"], ["savedpl", "ライブラリ"]];
 let hidden = new Set((() => { try { return JSON.parse(ls.get("tf-home-hidden", "[]")); } catch { return []; } })());
 const on = (k) => !hidden.has(k);
 const KEYS = SECTIONS.map(([k]) => k);
-let order = (() => { let o = []; try { o = JSON.parse(ls.get("tf-home-order", "[]")); } catch {} return [...o.filter((k) => KEYS.includes(k) || k.startsWith("pl:")),...KEYS.filter((k) => !o.includes(k))]; })(); // ホームの並び順
+let order = (() => { let o = []; try { o = JSON.parse(ls.get("tf-home-order", "[]")); } catch {} const r = [...o.filter((k) => KEYS.includes(k) || k.startsWith("pl:")), ...KEYS.filter((k) => !o.includes(k))]; if (!o.includes("chreel")) { r.splice(r.indexOf("chreel"), 1); r.splice(Math.max(0, r.indexOf("resume") + 1), 0, "chreel"); } return r; })(); // 新しい「登録者が多いチャンネル」は、保存済みの並びに無ければ「続きから」の次に入れる // ホームの並び順
 let hpl = new Set((() => { try { return JSON.parse(ls.get("tf-home-hpl", "[]")); } catch { return []; } })()); // ホームで非表示にする再生リスト
 const plId = (p) => p.id || "dummy" + p.n;
 let folded = new Set((() => { try { return JSON.parse(ls.get("tf-home-folded", "[]")); } catch { return []; } })()); // サイドバーで閉じているフォルダ
@@ -63,7 +63,7 @@ const seeAll = (key) => key ? `<button class="seeall" data-t="${esc(key)}">す�
 const rail = (title, cards, n, unit = "本", key = "") => `<section class="row"><h2>${key ? `<button class="h2l" data-t="${esc(key)}">${esc(title)}</button>` : esc(title)}<small>${n}${unit}</small>${seeAll(key)}</h2><div class="rail"><button class="arrow l" data-s="-1" aria-label="前へ">‹</button><div class="track">${cards}</div><button class="arrow r" data-s="1" aria-label="次へ">›</button></div></section>`;
 // ex: 動画IDから、サムネイルに重ねるボタン(×)を作る関数(なければ付けない)
 const row = (title, items, key = "", ex = null) => items.length ? rail(title, items.map((e) => cardWith(e, ex ? ex(e[0]) : "")).join(""), items.length, "本", key) : "";
-const note = (title, msg) => `<section class="row"><h2>${esc(title)}</h2><div class="empty" style="margin:6px 32px 14px">${msg}</div></section>`;
+const note = (title, msg) => `<section class="row"><h2>${esc(title)}</h2><div class="empty${/読み込み中/.test(msg) ? " ld" : ""}" style="margin:6px 32px 14px">${msg}</div></section>`;
 const tabsHtml = () => [["all", "すべて"], ["channels", "登録チャンネル"], ...data.folders.filter((f) => !f.parent).map((f) => [f.id, f.name]), ["uncat", "未分類"]].map(([id, n]) => `<button class="tab ${tab === id ? "on" : ""}" data-t="${id}">${esc(n)}</button>`).join("");
 
 // サイドバーでフォルダ名を入力中の状態: { mode: "add" | "sub" | "rename", id?, parent?, value, selectAll? }(channels.js が操作)
@@ -78,10 +78,11 @@ function renderNav() {
   const item = (id, ico, name, extra = "") => `<button class="ni ${tab === id ? "on" : ""}" data-t="${id}" data-drop="${id === "channels" ? "" : id}" title="${esc(name)}">${ico}<span class="lbl">${esc(name)}</span>${extra}</button>`;
   let h = `<button class="ni ${tab === "all" || tab.startsWith("list:") ? "on" : ""}" data-t="all" title="ホーム">${home}<span class="lbl">ホーム</span></button>`;
   h += `<button class="ni ${tab === "search" ? "on" : ""}" data-t="search" title="検索"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">検索</span></button>`;
+  h += `<button class="ni ${tab === "vhist" ? "on" : ""}" data-t="vhist" title="視聴履歴"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="lbl">視聴履歴</span></button>`;
   h += `<button class="ni ${tab === "bookmarks" ? "on" : ""}" data-t="bookmarks" title="ブックマーク"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="lbl">ブックマーク</span></button>`;
   h += typeof musicNav === "function" ? musicNav(tab) : "";
   h += `<div class="nav-h nav-hh"><span>フォルダ</span><span class="fmode" role="group" aria-label="フォルダを押したときの表示"><button type="button" class="${folderMode === "manage" ? "on" : ""}" data-fmode="manage" title="チャンネルを管理する画面を開く">設定</button><button type="button" class="${folderMode === "list" ? "on" : ""}" data-fmode="list" title="登録されているチャンネルの一覧を開く">一覧</button></span><button type="button" class="fadd" data-act="addfolder" title="フォルダを追加" aria-label="フォルダを追加">＋</button></div>`;
-  h += item("channels", people, "すべて", (typeof nvBellHtml === "function" ? nvBellHtml() : "") + cnt("channels")).replace('data-drop=""', "");
+  h += item("channels", people, "すべて", cnt("channels")).replace('data-drop=""', "");
   const chev = (f) => kids(f.id).length ? `<span class="chev ${folded.has(f.id) ? "" : "open"}" data-fold="${esc(f.id)}" role="button" aria-label="${folded.has(f.id) ? "開く" : "閉じる"}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>` : `<span class="chev-sp"></span>`;
   // フォルダの「⋯」(名前の変更・サブフォルダ・並べ替え・削除のメニュー。右クリックでも開く。channels.js)
   const fmore = (f) => `<span class="fmore lbl" data-fmenu="${esc(f.id)}" role="button" title="フォルダの操作" aria-label="フォルダの操作">⋯</span>`;
@@ -164,6 +165,8 @@ function fixHeroBg() {
 }
 function render() {
   renderNav();
+  syncHideMem();
+  document.body.classList.toggle("on-home", tab === "all"); // 通知のベル(nvhist.js)は、ホームの右上にだけ出す
   // 検索画面を表示中の描き直し(保存データの更新など)は、結果の部分だけ更新する。画面全体を作り直すと、結果が一度消えてちらつく
   if (tab === "search" && $("s-form") && $("main").contains($("s-form")) && typeof paintSearch === "function") return paintSearch();
   let h = "";
@@ -171,7 +174,7 @@ function render() {
     h += renderHero();
     for (const k of fullOrder()) if (k.startsWith("pl:") ? !hpl.has(k.slice(3)) : on(k)) h += secHtml(k);
   } else {
-    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "bookmarks" ? bookmarksView() : tab === "music" ? musicView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
+    h += tab.startsWith("list:") ? listView(tab.slice(5)) : tab === "search" ? searchView() : tab === "vhist" ? vhistView() : tab === "bookmarks" ? bookmarksView() : tab === "music" ? musicView() : tab === "test" ? testView() : (folderMode === "list" && (tab === "uncat" || data.folders.some((f) => f.id === tab))) ? folderListView(tab) : channelsView(tab);
   }
   // 描き直しても、横スクロールの行の位置はそのままにする(×で外したときなど)。行は見出しの名前で見分ける(件数は変わるので含めない)
   const rowKey = (r) => (r.querySelector("h2 .h2l") || r.querySelector("h2"))?.firstChild?.textContent || "";
@@ -247,7 +250,11 @@ function railScroll(tr, dx) {
 // 検索結果のショートの棚(#s-out の中の横並び)の上でマウスのホイールを回すと、左右に動かす(下へ回すと右へ)
 // ホームの行は対象にしない(ホイールはページの縦スクロールのまま)
 // 端まで行ったら、いつもどおりページを縦にスクロールする(棚の上で止まってしまわないように)
+let shWheel = ls.get("tf-sh-wheel", "1") !== "0"; // 設定: ホイールで棚を左右に動かすか(オフならページの縦スクロールのまま)
+$("set-shwheel").checked = shWheel;
+$("set-shwheel").onchange = () => { shWheel = $("set-shwheel").checked; ls.set("tf-sh-wheel", shWheel ? "1" : "0"); };
 document.addEventListener("wheel", (e) => {
+  if (!shWheel) return;
   if (e.ctrlKey || e.shiftKey) return; // 拡大縮小・Shift+ホイール(ブラウザの横スクロール)はそのまま
   const tr = e.target.closest?.("#s-out .rail")?.querySelector(".track"); if (!tr) return;
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // タッチパッドの横スクロールは、そのまま
@@ -486,7 +493,7 @@ const kindOf = (p) => p.kind || "manual";
 // 再生リスト = 自分で作成したもの(「後で見る」を除く)
 const plsOf = (k) => pls().filter((p) => !LATER(p) && (k === "pl" ? kindOf(p) === "own" : kindOf(p) !== "own") && !hpl.has(plId(p)));
 const savedRow = () => { const l = all(); return l.length ? row("ライブラリ: 保存した動画", l, "list:saved") : ""; }; // 保存した動画がないときは行ごと出さない
-const SEC = { resume: () => resumeRow(), later: () => laterRow(), ytlater: () => ytLaterRow(), trend: () => trendRow(), pl: () => otherPlRow(), savedpl: () => savedPlRow(), saved: savedRow };
+const SEC = { chreel: () => chReelRow(), resume: () => resumeRow(), later: () => laterRow(), ytlater: () => ytLaterRow(), trend: () => trendRow(), pl: () => otherPlRow(), savedpl: () => savedPlRow(), saved: savedRow };
 // 「すべて表示」ページ
 function listView(k) {
   if (k === "trend") return trendView(); // 急上昇(trend.js)
@@ -514,6 +521,8 @@ function listView(k) {
 }
 /* 再生リストの一覧: 「視聴済み・メン限を隠す」(押すたびに切り替え。tf-pl-hidew / tf-pl-hidem。ドライブ同期の対象) */
 let plHideW = ls.get("tf-pl-hidew", "0") === "1", plHideM = ls.get("tf-pl-hidem", "0") === "1";
+// 「メン限」を隠す: データの判定とは別に、画面に出ているメン限の印(.mem)のカードを CSS でも隠す(body.hide-mem。home.css)
+const syncHideMem = () => { try { document.body.classList.toggle("hide-mem", tab === "search" ? sHideM : plHideM); } catch {} };
 const plVis = (items) => items.filter(([id, v]) => !(plHideW && isDone(id, v)) && !(plHideM && v.mem));
 const plCnt = (vis, all) => (vis.length === all.length ? all.length : `${vis.length} / ${all.length}`);
 const plAllHidden = () => `<div class="empty" style="margin-top:0">「隠す」の設定で、すべての動画が隠れています。</div>`;
@@ -522,6 +531,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-plhide]"); if (!b) return;
   if (b.dataset.plhide === "w") { plHideW = !plHideW; ls.set("tf-pl-hidew", plHideW ? "1" : "0"); } else { plHideM = !plHideM; ls.set("tf-pl-hidem", plHideM ? "1" : "0"); }
   render();
+  if (b.dataset.plhide === "m") setTimeout(() => toast(`メン限を隠す: ${plHideM ? "オン" : "オフ"}(画面にメン限の動画が ${document.querySelectorAll("#main .c .mem").length}本${plHideM ? "残っています" : "あります"})`), 400); // 動作の確認用
 });
 /* 削除・非公開になった動画: Wayback Machine(インターネットアーカイブ)で、残っている記録を探す */
 const GONE_RE = /^\[(削除された動画|非公開動画|Deleted video|Private video)\]$/;
@@ -558,7 +568,8 @@ const plByKey = (k) => ownPls().find((p) => "pl:" + plId(p) === k);
 const secHtml = (k) => k.startsWith("pl:") ? (plByKey(k) ? plVideoRow(plByKey(k)) : "") : SEC[k]();
 function fullOrder() {
   const pk = ownPls().map((p) => "pl:" + plId(p));
-  const keys = [...KEYS.filter((k) => k !== "pl"), ...pk];
+  const noLater = !useDummy && PLLIVE.loaded() && !laterPl(); // 「TubeFolio2 後で見る」の再生リストを消したら、ホームにも並び順の設定にも出さない
+  const keys = [...KEYS.filter((k) => k !== "pl" && !(noLater && k === "later")), ...pk];
   let o = [];
   for (const k of order) { if (k === "pl") o.push(...pk.filter((x) => !order.includes(x))); else if (keys.includes(k)) o.push(k); } // 以前の「再生リスト」の位置に展開
   o = [...new Set(o)];
@@ -567,7 +578,8 @@ function fullOrder() {
     let at = o.map((k) => k.startsWith("pl:")).lastIndexOf(true); if (at < 0) at = o.indexOf("later");
     o.splice(at + 1, 0, ...mp);
   }
-  return [...o, ...miss.filter((k) => !k.startsWith("pl:"))];
+  const mc = miss.filter((k) => !k.startsWith("pl:")); if (mc.includes("chreel")) { o.splice(Math.max(0, o.indexOf("resume") + 1), 0, "chreel"); mc.splice(mc.indexOf("chreel"), 1); } // 新しい「登録者が多いチャンネル」は、「続きから」の次に入れる
+  return [...o, ...mc];
 }
 // ライブラリ = 保存した再生リスト(他人の再生リストなど)と、保存した動画
 function savedPlRow() {

@@ -21,7 +21,8 @@ function fillWlSelect() {
   sel.innerHTML = ps.length ? ps.map((p) => `<option value="${esc(p.id)}" ${cur?.id === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("") : `<option value="">(作成した再生リストがありません)</option>`;
   sel.disabled = !ps.length;
 }
-$("set-wl").onchange = () => { ls.set("tf-wl-pl", $("set-wl").value); document.querySelectorAll("[data-wl]").forEach(paintWl); };
+$("set-wl").onchange = () => { ls.set("tf-wl-pl", $("set-wl").value); chrome.storage.local.set({ "tf-wl-pl": $("set-wl").value }); // 通知の「後で見る」(YouTube側)も同じ追加先にする
+ document.querySelectorAll("[data-wl]").forEach(paintWl); };
 
 /* ---------- 追加・解除(YouTube に反映し、表示中の一覧も合わせる) ---------- */
 async function setInPl(p, vid, on) {

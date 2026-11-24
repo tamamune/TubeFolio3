@@ -3,6 +3,13 @@
    設定で ON / OFF。クリックすると、いつもどおり再生画面を開く。 */
 let tpMode = ls.get("tf-thumb-pv", "1"); if (!["0", "1", "2"].includes(tpMode)) tpMode = "1"; // 0 = サムネイルのまま / 1 = 音なしで再生 / 2 = 音ありで再生
 let tpOn = tpMode !== "0";
+// プレビューの音量(設定 0〜100%。「音ありでプレビュー再生する」のときに使う)
+let tpVol = Math.min(100, Math.max(0, Math.round(+ls.get("tf-tp-vol", "50")))); if (isNaN(tpVol)) tpVol = 50;
+const tpVolSet = (v) => { tpVol = Math.min(100, Math.max(0, Math.round(+v) || 0)); ls.set("tf-tp-vol", String(tpVol)); $("set-tpvol").value = String(tpVol); $("set-tpvol-n").value = String(tpVol); if (tpFrame) tpSendVol(tpFrame); };
+const tpSendVol = (f) => { try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [tpVol] }), "*"); } catch {} };
+$("set-tpvol").value = $("set-tpvol-n").value = String(tpVol);
+$("set-tpvol").oninput = () => tpVolSet($("set-tpvol").value);
+$("set-tpvol-n").onchange = () => tpVolSet($("set-tpvol-n").value);
 $("set-tpv").value = tpMode;
 $("set-tpv").onchange = () => { tpMode = $("set-tpv").value; tpOn = tpMode !== "0"; ls.set("tf-thumb-pv", tpMode); if (!tpOn) tpStop(); };
 // サムネイル上のUIの大きさ(設定で 20〜100%。チャンネルのプレビューの大きさ pvScale とは別に持つ)
@@ -30,6 +37,7 @@ function tpStart(th) {
   f.onload = () => {
     let n = 0; const ask = () => { if (tpFrame !== f || f.dataset.msg || n++ > 12) return; try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"); } catch {} setTimeout(ask, 250); };
     ask();
+    if (tpMode === "2") [300, 900, 1800].forEach((t) => setTimeout(() => { if (tpFrame === f) tpSendVol(f); }, t)); // 音量を合わせる(読み込み直後は届かないことがあるので、数回)
   };
   th.style.setProperty("--ui", tpScale / 100); // プレビュー中に映像の上へ重なるボタン類の大きさ(設定「サムネイル上のUIの大きさ」。チャンネルのプレビューの大きさとは別)
   th.querySelector("img")?.after(f); th.classList.add("tp-on"); tpTh = th; tpFrame = f;
@@ -43,7 +51,7 @@ addEventListener("message", (e) => {
   let m; try { m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
   if (m?.event === "onError") return tpStop();
   const st = m?.event === "onStateChange" ? m.info : m?.info?.playerState;
-  if (st === 1 || m?.info?.currentTime > 0) tpFrame.classList.add("play"); // 再生が始まった
+  if (st === 1 || m?.info?.currentTime > 0) { tpFrame.classList.add("play"); if (tpMode === "2") tpSendVol(tpFrame); } // 再生が始まった
   else if (st === 0) tpStop();
 });
 document.addEventListener("mouseover", (e) => {

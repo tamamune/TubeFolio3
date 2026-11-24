@@ -8,9 +8,9 @@
    動画をクリックすると、その場で再生する(🕒・⋮ は plmenu.js) */
 
 const SEARCH_ICO = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
-const S_TARGETS = [["all", "すべて"], ["sub", "登録チャンネル"], ["nonsub", "未登録チャンネル"]];
+const S_TARGETS = [["all", "すべて"], ["sub", "登録"], ["nonsub", "未登録"]];
 // すべて: YouTube のホームのように、動画・ライブは並べて表示し、ショートは横並びの棚にまとめる
-const S_TYPES = [["all", "すべて"], ["video", "動画"], ["live", "ライブ・配信"], ["short", "ショート"]];
+const S_TYPES = [["all", "すべて"], ["video", "動画"], ["live", "ライブ"], ["short", "ショート"]];
 const S_DAYS = 5; // 登録チャンネルを日付ごとに表示する日数
 let sTarget = ls.get("tf-s-target", "sub"), sType = ls.get("tf-s-type", "video");
 // 隠すもの(押すたびに切り替え): 視聴済み(最後まで見た動画) / メンバー限定
@@ -37,7 +37,9 @@ const S = {
   kw: { key: "", list: [], token: "", busy: false, done: false, err: "" },
   sub: { list: [], token: "", busy: false, done: false, err: "", at: 0, started: false, reached: Infinity },
   rec: { list: [], token: "", busy: false, done: false, err: "", at: 0, started: false },
+  rel: { list: [], token: "", busy: false, done: false, err: "", at: 0, started: false, seeds: 0, got: 0 },
 };
+let sRel = false; // 「登録の関連」ボタン(登録チャンネルの新着の関連動画から、未登録チャンネルの動画を集める)
 
 /* ---------- YouTube のデータから動画を集める(動画 / ライブ・配信 / ショートを見分ける) ---------- */
 const LIVE_RE = /ライブ|LIVE|配信予定|配信中|プレミア|Premier|UPCOMING|Upcoming|視聴中|watching/i;
@@ -155,7 +157,7 @@ function dummyFill(st, mode, q) { Object.assign(st, { list: dummyVids(mode, q), 
 // ダミー表示の切り替え時は、前の一覧(本物/ダミー)を捨てる
 document.addEventListener("change", (e) => {
   if (e.target.id !== "set-dummy") return;
-  for (const k of ["kw", "sub", "rec"]) Object.assign(S[k], { list: [], token: "", done: false, busy: false, err: "", started: false, key: "", extra: 0 });
+  for (const k of ["kw", "sub", "rec", "rel"]) Object.assign(S[k], { list: [], token: "", done: false, busy: false, err: "", started: false, key: "", extra: 0 });
 }, true);
 
 /* ---------- 読み込みの本体 ---------- */
@@ -206,6 +208,46 @@ async function loadRec(reset, more = false) {
   } catch { st.err = "おすすめを読み込めませんでした(YouTubeへのログインを確認してください)"; }
   finally { st.busy = false; paintSearch(); }
 }
+// 登録の関連: 登録チャンネルの新着(最大REL_SEEDS本(40))それぞれの「関連動画」を集め、登録していないチャンネルの動画を、
+// 何本の新着から関連に挙がったか(多い順)で並べる
+const REL_SEEDS = 40;
+async function loadRel(reset) {
+  const st = S.rel;
+  if (useDummy) { dummyFill(st, "rec"); return paintSearch(); }
+  if (st.busy) return;
+  if (!reset && st.started) return paintSearch();
+  Object.assign(st, { list: [], token: "", done: false, err: "", at: Date.now(), started: true, seeds: 0, got: 0 });
+  st.busy = true; paintSearch();
+  const count = new Map(); // 動画ID → 関連に挙がった回数
+  try {
+    let seeds = S.sub.list.filter((v) => v.kind === "video" && !v.dummy);
+    if (!seeds.length) seeds = (await ytPage("https://www.youtube.com/feed/subscriptions")).list.filter((v) => v.kind === "video");
+    seeds = seeds.slice(0, REL_SEEDS); st.seeds = seeds.length;
+    if (!seeds.length) throw new Error("seeds");
+    const seedIds = new Set(seeds.map((v) => v.id));
+    let next = 0;
+    const worker = async () => {
+      while (next < seeds.length) {
+        const s = seeds[next++];
+        try {
+          const r = await ytPage("https://www.youtube.com/watch?v=" + encodeURIComponent(s.id) + "&hl=ja");
+          for (const v of r.list) {
+            if (v.id === s.id || seedIds.has(v.id) || isSubV(v)) continue;
+            const e = st.list.find((x) => x.id === v.id);
+            if (e) e.rc++; else st.list.push({ ...v, rc: 1 });
+          }
+          needDet(r.list.map((x) => [x.id, x]));
+        } catch {}
+        st.got++;
+        st.list.sort((a, b) => b.rc - a.rc);
+        paintSearch();
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    st.done = true;
+  } catch { st.err = "関連動画を読み込めませんでした(YouTubeへのログインを確認してください)"; }
+  finally { st.busy = false; paintSearch(); }
+}
 // キーワード検索(種類はYouTube側で絞り込み、対象はこちらで絞り込む)
 // 新しいキーワード・種類で検索し直したときは、前の検索の結果は捨てる(sRun で見分ける)
 async function loadKw(more) {
@@ -231,7 +273,7 @@ async function loadKw(more) {
   finally { if (st.busy === run) { st.busy = false; paintSearch(); } }
 }
 // いまの条件で表示する動画
-const shown = (list) => withDet(list.map((v) => [v.id, v])).map(([, v]) => v).filter((v) => typeOk(v) && (v.sub ? sTarget !== "nonsub" : targetOk(v)) && !(sHideW && isDone(v.id, v)) && !(sHideM && v.mem) && viewsOk(v));
+const shown = (list, rel = false) => withDet(list.map((v) => [v.id, v])).map(([, v]) => v).filter((v) => typeOk(v) && (rel ? !isSubV(v) : v.sub ? sTarget !== "nonsub" : targetOk(v)) &&!(sHideW && isDone(v.id, v)) && !(sHideM && v.mem) && viewsOk(v));
 
 /* ---------- 表示 ---------- */
 const dummyPg = (v) => v.pct ? `<span class="pg"><i style="width:${v.pct}%"></i></span>` : "";
@@ -259,14 +301,15 @@ const chipRow =(label, list, cur, attr) => `<div class="s-chips grp"><span class
 // 隠すボタン(押すたびに オン/オフ)
 const hideRow = () => `<div class="s-chips grp s-hide"><span class="s-cl">隠す</span><button type="button" class="tab ${sHideW ? "on" : ""}" data-shide="w" aria-pressed="${sHideW}" title="最後まで見た動画(✓ 視聴済み)を一覧に出さない">✓ 視聴済み</button><button type="button" class="tab ${sHideM ? "on" : ""}" data-shide="m" aria-pressed="${sHideM}" title="チャンネルメンバー限定の動画を一覧に出さない">メン限</button></div>`;
 const viewsRow = () => `<div class="s-chips grp s-views"><span class="s-cl">再生回数</span>${S_VIEWS.map(([k, n]) => `<button type="button" class="tab ${sViews === k ? "on" : ""}" data-sviews="${k}" aria-pressed="${sViews === k}" ${k >= 0 ? `title="再生回数が${k ? k + "回以下" : "0回"}の動画だけを出します(キーワード検索はアップロード日順で探します)"` : ""}>${k === 0 ? "👀 " + n : n}</button>`).join("")}</div>`;
-const filtersHtml = () => chipRow("対象", S_TARGETS, sTarget, "data-starget") + chipRow("種類", S_TYPES, sType, "data-stype") + rndHtml() + gtBtn() + advBtn(); // gtBtn は trend.js(Google の急上昇ワード) // 「隠す」は結果の見出しの行(グリッド・リストの左)
+const relBtn = () => `<button type="button" class="tab s-rel ${sRel ? "on" : ""}" data-act="s-rel" aria-pressed="${sRel}" title="登録チャンネルの新着の「関連動画」から、登録していないチャンネルの動画を集めて一覧にします(キーワードなしのとき)">🔗 登録の関連</button>`;
+const filtersHtml = () => chipRow("対象", S_TARGETS, sTarget, "data-starget") + relBtn() + chipRow("種類", S_TYPES, sType, "data-stype") + rndHtml() + gtBtn() + advBtn(); // gtBtn は trend.js(Google の急上昇ワード) // 「隠す」は結果の見出しの行(グリッド・リストの左)
 // ランダムに入れるタグの数(リストで選ぶ。ホイールでも変えられる: viewmode.js)
 document.addEventListener("change", (e) => {
   if (!e.target.matches?.("select[data-srn]")) return;
   sRn = +e.target.value; ls.set("tf-s-rn", String(sRn));
   const d = document.querySelector(".s-dice"); if (d) d.title = `保存してあるタグから${sRn}個を選び、| でつないで検索します`;
 });
-const sMode = () => sq ? "kw" : sTarget === "sub" ? "sub" : "rec";
+const sMode = () => sq ? "kw" : sRel ? "rel" : sTarget === "sub" ? "sub" : "rec";
 
 // 「もっと見る」が画面の近くまで来たら、自動で続きを読み込む(ボタンを押さなくてよい)
 const searchMoreNow = () => (sMode() === "kw" ? loadKw(true) : loadRec(false, true));
@@ -299,14 +342,14 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
     if (nodate.length && !st.busy) h += `<div class="s-day">日付を確認中<small>${nodate.length}本</small></div>${mixedGrid(nodate)}`;
     if (!st.busy && st.started) h += `<div class="s-more"><button class="btn s" data-act="s-reload">⟳ 読み込み直す</button></div>`;
   } else {
-    const list = shown(st.list);
-    const head = mode === "kw" ? `「${esc(sq)}」の検索結果` : sTarget === "all" ? "YouTubeのおすすめ" : "おすすめ(未登録チャンネル)";
+    const list = shown(st.list, mode === "rel");
+    const head = mode === "rel" ? "登録チャンネルの関連(未登録チャンネル)" : mode === "kw" ? `「${esc(sq)}」の検索結果` : sTarget === "all" ? "YouTubeのおすすめ" : "おすすめ(未登録チャンネル)";
     if (list.length) h += `<div class="s-bar"><div class="s-head">${head}<small>${list.length}本</small></div>${vbar(hideRow())}</div>${mixedGrid(list)}`;
     else if (!st.busy && !st.err && st.list.length && (sHideW || sHideM || sViews >= 0)) h += `<div class="s-bar"><div class="s-head">${head}<small>0本</small></div>${vbar(hideRow())}</div><div class="empty">読み込んだ ${st.list.length}本には、${sViews >= 0 ? `再生回数が${sViews ? sViews + "回以下" : "0回"}の動画がありませんでした${sHideW || sHideM ? "(「隠す」の設定で隠れているものもあります)" : ""}` : "「隠す」の設定ですべて隠れています"}。${!st.done ? "「もっと見る」で続きを探せます。" : ""}</div>`;
     else if (!st.busy && !st.err && (mode === "kw" || st.started)) h += `<div class="empty">${mode === "kw" ? `「${esc(sq)}」に一致する${tn}は見つかりませんでした。` : `表示できる${tn}がありません。`}</div>`;
-    if (st.busy) h += `<div class="s-load">${mode === "kw" ? "検索中…" : "読み込み中…"}</div>`;
-    else if (!st.done && (list.length || st.list.length)) h += `<div class="s-more"><button class="btn s" data-act="s-more">もっと見る</button></div>`;
-    else if (mode === "rec" && st.started) h += `<div class="s-more"><button class="btn s" data-act="s-reload">⟳ 読み込み直す</button></div>`;
+    if (st.busy) h += `<div class="s-load">${mode === "kw" ? "検索中…" : mode === "rel" ? `関連動画を集めています…(${st.got}/${st.seeds})` : "読み込み中…"}</div>`;
+    else if (mode !== "rel" && !st.done && (list.length || st.list.length)) h += `<div class="s-more"><button class="btn s" data-act="s-more">もっと見る</button></div>`;
+    else if ((mode === "rec" || mode === "rel") && st.started) h += `<div class="s-more"><button class="btn s" data-act="s-reload">⟳ 読み込み直す</button></div>`;
   }
   if (box._h === h) return; // 中身が同じなら描き直さない(ちらつき防止)
   // 横並びの棚(ショート)の左右の位置は、描き直しても保つ
@@ -322,7 +365,7 @@ function runSearch(force = false) {
   const mode = sMode();
   if (mode === "kw") return !force && S.kw.key === kwKey() && (S.kw.list.length || S.kw.busy) ? paintSearch() : loadKw(false);
   const st = S[mode], old = Date.now() - st.at > 10 * 60 * 1000; // 10分たったら読み直す
-  if (force || !st.started || (old && !st.busy)) return mode === "sub" ? loadSub(true) : loadRec(true);
+  if (force || !st.started || (old && !st.busy)) return mode === "sub" ? loadSub(true) : mode === "rel" ? loadRel(true) : loadRec(true);
   if (mode === "sub" && !st.done) return loadSub(false);
   paintSearch();
 }
@@ -342,7 +385,7 @@ const opsHtml = () => `<div class="grp s-ops"><span class="s-cl">記号</span>${
 const rndHtml = () => `<span class="grp s-rnd"><button type="button" class="tab s-dice" data-act="s-rand" title="保存してあるタグから${sRn}個を選び、| でつないで検索します">🎲 タグ検索</button><span class="s-cl">ランダム</span><select class="wsel" data-srn aria-label="入れるタグの数" title="入れるタグの数(マウスのホイールでも変えられます)">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${sRn === n ? "selected" : ""}>${n}個</option>`).join("")}</select></span>`;
 // 詳しい条件(再生回数・記号)は、ふだんは隠しておき、ボタンで開く(開いたかどうかは覚える。ドライブ同期の対象)
 let sAdv = ls.get("tf-s-adv", "0") === "1";
-const advBtn = () => `<button type="button" class="pill s-advb ${sAdv ? "on" : ""} ${!sAdv && sViews >= 0 ? "act" : ""}" data-act="s-adv" aria-expanded="${sAdv}" title="再生回数・記号を${sAdv ? "隠す" : "出す"}">⚙ 詳しい条件${!sAdv && sViews >= 0 ? `(${S_VIEWS.find(([k]) => k === sViews)[1]})` : ""} ${sAdv ? "▴" : "▾"}</button>`;
+const advBtn = () => `<button type="button" class="pill s-advb ${sAdv ? "on" : ""} ${!sAdv && sViews >= 0 ? "act" : ""}" data-act="s-adv" aria-expanded="${sAdv}" title="再生回数・記号を${sAdv ? "隠す" : "出す"}">⚙ 詳細条件${!sAdv && sViews >= 0 ? `(${S_VIEWS.find(([k]) => k === sViews)[1]})` : ""} ${sAdv ? "▴" : "▾"}</button>`;
 const advHtml = () => `<div class="s-adv" ${sAdv ? "" : "hidden"}>${viewsRow()}${opsHtml()}</div>`;
 function sInsert(tok) { // 入力欄のカーソル位置(選んだ文字があればその前後)に記号を入れる
   const i = $("s-q"); if (!i) return;
@@ -371,7 +414,7 @@ const foldBtn = () => { const n = filterNote().length; return `<button type="but
 function searchView() {
   sFold = !narrowS(); // 検索を開くたびに、広い横長の画面は項目を開いた状態、狭い・縦長の画面は閉じた状態から
   setTimeout(() => { runSearch(); const i = $("s-q"); if (i && !sq) i.focus(); gtPaint(); if (gtOpen) gtLoad(false); }, 0);
-  return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button><button class="btn p" type="submit">検索</button><button type="button" class="btn s s-clear" data-act="s-clear">クリア</button>${foldBtn()}</form>`
+  return `<div class="s-top ${sFold ? "fold-open" : ""}" id="s-top"><div class="s-frow"><form class="s-form" id="s-form" role="search">${SEARCH_ICO}<input id="s-q" type="search" placeholder="キーワードで検索(空のままなら一覧を表示)  ・  / で入力欄へ" value="${esc(sq)}" autocomplete="off"><button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" ${sq ? "" : "hidden"}>✕</button></form><button class="btn p s-go" type="submit" form="s-form">検索</button><button type="button" class="btn s s-clear" data-act="s-clear">クリア</button>${foldBtn()}</div>`
     + `<div class="s-filters">${filtersHtml()}</div>${advHtml()}${gtPanel()}<div class="s-hist" id="s-hist">${sq ? "" : histHtml()}</div></div><div id="s-out"></div>`;
 }
 
@@ -384,7 +427,7 @@ document.addEventListener("submit", (e) => {
 // 画面の向き・幅が変わったら、その画面の初期状態(広い=開く / 狭い=閉じる)に合わせる
 matchMedia("(max-width:820px),(orientation:portrait)").addEventListener("change", () => { sFold = !narrowS(); $("s-top")?.classList.toggle("fold-open", sFold); const b = document.querySelector(".s-fold"); if (b) b.outerHTML = foldBtn(); });
 function sResetFilters() {
-  sTarget = "all"; sType = "all"; sViews = -1;
+  sTarget = "all"; sType = "all"; sViews = -1; sRel = false;
   ls.set("tf-s-target", sTarget); ls.set("tf-s-type", sType); ls.set("tf-s-views", String(sViews));
   const f = document.querySelector(".s-filters"); if (f) f.innerHTML = filtersHtml();
   const a = document.querySelector(".s-adv"); if (a) a.outerHTML = advHtml();
@@ -413,9 +456,11 @@ document.addEventListener("click", (e) => {
   }
   if ((b = t("[data-shide]"))) {
     if (b.dataset.shide === "w") { sHideW = !sHideW; ls.set("tf-s-hidew", sHideW ? "1" : "0"); } else { sHideM = !sHideM; ls.set("tf-s-hidem", sHideM ? "1" : "0"); }
+    syncHideMem();
     return repaintFilters();
   }
   if ((b = t("[data-sop]"))) return sInsert(b.dataset.sop);
+  if (t('[data-act="s-rel"]')) { sRel = !sRel; if (sRel && sq) { const i = $("s-q"); if (i) i.value = ""; sq = ""; sSyncBar(); } repaintFilters(); return; }
   if (t('[data-act="s-rand"]')) return sRandomTags();
   if (t('[data-act="s-clear"]')) { const i = $("s-q"); i.value = ""; sq = ""; sResetFilters(); sSyncBar(); i.focus(); return runSearch(true); }
   if (t('[data-act="s-fold"]')) { sFold = !sFold; $("s-top")?.classList.toggle("fold-open", sFold); const b = document.querySelector(".s-fold"); if (b) b.outerHTML = foldBtn(); return; }

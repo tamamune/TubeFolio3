@@ -1,7 +1,7 @@
 /* ===== 急上昇(日本) と Google の急上昇ワード =====
    ・急上昇動画: youtube-trending.info の日別の一覧(最大約200本。取り出しは background.js の trendDay)
      ホームの行「急上昇(日本)」と、すべて表示の画面(日付の移動・ジャンルの選択・連続再生)
-   ・急上昇ワード: Google トレンド(日本)。検索画面の「🔥 急上昇ワード」で開く。押すとそのワードで検索 */
+   ・急上昇ワード: Google トレンド(日本)。検索画面の「🔥 急上昇」で開く。押すとそのワードで検索 */
 const TR_CAT = { "Film & Animation": "映画とアニメ", "Autos & Vehicles": "自動車と乗り物", Music: "音楽", "Pets & Animals": "ペットと動物", Sports: "スポーツ", "Travel & Events": "旅行とイベント", Gaming: "ゲーム", "People & Blogs": "ブログ", Comedy: "コメディー", Entertainment: "エンターテイメント", "News & Politics": "ニュースと政治", "Howto & Style": "ハウツーとスタイル", Education: "教育", "Science & Technology": "科学と技術", "Nonprofits & Activism": "非営利団体と社会活動" };
 const trCatName = (c) => TR_CAT[c] || c || "その他";
 const trYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -75,7 +75,7 @@ async function gtLoad(force) {
   if (r?.ok) { gtData = r.r; gtErr = ""; } else gtErr = r?.error || "取得できませんでした";
   gtPaint();
 }
-const gtBtn = () => `<button type="button" class="pill ${gtOpen ? "on" : ""}" data-gt="toggle" aria-expanded="${gtOpen}" title="Google トレンド(日本)の急上昇ワード。押したワードで検索します">🔥 急上昇ワード ${gtOpen ? "▴" : "▾"}</button>`;
+const gtBtn = () => `<button type="button" class="pill ${gtOpen ? "on" : ""}" data-gt="toggle" aria-expanded="${gtOpen}" title="Google トレンド(日本)の急上昇ワード。押したワードで検索します">🔥 急上昇 ${gtOpen ? "▴" : "▾"}</button>`;
 const gtPanel = () => `<div class="gt" id="gt" ${gtOpen ? "" : "hidden"}></div>`;
 function gtPaint() {
   const box = $("gt"); if (!box) return;

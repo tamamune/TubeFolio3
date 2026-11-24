@@ -1,12 +1,12 @@
 (() => {
   /* ===== m.youtube.com(スマホ版 YouTube)用の、画面下のツールバー =====
      ・縦長の画面(折りたたみ端末のサブ画面など)ではサイドバーが出ないので、下に並べる
-     ・左: TubeFolio3 を開く / 動画のページでは ◀| ⟲ ⟳ |▶(1コマ戻る・〇秒戻る・〇秒進む・1コマ進む)・A-B リピート・速さ
+     ・左: TubeFolio3 のアイコン(押すと開く)/ 動画のページでは、その右に 時間(チャプター・コメントの時間の一覧)・◀| ⟲ ⟳ |▶(1コマ戻る・〇秒戻る・〇秒進む・1コマ進む)・速さ
      ・〇秒は設定「一般」(tf-seek)と同じ。色は tf-accent(content の色設定)に合わせる */
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const isWatch = () => location.pathname === "/watch";
   const video = () => [...document.querySelectorAll("video")].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0] || null;
-  let seekSec = 10, ab = { a: null, b: null }, rate = 1;
+  let seekSec = 10, rate = 1;
   chrome.storage.local.get("tf-seek").then((r) => { const n = +r["tf-seek"]; if (n > 0) seekSec = n; paint(); });
   chrome.storage.onChanged.addListener((c) => { if (c["tf-seek"]) { const n = +c["tf-seek"].newValue; seekSec = n > 0 ? n : 10; paint(); } });
 
@@ -21,25 +21,101 @@
   const tri = (back) => `<svg viewBox="3 3 18 18" width="22" height="22" fill="currentColor"${back ? ' style="transform:scaleX(-1)"' : ""}><path d="M7 6.5v11l8-5.5z"/><rect x="16" y="6.5" width="2.2" height="11" rx=".6"/></svg>`;
   const sec = (back, n) => `<svg viewBox="1.5 1.5 21 21" width="26" height="26"><g${back ? "" : ' transform="matrix(-1 0 0 1 24 0)"'}><path d="M12 4.2A7.8 7.8 0 1 1 4.2 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 1.6 8.2 4.4 12 7.2z" fill="currentColor"/></g><text x="12" y="15.2" text-anchor="middle" font-size="7.6" font-weight="700" fill="currentColor">${n}</text></svg>`;
 
-  const home = btn(`<img src="${chrome.runtime.getURL("icons/icon-32.png")}" width="22" height="22" alt=""><span>TubeFolio3</span>`, "TubeFolio3 を開く", () => chrome.runtime.sendMessage("tf-open-manager"), "tfm-home");
+  /* ===== 「時間」ボタン(パソコン版 content.js と同じ): 動画のチャプターと、コメントにある時間(0:15 など)の一覧 =====
+     押すとその時間へ移動する。どちらも無い動画では、ボタンを隠す。アイコンの上の数字は、時間のあるコメントの数 */
+  const yta = (op, ...args) => new Promise((res, rej) => chrome.runtime.sendMessage({ tf: "yta", op, args }, (r) => (chrome.runtime.lastError ? rej(new Error(chrome.runtime.lastError.message)) : r?.ok ? res(r.r) : rej(new Error(r?.error || "失敗しました")))));
+  const vidNow = () => (isWatch() ? new URLSearchParams(location.search).get("v") : null);
+  const ex = { vid: null, gen: 0, comments: [], chapters: [] };
+  const TS_RE = /(?<![\d:])((?:\d{1,2}:)?[0-5]?\d:[0-5]\d)(?![\d:])/;
+  const tsSec = (s) => s.split(":").reduce((a, x) => a * 60 + +x, 0);
+  const fmtT = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0"); };
+  function exComments(list) { // コメント1件から時間のある行を取り出す(1件に時間が複数あれば、行ごとに分ける)
+    const out = [];
+    for (const c of list) {
+      for (const line of String(c.raw || c.text || "").split(/\n+/)) {
+        const m = line.match(TS_RE); if (!m) continue;
+        const rest = line.replace(m[0], "").replace(/^[\s\-–—:：・|｜>→]+|[\s\-–—:：・|｜]+$/g, "").trim();
+        out.push({ sec: tsSec(m[1]), text: rest || line.trim(), name: c.name || "" });
+      }
+    }
+    return out.sort((a, b) => a.sec - b.sec).slice(0, 300);
+  }
+  function items() { // 動画の長さを超える時間は、時間ではないものとして除く
+    const d = video()?.duration, ok = (s) => !(isFinite(d) && d > 0) || s <= d + 1;
+    return { c: ex.comments.filter((x) => ok(x.sec)), h: ex.chapters.filter((x) => ok(x.sec)) };
+  }
+  const tsBtn = btn(`<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"/><path d="M12 9.5V13l2.5 1.5M9.5 3h5"/></svg><span class="tfm-bdg" hidden></span>`, "チャプター・コメントの時間", () => togglePanel(), "tfm-ts");
+  tsBtn.hidden = true;
+  const closePanel = () => document.querySelector(".tfm-tsp")?.remove();
+  function updateTs() {
+    const { c, h } = items(), has = isWatch() && c.length + h.length > 0, bd = tsBtn.querySelector(".tfm-bdg");
+    tsBtn.hidden = !has; bd.hidden = !c.length; bd.textContent = c.length > 99 ? "99+" : c.length;
+    if (!has) closePanel(); else if (document.querySelector(".tfm-tsp")) renderPanel();
+  }
+  function loadEx() {
+    const v = vidNow(); if (ex.vid === v) return;
+    ex.vid = v; ex.comments = []; ex.chapters = []; const g = ++ex.gen; closePanel(); updateTs();
+    if (!v) return;
+    yta("chapters", v).then((r) => { if (ex.gen === g) { ex.chapters = r || []; updateTs(); } }).catch(() => {});
+    const tryC = async (n) => {
+      let list = []; try { list = await yta("comments", v, 150, "top"); } catch { /* 取れなければ、やり直す */ }
+      if (ex.gen !== g) return;
+      ex.comments = exComments(list || []); updateTs();
+      if (!(list || []).length && n < 3) setTimeout(() => tryC(n + 1), 4000);
+    };
+    tryC(0);
+  }
+  document.addEventListener("durationchange", updateTs, true);
+  function renderPanel() {
+    const m = document.querySelector(".tfm-tsp"); if (!m) return;
+    const { c, h } = items(), sig = JSON.stringify([c.map((r) => [r.sec, r.text]), h.map((r) => [r.sec, r.title])]);
+    if (m.dataset.sig === sig) return;
+    m.dataset.sig = sig; const top = m.scrollTop; m.textContent = "";
+    const sect = (title, rows, kind) => {
+      m.append(el("div", "tfm-tsh", `${title}(${rows.length})`));
+      for (const r of rows) {
+        const d = el("div", "tfm-tsr"); d.dataset.sec = r.sec;
+        const tx = el("div", "tfm-tsx"); tx.append(el("span", null, r.text || r.title || "(題名なし)"));
+        if (kind === "c" && r.name) tx.append(el("small", null, r.name.replace(/^@/, "")));
+        d.append(el("span", "tfm-tst", fmtT(r.sec)), tx); m.append(d);
+      }
+    };
+    if (c.length) sect("コメントの時間", c, "c");
+    if (c.length && h.length) m.append(el("hr", "tfm-tsl"));
+    if (h.length) sect("チャプター", h, "h");
+    m.scrollTop = top;
+  }
+  function togglePanel() {
+    if (document.querySelector(".tfm-tsp")) return closePanel();
+    const m = el("div", "tfm-tsp");
+    m.addEventListener("click", (e) => { // 行を押したら、その時間へ移動して一覧を閉じる
+      const row = e.target.closest?.(".tfm-tsr"); if (!row) return;
+      const v = video(); if (v) { v.currentTime = +row.dataset.sec; v.play?.().catch(() => {}); }
+      closePanel();
+    });
+    document.body.append(m); renderPanel();
+    setTimeout(() => addEventListener("click", function h(e) { if (!m.isConnected) return removeEventListener("click", h, true); if (!m.contains(e.target) && !tsBtn.contains(e.target)) { closePanel(); removeEventListener("click", h, true); } }, true), 0);
+  }
+
+  // 再生・一時停止(⟲ と ⟳ の真ん中)。動画の状態に合わせて ▶ / ⏸ を切り替える
+  const PLAY = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>`;
+  const PAUSE = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><rect x="6.5" y="5.5" width="3.8" height="13" rx="1"/><rect x="13.7" y="5.5" width="3.8" height="13" rx="1"/></svg>`;
+  const ppBtn = btn(PLAY, "再生 / 一時停止", () => { const v = video(); if (!v) return; if (v.paused) v.play().catch(() => {}); else v.pause(); }, "tfm-pp");
+  const ppPaint = () => { const v = video(), p = !v || v.paused; if (ppBtn.dataset.p !== String(p)) { ppBtn.dataset.p = String(p); ppBtn.innerHTML = p ? PLAY : PAUSE; } };
+  document.addEventListener("play", ppPaint, true); document.addEventListener("pause", ppPaint, true); document.addEventListener("loadeddata", ppPaint, true);
+
+  const home = btn(`<img src="${chrome.runtime.getURL("icons/icon-32.png")}" width="24" height="24" alt="">`, "TubeFolio3 を開く", () => chrome.runtime.sendMessage("tf-open-manager"), "tfm-home");
   const tools = el("span", "tfm-tools");
-  let abBtn, rateBtn;
+  let rateBtn;
   function paint() {
     tools.textContent = "";
-    abBtn = btn("A-B", "A-B 区間リピート(1回目で A、2回目で B、3回目で解除)", () => {
-      const v = video(); if (!v) return;
-      if (ab.a == null) ab.a = v.currentTime; else if (ab.b == null) { ab.b = v.currentTime; if (ab.b <= ab.a) [ab.a, ab.b] = [ab.b, ab.a]; v.currentTime = ab.a; } else ab = { a: null, b: null };
-      abLabel();
-    }, "tfm-t");
     rateBtn = btn("", "再生の速さ(押すたびに切り替え)", () => {
       const L = [1, 1.25, 1.5, 2, 0.75, 0.5]; const v = video(); rate = L[(L.indexOf(rate) + 1) % L.length] ?? 1; if (v) v.playbackRate = rate; rateBtn.textContent = rate + "x";
     }, "tfm-t");
     rateBtn.textContent = rate + "x";
-    tools.append(btn(tri(true), "1コマ戻る(一時停止します)", step(-1)), btn(sec(true, seekSec), `${seekSec}秒戻る`, seek(-seekSec)), btn(sec(false, seekSec), `${seekSec}秒進む`, seek(seekSec)), btn(tri(false), "1コマ進む(一時停止します)", step(1)), abBtn, rateBtn);
-    abLabel();
+    tools.append(btn(tri(true), "1コマ戻る(一時停止します)", step(-1)), btn(sec(true, seekSec), `${seekSec}秒戻る`, seek(-seekSec)), ppBtn, btn(sec(false, seekSec), `${seekSec}秒進む`, seek(seekSec)), btn(tri(false), "1コマ進む(一時停止します)", step(1)), rateBtn);
   }
-  function abLabel() { if (!abBtn) return; abBtn.textContent = ab.a == null ? "A-B" : ab.b == null ? "A→?" : "A⇄B"; abBtn.classList.toggle("on", ab.a != null); }
-  bar.append(tools, home); // TubeFolio3 のボタンは右端
+  bar.append(home, tsBtn, tools); // TubeFolio3 のアイコンは左端、その右に「時間」ボタン
 
   // YouTube の下のメニュー(ホーム・ショート・登録チャンネル・マイページ)の右端(マイページの横)に、TubeFolio3 のアイコンを足す。押すと TubeFolio3 を開く
   function tfIcon() {
@@ -65,22 +141,21 @@
     after.after(m);
   }
 
-  // A-B リピート: B を過ぎたら A に戻す
-  setInterval(() => { const v = video(); if (v && ab.a != null && ab.b != null && v.currentTime >= ab.b) v.currentTime = ab.a; }, 150);
-
   // YouTube 自身の下のメニュー(ホーム・ショート・登録チャンネルなど)があるときは、その上に重ねる
   function place() {
     const pivot = document.querySelector("ytm-pivot-bar-renderer");
     const h = pivot && pivot.getBoundingClientRect().height > 0 ? pivot.getBoundingClientRect().height : 0;
     tfIcon();
     document.documentElement.style.setProperty("--tfm-pivot", h + "px");
+    ppPaint();
     const watch = isWatch(); tools.hidden = !watch;
+    if (watch) loadEx(); else if (ex.vid) { ex.vid = null; ex.gen++; ex.comments = []; ex.chapters = []; updateTs(); }
     bar.hidden = !watch; document.documentElement.classList.toggle("tfm-on", watch); // バーは動画の再生ページだけ(ホームなどでは出さない)
     if (watch && video() && video().playbackRate !== rate && rate !== 1 && !video().paused) video().playbackRate = rate;
   }
   const mount = () => { if (!bar.isConnected) document.body.append(bar); place(); };
   new MutationObserver(() => { clearTimeout(mount.t); mount.t = setTimeout(mount, 300); }).observe(document.documentElement, { childList: true, subtree: true });
-  addEventListener("yt-navigate-finish", () => { ab = { a: null, b: null }; abLabel(); mount(); });
+  addEventListener("yt-navigate-finish", mount);
   addEventListener("resize", place);
   paint(); mount();
 })();

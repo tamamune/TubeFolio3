@@ -5,7 +5,11 @@
 .tfm-bar[hidden]{display:none}
 .tfm-bar::-webkit-scrollbar{display:none}
 .tfm-tools{display:flex;align-items:center;gap:2px;margin-right:auto}
-.tfm-home{margin-left:auto}
+.tfm-home{min-width:44px;padding:0 6px}
+.tfm-ts{position:relative}
+.tfm-ts[hidden]{display:none}
+.tfm-bdg{position:absolute;top:2px;left:50%;transform:translateX(-50%);min-width:14px;height:14px;padding:0 4px;box-sizing:border-box;border-radius:7px;background:var(--tfm-acc);color:#0f0f0f;font:700 10px/14px system-ui,sans-serif;text-align:center;pointer-events:none}
+.tfm-bdg[hidden]{display:none}
 .tfm-tools[hidden]{display:none}
 .tfm-b{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;height:44px;padding:0 8px;border:0;border-radius:22px;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tfm-b:active{background:#ffffff22}
@@ -16,3 +20,14 @@
 :root.tfm-on body{padding-bottom:56px}
 
 .tfm-tf{color:var(--tfm-fg)}.tfm-tf-ic{display:block}
+
+/* 「時間」の一覧(チャプター・コメントの時間)。ツールバーの上に出す */
+.tfm-tsp{position:fixed;left:8px;right:8px;bottom:calc(var(--tfm-pivot) + 56px);z-index:2147483001;max-height:55vh;overflow-y:auto;padding:6px 12px 10px;border-radius:12px;background:rgba(28,28,28,.97);color:#fff;font:14px system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.6);overscroll-behavior:contain}
+.tfm-tsh{position:sticky;top:-6px;margin:0 -12px 2px;padding:8px 12px 4px;background:rgba(28,28,28,.98);font-size:12px;font-weight:500;color:#aaa}
+.tfm-tsr{display:flex;gap:10px;align-items:center;padding:9px 4px;border-radius:8px}
+.tfm-tsr:active{background:#ffffff22}
+.tfm-tst{flex:none;min-width:48px;height:24px;line-height:24px;padding:0 8px;border-radius:999px;background:#ffb40033;background:color-mix(in srgb,var(--tfm-acc) 22%,transparent);color:var(--tfm-acc);font-size:13px;font-weight:500;text-align:center;font-variant-numeric:tabular-nums}
+.tfm-tsx{min-width:0;flex:1;display:flex;align-items:baseline;gap:8px;overflow:hidden;white-space:nowrap}
+.tfm-tsx span{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tfm-tsx small{color:#999;font-size:11px}
+.tfm-tsl{margin:8px 0 4px;border:0;border-top:1px solid #ffffff40}

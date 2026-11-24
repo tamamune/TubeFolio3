@@ -277,6 +277,34 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.tf === "nv-test") { nvDeliver([{ id: "dQw4w9WgXcQ", title: "テスト通知です(押すと動画を開きます)", ch: "TubeFolio3", kind: "test" }], "テスト").then(() => reply({ ok: true }), (e) => reply({ ok: false, error: e?.message || String(e) })); return true; }
   if (msg?.tf === "nv-check") { nvCheck(true).then(reply, (e) => reply({ ok: false, error: e?.message || String(e) })); return true; }
 });
+// ホームの「日本の登録者数 TOP50」: 拡張機能からの通信が止められるとき用。裏のタブでランキングのページを開き、表を読んで閉じる
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.tf !== "nox-rank") return;
+  (async () => {
+    let tab;
+    try {
+      tab = await chrome.tabs.create({ url: msg.url, active: false });
+      await new Promise((res, rej) => { const t = setTimeout(() => { chrome.tabs.onUpdated.removeListener(f); rej(new Error("ページの読み込みが終わりませんでした")); }, 30000); const f = (id, i) => { if (id === tab.id && i.status === "complete") { clearTimeout(t); chrome.tabs.onUpdated.removeListener(f); res(); } }; chrome.tabs.onUpdated.addListener(f); });
+      const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => [...document.querySelectorAll("table tbody tr")].map((tr) => { const td = [...tr.querySelectorAll("td")], a = td[1]?.querySelector("a[href*='/channel/']"), nm = [...(td[1]?.querySelectorAll("a") || [])].map((x) => x.textContent.trim()).find(Boolean) || (td[1]?.textContent || "").trim(), sc = td.slice(2, 5).find((c) => /^\s*[\d.,]+\s*(億|万)?/.test(c.textContent)); return { href: a?.getAttribute("href") || "", name: nm, subs: sc?.textContent.trim() || "" }; }) });
+      reply({ ok: true, rows: r?.result || [] });
+    } catch (e) { reply({ ok: false, error: e?.message || String(e) }); }
+    finally { if (tab?.id) chrome.tabs.remove(tab.id).catch(() => {}); }
+  })();
+  return true;
+});
+// 「テスト」ページのボタン: 開いている YouTube のタブ(動画の再生ページを優先、いちばん最近使ったもの)に、テスト表示を頼む
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.tf !== "test-yt" || !["test-bed", "test-end"].includes(msg.what)) return;
+  (async () => {
+    const tabs = (await chrome.tabs.query({ url: "https://www.youtube.com/*" })).sort((a, b) => (/\/watch/.test(b.url || "") - /\/watch/.test(a.url || "")) || (b.active - a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
+    let err = tabs.length ? "" : "YouTube のタブが開いていません。動画を開いてから押してください", noRecv = 0;
+    for (const t of tabs) { try { const r = await chrome.tabs.sendMessage(t.id, { tf: msg.what }); if (r?.ok) return reply({ ok: true }); if (r?.error) err = r.error; } catch { noRecv++; /* 拡張機能を再読み込みする前に開いたタブなど */ } }
+    if (!err && noRecv) err = `YouTube のタブ(${noRecv}件)に届きませんでした。YouTube のタブを再読み込み(F5)してから、もう一度押してください`;
+    else if (!err) err = "動画の再生ページではありません。動画を開いてから押してください";
+    reply({ ok: false, error: err });
+  })();
+  return true;
+});
 const nvSetup = () => chrome.alarms?.create("tf-nv", { periodInMinutes: 15, delayInMinutes: 1 });
 chrome.runtime.onInstalled.addListener(nvSetup);
 chrome.runtime.onStartup.addListener(nvSetup);

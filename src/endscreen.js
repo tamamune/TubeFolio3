@@ -75,13 +75,14 @@
   /* ---------- 画面 ---------- */
   let box = null, shownFor = "";
   function hide() { box?.remove(); box = null; shownFor = ""; document.documentElement.classList.remove("tf-end-on"); }
-  async function show() {
+  async function show(force) { // force: テストボタンから。設定が「使わない」でも、すでに出していても、出す
     const vid = vidNow(), mp = document.querySelector("#movie_player");
-    if (!on() || !vid || !mp || shownFor === vid || mp.classList.contains("ad-showing")) return;
+    if ((!force && (!on() || shownFor === vid)) || !vid || !mp || mp.classList.contains("ad-showing")) return;
     shownFor = vid;
     document.documentElement.classList.add("tf-end-on"); // YouTube の終わりの画面と、自動再生の「次の動画」を隠す
     cancelAutonav();
-    const list = await choose(vid);
+    let list = await choose(vid);
+    if (force && !list.length) list = [1, 2, 3, 4].map((n) => ({ id: vid, title: `テスト用のおすすめ ${n}(再生リストが未設定のため、いまの動画を使っています)`, channel: "TubeFolio3", duration: "" })); // 設定が空でも、見た目を確かめられるように
     if (shownFor !== vid || !list.length) { if (!list.length) document.documentElement.classList.remove("tf-end-on"); return; }
     box?.remove();
     box = el("div", "tf-end"); box.setAttribute("role", "region"); box.setAttribute("aria-label", "TubeFolio3 のおすすめ");
@@ -101,6 +102,7 @@
     box.append(head, grid);
     ["click", "mousedown", "pointerdown", "dblclick", "keydown", "wheel"].forEach((k) => box.addEventListener(k, (e) => e.stopPropagation())); // プレーヤーの操作に渡さない
     mp.append(box);
+    try { const a = new Audio(chrome.runtime.getURL("sounds/quiz5.mp3")); a.volume = 0.6; a.play().catch(() => {}); } catch {} // おすすめを出したときの音
   }
   // 自動再生の「◯秒後に次の動画」を取り消す(取り消さないと、YouTube のおすすめへ移ってしまう)
   // カウントダウンは隠してあるので見えていなくても押す。始まるまで少しかかるため、3秒の間くり返し押す(何もないときに押しても害はない)
@@ -128,4 +130,9 @@
   document.addEventListener("playing", (e) => { if (shownFor && inPlayer(e) && before(e.target)) hide(); }, true); // 最初から見直したら消す
   document.addEventListener("seeking", (e) => { if (shownFor && inPlayer(e) && before(e.target)) hide(); }, true);
   addEventListener("yt-navigate-start", hide);
+  chrome.runtime.onMessage.addListener((m, s, reply) => { // TubeFolio3 の「テスト」ページのボタンから
+    if (m?.tf !== "test-end") return;
+    if (!vidNow() || !document.querySelector("#movie_player")) return reply({ ok: false, error: "動画の再生ページではありません" });
+    shownFor = ""; show(true).then(() => reply({ ok: true })); return true;
+  });
 })();

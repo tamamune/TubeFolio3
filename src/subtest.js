@@ -85,7 +85,7 @@ function appearHtml() { // 設定の他の項目と同じ「ラベル + 右に�
 // テストのページ(サイドバー下のテストボタン)。今後のテスト項目をここに置く
 function testView() {
   return `<section class="tp"><header class="tp-h"><h2>テスト</h2><p>テスト中の項目を置くページです。</p></header>
-    <div class="tp-card"><label class="tp-r"><span class="tp-t"><b>ダミー表示</b><small>YouTube由来の動画・再生リストを、ダミーのデータで表示します</small></span><span class="tp-sw"><input type="checkbox" id="set-dummy" ${useDummy ? "checked" : ""}><i></i></span></label></div></section>`;
+    <div class="tp-card"><label class="tp-r"><span class="tp-t"><b>ダミー表示</b><small>YouTube由来の動画・再生リストを、ダミーのデータで表示します</small></span><span class="tp-sw"><input type="checkbox" id="set-dummy" ${useDummy ? "checked" : ""}><i></i></span></label></div>${ttCard()}</section>`;
 }
 document.addEventListener("change", (e) => {
   if (e.target.id !== "set-substyle") return;
@@ -96,4 +96,21 @@ $("set-date").onchange = () => { dateMode = $("set-date").value; ls.set("tf-date
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-accent]"); if (!b) return;
   accent = b.dataset.accent; ls.set("tf-accent", accent); document.body.dataset.acc = accent; chrome.storage?.local.set({ "tf-accent": accent }); render(); paintLook();
+});
+
+/* ---------- テストの表示ボタン(就寝画面・おすすめ動画・通知) ---------- */
+const TT_ROWS = [
+  ["bed", "就寝画面", "就寝時間のお知らせ(ぷよんの音つき)を、開いている YouTube の画面に出します。「夜ふかし」ボタンの確認もできます"],
+  ["end", "おすすめ動画", "動画の終わりに出る「TubeFolio3 のおすすめ」(音つき)を、いま開いている動画の上に出します。再生リストが未設定でも、見た目を確かめられます"],
+  ["nv", "通知", "新着の通知(YouTube 画面の右下とパソコンの通知)を、テストで出します"],
+];
+const ttCard = () => `<div class="tp-card tt-card">${TT_ROWS.map(([k, t, d]) => `<div class="tp-r tt-r"><span class="tp-t"><b>${t}</b><small>${d}</small></span><button type="button" class="btn s" data-tt="${k}">表示する</button></div>`).join("")}</div>`;
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-tt]"); if (!b) return;
+  const k = b.dataset.tt; b.disabled = true;
+  try {
+    const r = k === "nv" ? await chrome.runtime.sendMessage({ tf: "nv-test" }) : await chrome.runtime.sendMessage({ tf: "test-yt", what: k === "bed" ? "test-bed" : "test-end" });
+    toast(r?.ok ? (k === "nv" ? "テスト通知を出しました(出ないときは、Windows とブラウザの通知の設定を見てください)" : "YouTube の画面に出しました") : "出せませんでした: " + (r?.error || "不明なエラー"));
+  } catch (err) { toast("拡張機能に接続できませんでした: " + (err?.message || err)); }
+  b.disabled = false;
 });

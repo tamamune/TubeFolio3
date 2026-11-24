@@ -426,9 +426,12 @@
     const d = document.querySelector("#movie_player video")?.duration, ok = (s) => !(isFinite(d) && d > 0) || s <= d + 1;
     return { c: ex.comments.filter((x) => ok(x.sec)), h: ex.chapters.filter((x) => ok(x.sec)) };
   }
+  // 時間のあるコメントかチャプターが見つかって、「時間」ボタンが出るとき、1本の動画につき1回だけ音を鳴らす
+  const tsBeep = () => { try { const a = new Audio(chrome.runtime.getURL("sounds/warn1.mp3")); a.volume = 0.6; a.play().catch(() => {}); } catch {} };
   function updateTsBtn() {
     const b = document.querySelector(".tf-ytp[data-k=ts]"); if (!b) return;
     const { c, h } = exItems(), has = c.length + h.length > 0, bd = b.querySelector(".tf-bdg");
+    if (has && b.hidden && ex.vid && ex.beep !== ex.vid) { ex.beep = ex.vid; tsBeep(); }
     b.hidden = !has; if (bd) { bd.hidden = !c.length; bd.textContent = c.length > 99 ? "99+" : c.length; }
     if (!has) closeTsPanel(); else if (document.querySelector(".tf-tsp")) renderTsPanel();
   }

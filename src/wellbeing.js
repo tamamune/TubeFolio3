@@ -6,7 +6,7 @@
      ・就寝: 決めた就寝時間(例 23:00〜06:00。日をまたいでもよい)に動画を再生していたら、一時停止して寝るよう勧める
      ・どちらも「あと15分」で先送りできる
      ・設定(chrome.storage。ドライブ同期の対象): tf-break = 休憩までの分(0 = 使わない)、tf-bed = on/off、tf-bed-from / tf-bed-to = "HH:MM" */
-  const RUN = "tf-watch-run", GAP = 10 * 60 * 1000, SNOOZE = 15 * 60 * 1000, TICK = 15000;
+  const RUN = "tf-watch-run", GAP = 10 * 60 * 1000, SNOOZE = 15 * 60 * 1000, LATE = 60 * 60 * 1000, TICK = 15000;
   let breakMin = 0, bedOn = false, bedFrom = "23:00", bedTo = "06:00";
   let lastTick = 0, shown = "";
 
@@ -26,7 +26,7 @@
     const v = video(); try { v?.pause(); } catch {}
     const p = document.getElementById("movie_player") || document.body;
     const box = document.createElement("div"); box.className = "tf-wb"; box.setAttribute("role", "dialog");
-    box.innerHTML = `<div class="tf-wb-in"><div class="tf-wb-ic">${kind === "bed" ? "🌙" : "☕"}</div><b></b><p></p><div class="tf-wb-b"><button type="button" class="ok"></button><button type="button" class="more">あと15分見る</button></div></div>`;
+    box.innerHTML = `<div class="tf-wb-in"><div class="tf-wb-ic">${kind === "bed" ? "🌙" : "☕"}</div><b></b><p></p><div class="tf-wb-b"><button type="button" class="ok"></button><button type="button" class="more">あと15分見る</button>${kind === "bed" ? `<button type="button" class="late" title="1時間、お知らせを出さずに見続けます">夜ふかし</button>` : ""}</div></div>`;
     box.querySelector("b").textContent = title; box.querySelector("p").textContent = text; box.querySelector(".ok").textContent = okLabel;
     const close = () => { box.remove(); shown = ""; };
     box.addEventListener("click", (e) => e.stopPropagation());
@@ -40,7 +40,11 @@
       else await chrome.storage.local.set({ "tf-bed-snooze": Date.now() + SNOOZE });
       close(); try { video()?.play(); } catch {}
     };
+    box.querySelector(".late")?.addEventListener("click", async () => { // 夜ふかし: 1時間は就寝のお知らせを出さず、続きを再生
+      await chrome.storage.local.set({ "tf-bed-snooze": Date.now() + LATE }); close(); try { video()?.play(); } catch {}
+    });
     p.appendChild(box);
+    if (kind === "bed") { try { const a = new Audio(chrome.runtime.getURL("sounds/puyon.mp3")); a.volume = 0.7; a.play().catch(() => {}); } catch {} } // 就寝の画面が出たときの音
   }
 
   /* ---------- 見ている時間を数えて、時間になったら知らせる ---------- */
@@ -61,6 +65,11 @@
   setInterval(tick, TICK);
   document.addEventListener("play", () => { lastTick = Date.now(); setTimeout(tick, 1000); }, true); // 再生を始めた直後にも確かめる(就寝時間中に再生したとき)
 
+  chrome.runtime.onMessage.addListener((m, s, reply) => { // TubeFolio3 の「テスト」ページのボタンから
+    if (m?.tf !== "test-bed") return;
+    shown = ""; document.querySelector(".tf-wb")?.remove();
+    ask("bed", `就寝時間です(${bedFrom}〜${bedTo})`, "そろそろ動画を止めて、寝る準備をしませんか?(テスト表示です)", "やめて寝る"); reply({ ok: true });
+  });
   const apply = (r) => {
     if ("tf-break" in r) breakMin = Math.max(0, +r["tf-break"] || 0);
     if ("tf-bed" in r) bedOn = r["tf-bed"] === "on";

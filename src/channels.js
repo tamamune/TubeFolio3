@@ -187,6 +187,10 @@ $("chd-list").addEventListener("change", async (e) => {
   c.folders = [...s]; await persist(); render();
 });
 $("chd-close").onclick = () => $("chd").close();
+// 枠の外(暗い所)をクリックしても閉じる。枠の中で押し始めて外で離した場合(文字の選択など)は閉じない
+{ let down = false; const out = (e) => { const r = $("chd").getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+  $("chd").addEventListener("mousedown", (e) => { down = out(e); });
+  $("chd").addEventListener("click", (e) => { if (down && out(e)) $("chd").close(); down = false; }); }
 async function moveChannel(id, target) { // ドラッグ&ドロップ: 指定のフォルダに追加する(同じチャンネルを複数のフォルダに入れられる)。未分類へ落とすと全フォルダから外す
   const c = data.channels?.[id]; if (!c) return;
   c.folders = target === "uncat" ? [] : [...new Set([...(c.folders || []), target])];
@@ -310,7 +314,11 @@ document.addEventListener("drop", (e) => { const n = e.target.closest?.("[data-d
 
 
 /* ===== キーワードによる仕分け補助(候補を表示するだけで、自動では入れない) ===== */
-const nz = (x) => String(x || "").normalize("NFKC").toLowerCase();
+// 同じ文字列を何度も正規化しないよう、結果を覚えておく(登録補助の候補の計算が、タイトルを大量に正規化して重くなっていたため)
+const nzC = new Map();
+const nz = (x) => { const s = String(x || ""); let r = nzC.get(s); if (r === undefined) { r = s.normalize("NFKC").toLowerCase(); if (nzC.size > 60000) nzC.clear(); nzC.set(s, r); } return r; };
+const kwsC = new Map(); // フォルダID → { sig, kws }(キーワードの正規化も毎回やり直さない)
+const kwsOf = (f) => { const sig = (f.keywords || []).join("\u0001"); let e = kwsC.get(f.id); if (!e || e.sig !== sig) kwsC.set(f.id, e = { sig, kws: (f.keywords || []).map(nz).filter(Boolean) }); return e.kws; };
 // チャンネルごとの「そのチャンネルの動画タイトル」(保存した動画・視聴履歴・後で見る から集める)
 function titlesByChannel() {
   const m = new Map(), add = (ch, t) => { if (!ch || !t) return; const k = nz(ch); (m.get(k) || m.set(k, []).get(k)).push(t); };
@@ -321,7 +329,7 @@ function titlesByChannel() {
 }
 // チャンネル c がフォルダ f のキーワードに引っかかるか(チャンネル名 → ハンドル名 → 動画タイトル → 概要欄の順に見る)。引っかかれば { k, where }
 function kwHit(f, c, tmap) {
-  const kws = (f.keywords || []).map(nz).filter(Boolean); if (!kws.length) return null;
+  const kws = kwsOf(f); if (!kws.length) return null;
   if ((c.folders || []).includes(f.id) || (f.ignored || []).includes(c.id) || c.subscribed === false) return null;
   const name = nz(c.name), handle = nz(c.handle), titles = [...(tmap.get(name) || []), ...(c.titles || [])], desc = nz(c.desc);
   for (const k of kws) {

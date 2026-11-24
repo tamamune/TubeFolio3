@@ -23,13 +23,14 @@
   const key = (r) => (r.querySelector("h2")?.textContent || "").replace(/\d+/g, "").trim();
   const io = new IntersectionObserver((es) => {
     for (const e of es) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-  }, { threshold: 0.08 });
+  }, { threshold: 0 }); // 背の高い行(フォルダ設定のチャンネル表など)は「8%見える」が満たされず、真っ黒のまま残るので、1pxでも見えたら出す
   const prep = () => {
     for (const r of main.querySelectorAll(".row:not([data-an])")) {
       r.dataset.an = "1";
       const k = key(r);
       r.querySelectorAll(".track .c").forEach((c, i) => c.style.setProperty("--i", Math.min(i, 12)));
       if (seen.has(k)) continue; // 前に出た行は、そのまま表示
+      continue; // 行の入場アニメーションは行わない(初回だけ見出しに枠が出るため)
       seen.add(k);
       r.classList.add("rv");
       io.observe(r);

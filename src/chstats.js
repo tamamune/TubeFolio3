@@ -111,13 +111,17 @@ function chRow(c, from) {
     <div class="chr-h">${av}<div class="chr-t"><span class="chr-nl">${name}${rateBtn(c)}${skipBtn(c)}${notifyBtn(c)}</span><small>${esc(handleTxt(c.handle))}${c.subscribed === false ? " ・ 登録解除済み" : ""}</small></div>
       <button class="chr-i ${fl.length ? "on named" : ""}" data-chf="${esc(c.id)}" title="フォルダ: ${fl.length ? esc(fl.join("・")) : "未分類"}(押すと選べます)" aria-label="フォルダを選ぶ">${ICO_FOLDER}${fl.length ? `<span class="chr-fn">${esc(fl[0])}</span>${fl.length > 1 ? `<i>+${fl.length - 1}</i>` : ""}` : ""}</button>
       <div class="chr-s">${sum}</div>
-      <button class="chr-i ${busy ? "spin" : ""}" data-chstat="${esc(c.id)}" ${busy ? "disabled" : ""} title="${s ? "もう一度調べる" : "動画・ライブ配信・ショートの投稿を調べる"}" aria-label="${s ? "再調査" : "調べる"}">${ICO_REFRESH}</button>${from ? `<button class="chr-x" data-chrm="${esc(c.id)}" data-from="${esc(from)}" title="このフォルダから外す" aria-label="このフォルダから外す">✕</button>` : ""}</div>
+      <button class="chr-i ${busy ? "spin" : ""}" data-chstat="${esc(c.id)}" ${busy ? "disabled" : ""} title="${s ? "もう一度調べる" : "動画・ライブ配信・ショートの投稿を調べる"}" aria-label="${s ? "再調査" : "調べる"}">${ICO_REFRESH}</button>${from ? `<button class="chr-x" data-chrm="${esc(c.id)}" data-from="${esc(from)}" title="このフォルダから外す" aria-label="このフォルダから外す">✕</button>` : ""}${thBtn(c)}</div>
     ${chSugHtml(c)}
     ${open ? `<div class="chr-d">${statTable(c)}</div>` : ""}</div>`;
 }
 // 登録補助: 一覧の上に件数と「候補を表示/隠す」ボタン(候補そのものは、各チャンネルの行に出す)
 let sgShow = ls.get("tf-ch-sug", "1") === "1"; // 候補を出すか(設定はドライブ同期の対象)
-function sgCount(list) { const tm = titlesByChannel(); let n = 0; for (const c of list) n += chSuggest(c, tm).length; return n; } // 候補の数(ボタンに出す)
+// 候補の計算結果は、画面を描く間(最長5秒)使い回す。描き直しの先頭(channelsView)で捨てる
+let sgMemo = null, sgMemoAt = 0, sgTm = null;
+function sgMemoGet() { if (!sgMemo || Date.now() - sgMemoAt > 5000) { sgMemo = new Map(); sgMemoAt = Date.now(); sgTm = null; } return sgMemo; }
+function chSuggestM(c) { const m = sgMemoGet(); let r = m.get(c.id); if (!r) { if (!sgTm) sgTm = titlesByChannel(); m.set(c.id, r = chSuggest(c, sgTm)); } return r; }
+function sgCount(list) { let n = 0; for (const c of list) n += chSuggestM(c).length; return n; } // 候補の数(ボタンに出す)
 // チャンネル名で検索(名前・ハンドル名。入力中は一覧だけ絞り込み、入力欄はそのまま)
 let chQ = "", chQTimer = 0;
 const chQOk = (c) => { const q = nz(chQ.trim()); return !q || nz(c.name).includes(q) || nz(c.handle).includes(q); };
@@ -128,11 +132,9 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("click", (e) => { if (!e.target.closest("[data-sgshow]")) return; sgShow = !sgShow; ls.set("tf-ch-sug", sgShow ? "1" : "0"); render(); });
 // 各チャンネルの行の候補: チャンネル名の下に1行で、フォルダ名だけの小さなボタンを並べる。押すと登録、✕で候補から外す
-let sgTmap = null, sgTmapAt = 0;
 function chSugHtml(c) {
   if (!sgShow) return "";
-  if (Date.now() - sgTmapAt > 2000) { sgTmap = titlesByChannel(); sgTmapAt = Date.now(); } // 一覧を描くあいだは使い回す
-  const s = chSuggest(c, sgTmap); if (!s.length) return "";
+  const s = chSuggestM(c); if (!s.length) return "";
   return `<div class="chr-sg"><span class="chr-sgl">候補</span>${s.map(({ f, k, where }) => `<span class="chr-sgc"><button type="button" class="chr-sga" data-sgadd="${esc(c.id)}|${esc(f.id)}" title="「${esc(folderPath(f.id))}」に登録する(「${esc(k)}」← ${esc(where)})">＋ ${esc(folderPath(f.id))}</button><button type="button" class="chr-sgx" data-sgx="${esc(c.id)}|${esc(f.id)}" title="このフォルダの候補から外す" aria-label="候補から外す">✕</button></span>`).join("")}</div>`;
 }
 let curFolderForRow = "";
@@ -209,11 +211,12 @@ function paintStatBar() {
 
 // フォルダ管理の画面(登録チャンネル / フォルダ / 未分類): フォルダの切り替えは左のサイドバーで行い、ここにはチャンネルの表を出す
 function channelsView(t) {
+  sgMemo = null; // 描き直しのたびに、候補は計算し直す(フォルダ・キーワード・登録の変更を反映)
   const all = chIn(t), list = (chPer >= 0 || chKind !== "all" ? all.filter(chPassPer) : all).filter(chQOk), f = data.folders.find((x) => x.id === t), miss = all.filter((c) => !c.stats).length;
   curFolderForRow = f ? f.id : "";
   const last = +ls.get("tf-ch-sync", "0");
   // YouTubeと同期: めったに使わないので、見出しの右端に小さく置く
-  const sync = t === "channels" ? `<span class="ch-sync"><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span><button type="button" class="s-op" data-act="sync" ${syncing ? "disabled" : ""} title="YouTubeの登録チャンネルを取り込み直します">${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button></span>` : "";
+  const sync = t === "channels" || t === "uncat" ? `<span class="ch-sync"><span class="sync-i">${useDummy ? "ダミー表示中(設定で切り替え)" : last ? "最終同期 " + new Date(last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "未同期"}</span><button type="button" class="s-op" data-act="sync" ${syncing ? "disabled" : ""} title="YouTubeの登録チャンネルを取り込み直します">${syncing ? "同期中…" : "⟳ YouTubeと同期"}</button></span>` : "";
   const sib = f ? data.folders.filter((x) => (x.parent || "") === (f.parent || "")) : [], si = f ? sib.indexOf(f) : -1;
   const mv = f ? `<button class="btn s" data-act="up" data-id="${esc(f.id)}" ${si <= 0 ? "disabled" : ""} title="フォルダを上へ">▲ 上へ</button><button class="btn s" data-act="down" data-id="${esc(f.id)}" ${si >= sib.length - 1 ? "disabled" : ""} title="フォルダを下へ">▼ 下へ</button>${f.parent ? `<button class="btn s" data-act="unnest" data-id="${esc(f.id)}" title="親フォルダの外(ひとつ上の階層)へ出します">入れ子を解除</button>` : ""}` : "";
   const fa = ""; // フォルダの操作(上へ・下へ・名前の変更・削除など)は、サイドバーのフォルダ行の ▲▼ と「⋯」メニューで行う
@@ -270,9 +273,12 @@ for (const cb of $("set-pvk").querySelectorAll("input")) {
   cb.checked = pvKinds.has(cb.value);
   cb.onchange = () => { cb.checked ? pvKinds.add(cb.value) : pvKinds.delete(cb.value); ls.set("tf-ch-pvk", PV_SECTIONS.map(([k]) => k).filter((k) => pvKinds.has(k)).join(",")); hidePv(); };
 }
-const pvOff = () => pvN === 0 || !pvKinds.size;
+let pvOn = ls.get("tf-ch-pvon", "1") !== "0"; // マウスオーバーのプレビューを出すか(設定。ドライブ同期の対象)
+$("set-pvon").checked = pvOn;
+$("set-pvon").onchange = () => { pvOn = $("set-pvon").checked; ls.set("tf-ch-pvon", pvOn ? "1" : "0"); if (!pvOn) hidePv(); };
+const pvOff = () => !pvOn || pvN === 0 || !pvKinds.size;
 const pvCache = new Map(); // チャンネルID -> { at, data | promise }
-let pvTimer = 0, pvHide = 0, pvId = "";
+let pvTimer = 0, pvHide = 0, pvId = "", pvLast = null;
 
 // チャンネルページを読む(動画一覧と、並び替え「人気」の続きのトークンを取り出す)
 async function ytRaw(url) {
@@ -283,23 +289,54 @@ async function ytRaw(url) {
   const root = JSON.parse(html.slice(a + 16, b));
   let pop = "";
   (function w(n) { if (pop || !n || typeof n !== "object") return; const cv = n.chipViewModel; if (cv && /人気|Popular/i.test(cv.text || "")) { pop = cv.tapCommand?.innertubeCommand?.continuationCommand?.token || ""; return; } Object.values(n).forEach(w); })(root);
-  return { list: collectVideos(root).list, pop };
+  return { list: collectVideos(root).list, pop, desc: root.metadata?.channelMetadataRenderer?.description || "" };
 }
 async function fetchPreview(c) {
-  const base = c.base || `https://www.youtube.com/channel/${encodeURIComponent(c.id)}`, none = { list: [], pop: "" };
+  const base = c.base || `https://www.youtube.com/channel/${encodeURIComponent(c.id)}`, none = { list: [], pop: "", desc: "" };
   const [v, l, s] = await Promise.all(["videos", "streams", "shorts"].map((t) => ytRaw(`${base}/${t}?hl=ja`).catch(() => none)));
   let pop = [];
   if (v.pop) { try { pop = collectVideos(await YTA.browse(v.pop)).list; } catch {} }
-  return { video: v.list, live: l.list, short: s.list.map((x) => ({ ...x, kind: "short" })), pop };
+  return { desc: v.desc || l.desc || s.desc, video: v.list, live: l.list, short: s.list.map((x) => ({ ...x, kind: "short" })), pop };
 }
 function pvCard(v, c) {
   vmap.set(v.id, { ...(vmap.get(v.id) || {}), ...v, channel: v.channel || c.name });
   return `<button type="button" class="pv-c ${v.kind === "short" ? "sh" : ""}" data-v="${esc(v.id)}" title="${esc(v.title)}"><span class="pv-th"><img loading="lazy" src="${thumb(v.id)}" alt="">${v.duration ? `<em>${esc(v.duration)}</em>` : ""}</span><span class="pv-x"><span class="pv-t">${esc(v.title)}</span>${v.pub ? `<small>${esc(v.pub)}</small>` : ""}</span></button>`;
 }
+// 説明文: 日本語でない行は日本語に翻訳する(翻訳は動画の表示とは別に行い、できたら差し替える)。4行より長ければ「続きを読む」で下に開く
+const JA_RE = /[぀-ヿ一-鿿]/, LET_RE = /[\p{L}]/u;
+async function pvTrDesc(d) {
+  if (d.ja !== undefined || d.jaP) return d.jaP;
+  const lines = d.desc.split(/\r?\n/), idx = [];
+  lines.forEach((s, i) => { if (idx.length < 40 && LET_RE.test(s) && !JA_RE.test(s)) idx.push(i); });
+  if (!idx.length) { d.ja = d.desc; return; }
+  return d.jaP = Promise.race([YTA.translateMany(idx.map((i) => lines[i])), new Promise((r) => setTimeout(() => r(null), 20000))]).then((out) => {
+    const L = lines.slice(); (out || []).forEach((r, k) => { if (r?.text) L[idx[k]] = r.text; });
+    d.ja = L.join("\n");
+  }).catch(() => { d.ja = d.desc; });
+}
+function pvDescFit(el) {
+  const p = el?.querySelector(".pv-d"), b = el?.querySelector("[data-pvm]"); if (!p || !b) return;
+  const open = p.classList.contains("open");
+  b.hidden = !open && p.scrollHeight <= p.clientHeight + 1;
+}
+async function pvDescInit(el, d, t) {
+  if (!d?.desc) return;
+  pvDescFit(el);
+  if (d.ja === undefined) {
+    await pvTrDesc(d);
+    const p = $("pv")?.querySelector(".pv-d"); if (!p || $("pv") !== el) return;
+    p.textContent = d.ja ?? d.desc; pvDescFit(el); placePv(t);
+  }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pvm]"); if (!b) return;
+  const p = b.parentElement.querySelector(".pv-d"); p.classList.toggle("open"); b.textContent = p.classList.contains("open") ? "閉じる ▴" : "続きを読む ▾";
+  const t = pvLast; if (t) placePv(t);
+});
 function pvHtml(c, d) {
   const secs = PV_SECTIONS.filter(([k]) => pvKinds.has(k));
   const cols = secs.map(([k, n]) => `<div class="pv-s"><h4>${n}</h4>${d ? (d[k].length ? d[k].slice(0, pvN).map((v) => pvCard(v, c)).join("") : `<p class="pv-e">ありません</p>`) : `<p class="pv-e">読み込み中…</p>`}</div>`).join("");
-  return `<div class="pv-h"><b>${esc(c.name)}</b></div><div class="pv-g" style="--pvc:${secs.length};--pvc2:${Math.min(2, secs.length)}">${cols}</div>`;
+  return `<div class="pv-h"><b>${esc(c.name)}</b></div>${d?.desc ? `<div class="pv-dw"><p class="pv-d">${esc(d.ja ?? d.desc)}</p><button type="button" class="pv-m" data-pvm hidden>続きを読む ▾</button></div>` : ""}<div class="pv-g" style="--pvc:${secs.length};--pvc2:${Math.min(2, secs.length)}">${cols}</div>`;
 }
 // 表示の大きさ(設定で 1〜100%)
 // マウスを乗せてから表示するまでの時間(秒): チャンネルのプレビューにも、サムネイル上の動画再生(thumbpv.js)にも使う
@@ -349,8 +386,8 @@ async function showPv(t) {
   if (c.dummy) { el.innerHTML = `<div class="pv-h"><b>${esc(c.name)}</b></div><p class="pv-e" style="padding:8px 4px">ダミーのチャンネルのため、動画は表示できません。</p>`; return placePv(t); }
   const ck = t.ck || key; let ent = pvCache.get(ck);
   if (!ent || Date.now() - ent.at > 30 * 60 * 1000) { ent = { at: Date.now(), data: null, p: fetchPreview(c).then((d) => { ent.data = d; return d; }).catch(() => { pvCache.delete(ck); return null; }) }; pvCache.set(ck, ent); }
-  el.innerHTML = pvHtml(c, ent.data); placePv(t);
-  if (!ent.data) { await ent.p; if (pvId !== key || !$("pv")) return; el.innerHTML = ent.data ? pvHtml(c, ent.data) : `<div class="pv-h"><b>${esc(c.name)}</b></div><p class="pv-e" style="padding:8px 4px">読み込めませんでした(YouTubeへのログインや通信を確認してください)</p>`; placePv(t); }
+  pvLast = t; el.innerHTML = pvHtml(c, ent.data); placePv(t); pvDescInit(el, ent.data, t);
+  if (!ent.data) { await ent.p; if (pvId !== key || !$("pv")) return; if (ent.data) setTimeout(() => pvDescInit(el, ent.data, t), 0); el.innerHTML = ent.data ? pvHtml(c, ent.data) :`<div class="pv-h"><b>${esc(c.name)}</b></div><p class="pv-e" style="padding:8px 4px">読み込めませんでした(YouTubeへのログインや通信を確認してください)</p>`; placePv(t); }
 }
 function hidePv() { clearTimeout(pvTimer); clearTimeout(pvHide); $("pv")?.remove(); pvId = ""; }
 document.addEventListener("mouseover", (e) => {

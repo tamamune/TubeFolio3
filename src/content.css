@@ -284,6 +284,9 @@ html.tf-mini ytd-watch-flexy #movie_player .ytp-chrome-bottom{width:calc(100% - 
 .tf-wb-b .ok{background:#3ddc84;color:#000}
 .tf-wb-b .more{background:#2c2c2c;color:#ddd}
 .tf-wb-b .more:hover{background:#3a3a3a;color:#fff}
+/* 夜ふかし: ほかのボタンより小さく、目立たせない */
+.tf-wb-b .late{height:26px;padding:0 12px;background:none;color:#888;font-size:11.5px;font-weight:600;align-self:center;box-shadow:inset 0 0 0 1px #3a3a3a}
+.tf-wb-b .late:hover{color:#ddd;box-shadow:inset 0 0 0 1px #666}
 
 /* ツールの色: 追加の色(TubeFolio3 の設定「色の変更」と同じ) */
 html[data-tf-acc=blue]{--tf-acc:#7b8ff0;--tf-acc-t:#b2bef6;--tf-acc-a:123,143,240}
@@ -543,3 +546,17 @@ html:not([dark]) .tf-chb:hover{background:rgba(0,0,0,.1)}
 .tf-nvt-b{overflow:visible}
 .tf-nvt:not(.live)::after{left:16px;right:16px;width:auto;bottom:4px;height:3px;border-radius:3px}
 .tf-nvt::before{border-radius:0 4px 4px 0}
+
+/* 通知の「後で見る」ボタン */
+
+.tf-nvt-l:hover{background:rgba(255,255,255,.18)}
+.tf-nvt-l.ok{border-color:#3ecf8e;color:#3ecf8e}
+.tf-nvt-l:disabled{cursor:default;opacity:.85}
+
+/* 通知カードの「後で見る」: 1行目(種類のラベル)の右端に、履歴と同じ丸いボタンで置く。YouTube 側・TubeFolio3 側の両方で効くよう、初期化して作り直す */
+.tf-nvt-r{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;min-height:24px}
+.tf-nvt-r .tf-nvt-k{margin:0}
+.tf-nvt .tf-nvt-l{all:unset;box-sizing:border-box;flex:none;display:inline-flex;align-items:center;height:24px;padding:0 11px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.08);color:#e8e8e8;font:600 11.5px/1 system-ui,"Yu Gothic UI",sans-serif;white-space:nowrap;cursor:pointer;pointer-events:auto}
+.tf-nvt .tf-nvt-l:hover{background:rgba(255,255,255,.2);color:#fff}
+.tf-nvt .tf-nvt-l.ok{border-color:rgba(62,207,142,.55);background:rgba(62,207,142,.16);color:#4bdc9c;cursor:default}
+.tf-nvt .tf-nvt-l.ng{border-color:rgba(255,120,110,.6);color:#ff958d}

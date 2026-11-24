@@ -10,10 +10,11 @@
     "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
   },
   "web_accessible_resources": [
-    { "resources": ["icons/*.png"], "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"] }
+    { "resources": ["icons/*.png", "sounds/*.mp3"], "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"] }
   ],
-  "permissions": ["storage", "unlimitedStorage", "declarativeNetRequest", "cookies", "identity", "alarms", "notifications"],
+  "permissions": ["scripting", "storage", "unlimitedStorage", "declarativeNetRequest", "cookies", "identity", "alarms", "notifications"],
   "host_permissions": ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://i.ytimg.com/*", "https://www.googleapis.com/*", "https://translate.googleapis.com/*", "https://sponsor.ajay.app/*", "https://returnyoutubedislikeapi.com/*", "https://youtube-trending.info/*", "https://trends.google.co.jp/*", "https://www.bing.com/*", "https://news.google.com/*"],
+  "optional_host_permissions": ["https://*.noxinfluencer.com/*"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [
     {

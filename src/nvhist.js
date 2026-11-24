@@ -14,7 +14,11 @@
   const bellSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`;
   // サイドバー(home.js の renderNav)から呼ばれる。「すべて」の名前と件数の間に入る
   window.nvBellHtml = () => { const n = unread(); return `<span class="nvbell ${n ? "has" : ""} ${Date.now() < ringUntil ? "ring" : ""}" data-nvbell role="button" tabindex="0" title="通知の履歴" aria-label="通知の履歴${n ? `(未読 ${n}件)` : ""}">${bellSvg}${n ? `<b>${n > 99 ? "99+" : n}</b>` : ""}</span>`; };
-  const repaintBell = () => { if (typeof renderNav === "function") renderNav(); if (panel) paintPanel(); };
+  // ベルは、ホームの右上に固定で置く(#nv-top。サイドバーの「すべて」からは移した)。ホーム以外の画面と設定では隠す(home.css)
+  const repaintBell = () => {
+    let t = document.getElementById("nv-top"); if (!t) { t = document.createElement("div"); t.id = "nv-top"; document.body.append(t); }
+    t.innerHTML = window.nvBellHtml(); if (panel) paintPanel();
+  };
   const ring = () => {
     ringUntil = Date.now() + 1600;
     document.querySelectorAll(".nvbell").forEach((b) => { b.classList.remove("ring"); void b.offsetWidth; b.classList.add("ring"); });
@@ -31,7 +35,7 @@
   function paintPanel() {
     if (!panel) return;
     panel.innerHTML = `<div class="nvp-h"><b>通知の履歴</b><span><button type="button" data-nvp="read">すべて既読</button><button type="button" data-nvp="clear">履歴を消す</button></span></div>`
-      + (hist.length ? `<div class="nvp-l">${hist.map((x, i) => `<button type="button" class="nvp-i ${x.t > seenAt ? "new" : ""} ${esc(x.kind)}" data-nvi="${i}">${x.id ? `<img alt="" src="https://i.ytimg.com/vi/${encodeURIComponent(x.id)}/mqdefault.jpg">` : "<i></i>"}<span class="nvp-b"><small>${KIND[x.kind] || KIND.new} ・ ${ago(x.t)}</small><b>${esc(x.title)}</b><em>${esc(x.ch)}</em></span></button>`).join("")}</div>` : `<p class="nvp-e">通知の履歴はまだありません</p>`);
+      + (hist.length ? `<div class="nvp-l">${hist.map((x, i) => `<button type="button" class="nvp-i ${x.t > seenAt ? "new" : ""} ${esc(x.kind)}" data-nvi="${i}">${x.id ? `<img alt="" src="https://i.ytimg.com/vi/${encodeURIComponent(x.id)}/mqdefault.jpg">` : "<i></i>"}<span class="nvp-b"><span class="nvp-k"><small>${KIND[x.kind] || KIND.new} ・ ${ago(x.t)}</small>${x.id ? `<span class="nvp-lt" role="button" tabindex="0" data-nvl="${i}" title="後で見る再生リストに追加">🕒 後で見る</span>` : ""}</span><b>${esc(x.title)}</b><em>${esc(x.ch)}</em></span></button>`).join("")}</div>` : `<p class="nvp-e">通知の履歴はまだありません</p>`);
   }
   let seenAt = 0; // 開く前の「既読の時刻」。開いている間は、これより新しいものに「新しい」印を付ける
   function open(anchor) {
@@ -47,6 +51,14 @@
     const b = e.target.closest("[data-nvbell]");
     if (b) { e.stopPropagation(); e.preventDefault(); panel ? close() : open(b); return; } // 「すべて」を開く動きは止める
     if (!panel) return;
+    const lt = e.target.closest("[data-nvl]");
+    if (lt) { // 後で見る(plmenu.js の wlTarget / setInPl)
+      e.stopPropagation(); e.preventDefault(); const x = hist[+lt.dataset.nvl], p = wlTarget(); if (!x?.id) return;
+      if (x.kind === "test") { lt.textContent = "✓ 追加済み(テスト表示)"; lt.classList.add("ok"); return; } // テスト通知は、実際には追加しない
+      if (!p) { toast("追加先の再生リストがありません。設定で選んでください"); return; }
+      lt.textContent = "追加中…"; (async () => { if (!inPl(p, x.id) && !plList(p)) await loadPlFor(p); const ok = inPl(p, x.id) || await setInPl(p, x.id, true); if (panel) { lt.textContent = ok ? "✓ 追加済み" : "🕒 後で見る"; lt.classList.toggle("ok", !!ok); if (ok) lt.title = "追加しました"; } })();
+      return;
+    }
     const it = e.target.closest("[data-nvi]"), a = e.target.closest("[data-nvp]");
     if (it) { const x = hist[+it.dataset.nvi]; const u = x?.url || (x?.id ? "/watch?v=" + encodeURIComponent(x.id) : ""); if (u) chrome.tabs.create({ url: u.startsWith("http") ? u : "https://www.youtube.com" + u }); return; }
     if (a) { if (a.dataset.nvp === "clear") { hist = []; ls.set("tf-nv-clearat", String(Date.now())); chrome.storage.local.set({ [HK]: [] }); } else { ls.set(RK, String(Date.now())); seenAt = Date.now(); } paintPanel(); return; }
