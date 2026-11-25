@@ -416,7 +416,7 @@ function folderListView(t) {
   if (!S.sub.started) loadSub(true); // 新着をまだ読んでいなければ、読み始める(読むたびに paintFolderList で描き直す)
   setTimeout(paintFolderList, 0);
   // 一覧: 見出しの右に「▶ 連続再生」、その下に 隠す・表示(グリッド/リスト)・列数(再生リストのページと同じ操作バー)。「投稿が〇日以内」の絞り込みは使わない
-  return `<section class="row"><div class="lh-row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2><span id="fl-pq"></span></div>${crumb}${vbar(plHideRow())}<div id="fl-out"></div></section>`;
+  return `<section class="row"><div class="lh-row"><h2>${esc(folderName(t))}<small>${list.length}チャンネル</small></h2><span id="fl-pq"></span></div>${crumb}<div class="fl-tools">${yrMenuWrap(vbar(plHideRow()), plHideW || plHideM, "隠す・表示形式・列数")}</div><div id="fl-out"></div></section>`;
 }
 function paintFolderList() {
   const box = $("fl-out"); if (!box || folderMode !== "list") return;

@@ -11,7 +11,14 @@ const trData = {}, trErr = {}, trdBusy = new Set();
 let trLatest = ""; // データがあった、いちばん新しい日
 
 // 日付の一覧を取る(今日の分がまだなければ、前の日へさかのぼる)
+// ダミー表示のときの急上昇(通信しない)
+const TR_DCATS = ["Music", "Gaming", "Entertainment", "Sports", "News & Politics"];
+function trDummy(date) {
+  const names = typeof DUMMY_CH !== "undefined" ? DUMMY_CH : ["ダミー"], T = typeof D_TITLES !== "undefined" ? D_TITLES : ["急上昇の動画"];
+  return Array.from({ length: 30 }, (_, i) => ({ id: `dummyv-tr-${i}`, dummy: true, n: 500 + i, title: `【ダミー】${T[i % T.length]} #${i + 1}`, ch: `【ダミー】${names[(i * 3) % names.length]}`, len: `${(i * 7) % 40 + 3}:${String((i * 13) % 60).padStart(2, "0")}`, pub: date, views: `${(i * 37) % 90 + 1}万`, cat: TR_DCATS[i % TR_DCATS.length], rank: i + 1, chg: i % 4 === 0 ? "+" + (i + 1) : "=" }));
+}
 async function trLoad(date) {
+  if (useDummy) { if (!trData[date]) { trData[date] = trDummy(date); if (!trLatest || date > trLatest) trLatest = date; if (tab === "all" || tab === "list:trend") setTimeout(render, 0); } return; }
   if (trData[date] || trdBusy.has(date)) return;
   trdBusy.add(date);
   const r = await chrome.runtime.sendMessage({ tf: "trend", date }).catch((e) => ({ ok: false, error: e?.message }));
@@ -30,7 +37,7 @@ function trLatestDay() { // いちばん新しい日を探す(今日 → 昨日 
 }
 const trShift = (date, kind, n) => { const d = new Date(date + "T12:00:00"); if (kind === "M") d.setMonth(d.getMonth() + n); else d.setDate(d.getDate() + n * (kind === "W" ? 7 : 1)); return trYmd(d); };
 // 一覧のカードにする([id, v])
-const trItems = (list) => (list || []).filter((x) => !trCat || x.cat === trCat).map((x) => [x.id, { title: x.title, channel: x.ch, chUrl: x.chId ? "/channel/" + x.chId : "", duration: String(x.len || "").replace(/^0(\d:)/, "$1"), pub: x.pub ? x.pub.replace(/-/g, "/") + " 公開" : "", views: x.views ? x.views + " 回視聴" : "", rank: x.rank, chg: x.chg }]);
+const trItems = (list) => (list || []).filter((x) => !trCat || x.cat === trCat).map((x) => [x.id, { dummy: x.dummy, n: x.n, title: x.title, channel: x.ch, chUrl: x.chId ? "/channel/" + x.chId : "", duration: String(x.len || "").replace(/^0(\d:)/, "$1"), pub: x.pub ? x.pub.replace(/-/g, "/") + " 公開" : "", views: x.views ? x.views + " 回視聴" : "", rank: x.rank, chg: x.chg }]);
 const trRank = ([, v]) => `<span class="trk" title="急上昇の順位${v.chg && v.chg !== "=" ? `(前日から ${esc(v.chg)})` : ""}">#${v.rank}</span>`;
 const trLabel = (d) => { const x = new Date(d + "T12:00:00"); return `${x.getMonth() + 1}/${x.getDate()}(${"日月火水木金土"[x.getDay()]})`; };
 
@@ -40,7 +47,7 @@ function trendRow() {
   if (!d) { trLatestDay(); return note("急上昇(日本)", "読み込み中…"); }
   if (!trData[d]) { trLoad(d); return note("急上昇(日本)", esc(trErr[d] || "読み込み中…")); }
   const items = trItems(trData[d]);
-  return items.length ? rail(`急上昇(日本) ・ ${trLabel(d)}${trCat ? " ・ " + trCatName(trCat) : ""}`, items.slice(0, 40).map((e) => cardWith(e, trRank(e))).join(""), items.length, "本", "list:trend") : note("急上昇(日本)", `「${esc(trCatName(trCat))}」の動画はこの日の急上昇にありません`);
+  return items.length ? rail(`急上昇(日本) ・ ${trLabel(d)}${trCat ? " ・ " + trCatName(trCat) : ""}`, items.slice(0, 100).map((e) => cardWith(e, trRank(e))).join(""), items.length, "本", "list:trend") : note("急上昇(日本)", `「${esc(trCatName(trCat))}」の動画はこの日の急上昇にありません`);
 }
 // すべて表示: 日付の移動・ジャンル・連続再生
 function trendView() {
@@ -58,6 +65,12 @@ function trendView() {
     : `<div class="empty" style="margin-top:0">${esc(trErr[d] || "読み込み中…")}</div>`;
   return `<section class="row">${back}<h2>急上昇(日本) ・ ${trLabel(d)}<small>${items.length}本</small></h2>${nav}${body}</section>`;
 }
+document.addEventListener("change", (e) => { // ダミー表示の切り替え: 前の一覧(本物/ダミー)を捨てる
+  if (e.target.id !== "set-dummy") return;
+  for (const k of Object.keys(trData)) delete trData[k];
+  for (const k of Object.keys(trErr)) delete trErr[k];
+  trLatest = ""; trDate = "";
+});
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-trgo]"); if (!b || b.disabled) return; trDate = b.dataset.trgo; render(); });
 document.addEventListener("change", (e) => {
   if (e.target.id === "tr-date" && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { trDate = e.target.value > trToday() ? trToday() : e.target.value; render(); }

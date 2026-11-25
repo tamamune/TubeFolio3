@@ -12,10 +12,11 @@
 <header id="tbar">
   <div class="tb-l">
     <div class="tf-wrap">
-      <button type="button" id="tf-btn" class="tf-btn" aria-label="メニュー" aria-haspopup="true" aria-expanded="false">TF</button>
+      <button type="button" id="tf-btn" class="tf-btn" aria-label="メニュー" aria-haspopup="true" aria-expanded="false"><img src="icons/icon-48.png" alt="" width="28" height="28"></button>
       <div id="tf-pop" class="tb-pop" role="menu">
         <button type="button" class="tb-pi" role="menuitem" data-t="vhist"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>視聴履歴</span></button>
         <button type="button" class="tb-pi" role="menuitem" id="tf-set"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>設定</span></button>
+        <button type="button" class="tb-pi" role="menuitem" id="tf-test"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9V3"/><path d="M7.5 15h9"/></svg><span>テスト</span></button>
         <button type="button" class="tb-pi tf-acct" role="menuitem" id="tf-acct"><span class="av ph" id="tf-ph"></span><img class="av" id="tf-img" alt="" hidden><span class="tf-at"><b id="tf-name">YouTube</b><small id="tf-sub"></small></span></button>
       </div>
     </div>
@@ -31,12 +32,11 @@
     <label for="s-q" class="sr-only">キーワードで検索</label>
     <input id="s-q" type="search" placeholder="キーワードで検索" autocomplete="off">
     <button type="button" class="s-clr" id="s-clr" title="入力を消す(Esc)" aria-label="入力を消す" hidden>✕</button>
-    <div class="tbs-gow">
+    <div class="tbs-gow"><button type="button" class="tbs-tagb" id="tbs-tagb" data-act="s-tagb" aria-label="タグ検索" title="タグ検索(保存してあるタグをランダムに入れて検索)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1M9 9h.01M15 15h.01M12 12h.01"/></svg></button>
       <button type="submit" class="tbs-go">検索</button>
       <button type="button" class="tbs-drop" id="tbs-drop" data-tbs="more" aria-expanded="false" aria-label="詳しい条件" title="再生回数・急上昇ワード・記号"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
       <div class="tbs-more" id="tbs-m-more"></div>
     </div>
-    <div class="tbs-w tbs-tagw"><button type="button" class="tbs-tag" data-tbs="tag" aria-expanded="false" aria-label="タグ検索(ランダム)" title="タグ検索"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1M9 9h.01M15 15h.01M12 12h.01"/></svg></button><div class="tbs-menu tbs-tagm" id="tbs-m-tag"></div></div>
   </form>
 </header>
 <nav id="mnav" aria-label="メイン"></nav>

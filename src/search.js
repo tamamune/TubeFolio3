@@ -89,8 +89,8 @@ function liveBadge(s, pub = "", upcoming = null) {
 
 /* ---------- 読み込み(ページのHTML → 続きは youtubei) ---------- */
 let searchCtx = null; // 検索の続きを読むためのクライアント情報(最初の検索ページから取る)
-async function ytPage(url) {
-  const html = await (await fetch(url, { credentials: "include" })).text();
+async function ytPage(url, opts = {}) {
+  const html = await (await fetch(url, { credentials: "include", ...opts })).text();
   const a = html.indexOf("ytInitialData = "), b = html.indexOf(";</script>", a);
   if (a < 0 || b < 0) throw new Error("data");
   YTA.useHtml(html); // 続きを読むためのクライアント情報(ytapi.js)
@@ -299,6 +299,8 @@ function mixedGrid(list, label = "ショート") {
 }
 const chipRow =(label, list, cur, attr) => `<div class="s-chips grp"><span class="s-cl">${label}</span>${list.map(([k, n]) => `<button type="button" class="tab ${cur === k ? "on" : ""}" ${attr}="${k}" aria-pressed="${cur === k}">${n}</button>`).join("")}</div>`;
 // 隠すボタン(押すたびに オン/オフ)
+// 検索画面のツール(隠す・表示形式・列数)は、ホームの YouTube のおすすめと同じ〇に横三点のメニューにまとめる
+const sTools = () => yrMenuWrap(vbar(hideRow()), sHideW || sHideM, "隠す・表示形式・列数");
 const hideRow = () => `<div class="s-chips grp s-hide"><span class="s-cl">隠す</span><button type="button" class="tab ${sHideW ? "on" : ""}" data-shide="w" aria-pressed="${sHideW}" title="最後まで見た動画(✓ 視聴済み)を一覧に出さない">✓ 視聴済み</button><button type="button" class="tab ${sHideM ? "on" : ""}" data-shide="m" aria-pressed="${sHideM}" title="チャンネルメンバー限定の動画を一覧に出さない">メン限</button></div>`;
 const viewsRow = () => `<div class="s-chips grp s-views"><span class="s-cl">再生回数</span>${S_VIEWS.map(([k, n]) => `<button type="button" class="tab ${sViews === k ? "on" : ""}" data-sviews="${k}" aria-pressed="${sViews === k}" ${k >= 0 ? `title="再生回数が${k ? k + "回以下" : "0回"}の動画だけを出します(キーワード検索はアップロード日順で探します)"` : ""}>${k === 0 ? "👀 " + n : n}</button>`).join("")}</div>`;
 const relBtn = () => `<button type="button" class="tab s-rel ${sRel ? "on" : ""}" data-act="s-rel" aria-pressed="${sRel}" title="登録チャンネルの新着の「関連動画」から、登録していないチャンネルの動画を集めて一覧にします(キーワードなしのとき)">🔗 登録の関連</button>`;
@@ -329,7 +331,7 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
     // 日付ごと。読み込み中の日は「読み込み中…」、そろった日から表示する
     const list = shown(st.list), days = lastDays();
     const reached = st.reached ?? Infinity; // ここより新しい日はそろっている(loadSub で求める)
-    h += `<div class="s-bar"><div class="s-head">登録チャンネルの新着<small>日付ごと</small></div>${vbar(hideRow())}</div>`;
+    h += `<div class="s-bar"><div class="s-head">登録チャンネルの新着<small>日付ごと</small></div>${sTools()}</div>`;
     // 新しい日から順に。新着は新しい順に届くので、まだそろっていない日が出たら、そこで「読み込み中…」を出して止める
     for (const [i, d] of days.entries()) {
       const k = dayKey(d), items = list.filter((v) => { const x = vDate(v); return x && dayKey(x) === k; });
@@ -344,8 +346,8 @@ function paintSearch() { // 結果の部分だけ描き直す(入力欄は触ら
   } else {
     const list = shown(st.list, mode === "rel");
     const head = mode === "rel" ? "登録チャンネルの関連(未登録チャンネル)" : mode === "kw" ? `「${esc(sq)}」の検索結果` : sTarget === "all" ? "YouTubeのおすすめ" : "おすすめ(未登録チャンネル)";
-    if (list.length) h += `<div class="s-bar"><div class="s-head">${head}<small>${list.length}本</small></div>${vbar(hideRow())}</div>${mixedGrid(list)}`;
-    else if (!st.busy && !st.err && st.list.length && (sHideW || sHideM || sViews >= 0)) h += `<div class="s-bar"><div class="s-head">${head}<small>0本</small></div>${vbar(hideRow())}</div><div class="empty">読み込んだ ${st.list.length}本には、${sViews >= 0 ? `再生回数が${sViews ? sViews + "回以下" : "0回"}の動画がありませんでした${sHideW || sHideM ? "(「隠す」の設定で隠れているものもあります)" : ""}` : "「隠す」の設定ですべて隠れています"}。${!st.done ? "「もっと見る」で続きを探せます。" : ""}</div>`;
+    if (list.length) h += `<div class="s-bar"><div class="s-head">${head}<small>${list.length}本</small></div>${sTools()}</div>${mixedGrid(list)}`;
+    else if (!st.busy && !st.err && st.list.length && (sHideW || sHideM || sViews >= 0)) h += `<div class="s-bar"><div class="s-head">${head}<small>0本</small></div>${sTools()}</div><div class="empty">読み込んだ ${st.list.length}本には、${sViews >= 0 ? `再生回数が${sViews ? sViews + "回以下" : "0回"}の動画がありませんでした${sHideW || sHideM ? "(「隠す」の設定で隠れているものもあります)" : ""}` : "「隠す」の設定ですべて隠れています"}。${!st.done ? "「もっと見る」で続きを探せます。" : ""}</div>`;
     else if (!st.busy && !st.err && (mode === "kw" || st.started)) h += `<div class="empty">${mode === "kw" ? `「${esc(sq)}」に一致する${tn}は見つかりませんでした。` : `表示できる${tn}がありません。`}</div>`;
     if (st.busy) h += `<div class="s-load">${mode === "kw" ? "検索中…" : mode === "rel" ? `関連動画を集めています…(${st.got}/${st.seeds})` : "読み込み中…"}</div>`;
     else if (mode !== "rel" && !st.done && (list.length || st.list.length)) h += `<div class="s-more"><button class="btn s" data-act="s-more">もっと見る</button></div>`;
@@ -521,12 +523,16 @@ function tbsPaint() {
   const opt = (attr, k, n, cur) => { const on = String(cur) === String(k); return `<button type="button" class="tbs-o ${on ? "on" : ""}" ${attr}="${esc(String(k))}" aria-pressed="${on}">${esc(n)}</button>`; };
   put("tbs-m-target", `<div class="tbs-oo">${S_TARGETS.map(([k, n]) => opt("data-starget", k, n, sTarget)).join("")}</div>`);
   put("tbs-m-type", `<div class="tbs-oo">${S_TYPES.map(([k, n]) => opt("data-stype", k, n, sType)).join("")}</div>`);
-  put("tbs-m-tag", `<div class="tbs-oo">${[2, 3, 4].map((n) => `<button type="button" class="tbs-o ${sRn === n ? "on" : ""}" data-tbn="${n}" aria-pressed="${sRn === n}">${n}個で検索</button>`).join("")}</div>`);
   const hadGt = $("gt");
-  put("tbs-m-more", `<div class="tbs-h">再生回数</div><div class="tbs-oo">${S_VIEWS.map(([k, n]) => opt("data-sviews", k, n, sViews)).join("")}</div>`
-    + `<div class="tbs-h">登録の関連</div><div class="tbs-oo">${relBtn()}</div>`
-    + `<div class="tbs-h">急上昇ワード</div>${gtPanel()}`
-    + `<div class="tbs-h">記号</div>${opsHtml()}`);
+  const tb = $("tbs-tagb"); if (tb) tb.title = `タグ検索(保存してあるタグから${sRn}個を入れて検索。個数はしずくの中で選びます)`;
+  const blk = (t, body, cls = "") => `<section class="tbs-blk ${cls}"><div class="tbs-h">${t}</div>${body}</section>`;
+  put("tbs-m-more", `<div class="tbs-gr">`
+    + blk("タグ検索の個数", `<div class="tbs-oo">${[2, 3, 4].map((n) => `<button type="button" class="tbs-o ${sRn === n ? "on" : ""}" data-tbn="${n}" aria-pressed="${sRn === n}">${n}個</button>`).join("")}</div>`)
+    + blk("再生回数", `<div class="tbs-oo">${S_VIEWS.map(([k, n]) => opt("data-sviews", k, n, sViews)).join("")}</div>`)
+    + blk("登録の関連", `<div class="tbs-oo">${relBtn()}</div>`)
+    + blk("記号", opsHtml(), "wide")
+    + blk("急上昇ワード", gtPanel(), "wide")
+    + `</div>`);
   if (gtOpen) gtPaint();
   // 選んでいる条件を、ボタンに出す(「すべて」のときはアイコンだけ)
   const tg = S_TARGETS.find(([k]) => k === sTarget)?.[1] || "", ty = S_TYPES.find(([k]) => k === sType)?.[1] || "";
@@ -538,22 +544,42 @@ function tbsPaint() {
 document.addEventListener("click", (e) => {
   const path = e.composedPath(), inId = (id) => path.some((n) => n.id === id), inCls = (c) => path.some((n) => n.classList?.contains(c));
   const tb = e.target.closest?.("[data-tbs]");
+  if (e.target.closest?.("#tbs-tagb")) { tbsClose(); return sRandomTags(); } // 検索ボタンにマウスを乗せると左に出るタグ検索ボタン
   if (tb) { const k = tb.dataset.tbs; return k === tbsOpenK && !tbsHoverOpen ? tbsClose() : tbsOpen(k); }
   const tn = e.target.closest?.("[data-tbn]");
-  if (tn) { sRn = +tn.dataset.tbn; ls.set("tf-s-rn", String(sRn)); tbsClose(); tbsPaint(); return sRandomTags(); }
+  if (tn) { sRn = +tn.dataset.tbn; ls.set("tf-s-rn", String(sRn)); return tbsPaint(); } // 個数を選ぶだけ(しずくは開いたまま。検索はタグ検索ボタンで)
   if (inId("tbs-m-target") || inId("tbs-m-type")) return tbsClose(); // 選んだら閉じる(状態は上の click が変えている)
   if (inCls("tbs-more") || inCls("tbs-menu")) return; // しずくのメニューは、選んでも開いたまま
   tbsClose();
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tbsOpenK) tbsClose(); });
-// サイコロ: マウスを少し(0.45秒)乗せると個数が出る。離すと閉じる
-document.addEventListener("mouseover", (e) => {
-  if (!e.target.closest?.(".tbs-tagw") || tbsOpenK === "tag") return;
-  clearTimeout(tbsHoverT); tbsHoverT = setTimeout(() => { tbsOpen("tag"); tbsHoverOpen = true; }, 450);
-});
-document.addEventListener("mouseout", (e) => {
-  const w = e.target.closest?.(".tbs-tagw"); if (!w || w.contains(e.relatedTarget)) return;
-  clearTimeout(tbsHoverT); if (tbsOpenK === "tag" && tbsHoverOpen) tbsClose();
-});
 tbsPaint();
 { const i = $("s-q"); if (i && sq) { i.value = sq; sSyncBar(); } }
+
+/* ===== 上のバーのキーワード欄: クリック(フォーカス)すると、検索の履歴を下に出す =====
+   履歴を選ぶと、その言葉で検索する。入力すると、入力に合う履歴だけに絞る */
+(function () {
+  const form = $("s-form"), inp = $("s-q"); if (!form || !inp) return;
+  const box = document.createElement("div"); box.id = "tbs-hist"; box.className = "tbs-hist"; box.hidden = true; form.appendChild(box);
+  const paint = () => {
+    const v = inp.value.trim().toLowerCase(), h = sHist().filter((x) => !v || x.toLowerCase().includes(v));
+    if (!h.length) { box.hidden = true; return; }
+    box.innerHTML = `<div class="th-h"><span>検索の履歴</span><button type="button" class="th-x" data-thclear>履歴を消す</button></div>` + h.map((x) => `<button type="button" class="th-i" data-th="${esc(x)}" title="${esc(x)}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>${esc(x)}</span></button>`).join("");
+    box.hidden = false;
+  };
+  const hide = () => { box.hidden = true; };
+  inp.addEventListener("focus", () => { if (typeof tbsClose === "function") tbsClose(); paint(); });
+  inp.addEventListener("click", paint);
+  inp.addEventListener("input", paint);
+  inp.addEventListener("blur", () => setTimeout(hide, 120));
+  inp.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+  form.addEventListener("submit", hide);
+  box.addEventListener("mousedown", (e) => e.preventDefault()); // 欄のフォーカスを外さない(外れると、選ぶ前に消える)
+  box.addEventListener("click", (e) => {
+    if (e.target.closest("[data-thclear]")) { ls.set("tf-s-hist", "[]"); if (typeof sSyncBar === "function") sSyncBar(); return hide(); }
+    const b = e.target.closest("[data-th]"); if (!b) return;
+    inp.value = b.dataset.th; hide();
+    if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event("submit", { cancelable: true })); // 検索ボタンを押したのと同じ(どの画面からでも検索画面へ移る)
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#s-form")) hide(); });
+})();

@@ -22,6 +22,8 @@ const PLLIVE = (() => {
     const u = best?.url || (JSON.stringify(o).match(/https:\/\/(?:i\.ytimg\.com|[\w-]+\.ggpht\.com|lh\d\.googleusercontent\.com)\/[^"\\]+/) || [""])[0];
     return u.startsWith("//") ? "https:" + u : u;
   };
+  // 「52 本の動画」「52 videos」から本数を取る(分からなければ null)
+  const cnt = (t) => { const m = /(\d[\d,]*)\s*(?:本の動画|本|videos?)/i.exec(String(t || "")); return m ? +m[1].replace(/,/g, "") : null; };
   // ページのデータから再生リストを集める(非公式・仕様変更で動かなくなる可能性あり)
   function collect(root) {
     const found = new Map();
@@ -34,11 +36,11 @@ const PLLIVE = (() => {
         const rows = lv.metadata?.lockupMetadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows || [];
         const texts = rows.flatMap((r) => (r.metadataParts || []).map((p) => p.text?.content || "")).filter(Boolean);
         const own = texts.some((t) => /^(非公開|公開|限定公開|Private|Public|Unlisted)$/i.test(t.trim()));
-        found.set(lv.contentId, { title: lv.metadata?.lockupMetadataViewModel?.title?.content || lv.contentId, thumb: img(lv), kind: own ? "own" : "saved", channel: own ? "" : (texts[0] || "") });
+        found.set(lv.contentId, { title: lv.metadata?.lockupMetadataViewModel?.title?.content || lv.contentId, thumb: img(lv), kind: own ? "own" : "saved", channel: own ? "" : (texts[0] || ""), count: cnt(texts.join(" ") + " " + JSON.stringify(lv.contentImage || {})) });
       }
       for (const k of ["gridPlaylistRenderer", "playlistRenderer"]) {
         const r = n[k];
-        if (r?.playlistId) found.set(r.playlistId, { title: r.title?.simpleText || r.title?.runs?.[0]?.text || r.playlistId, thumb: img(r), kind: "own", channel: "" });
+        if (r?.playlistId) found.set(r.playlistId, { title: r.title?.simpleText || r.title?.runs?.[0]?.text || r.playlistId, thumb: img(r), kind: "own", channel: "", count: cnt(r.videoCountText?.simpleText || r.videoCountText?.runs?.map((x) => x.text).join("") || r.videoCount || "") });
       }
       Object.values(n).forEach(walk);
     })(root);
@@ -102,8 +104,8 @@ const PLLIVE = (() => {
       if (!found.size && !html.includes('"LOGGED_IN":true')) throw new Error("YouTubeにログインしていません。このChromeでYouTubeにログインしてください");
       // 読み込み済みの中身(動画一覧)は引き継ぐ
       const old = new Map((live || []).map((p) => [p.id, p]));
-      live = [...found].map(([id, m]) => Object.assign(old.get(id) || {}, { id, title: m.title, channel: m.channel, thumb: m.thumb || old.get(id)?.thumb || "", kind: m.kind }));
-      try { localStorage.setItem(LKEY, JSON.stringify(live.map((p) => ({ id: p.id, title: p.title, channel: p.channel, thumb: p.thumb, kind: p.kind })))); } catch { /* 容量いっぱいなど */ }
+      live = [...found].map(([id, m]) => Object.assign(old.get(id) || {}, { id, title: m.title, channel: m.channel, thumb: m.thumb || old.get(id)?.thumb || "", kind: m.kind, count: m.count ?? old.get(id)?.count ?? null }));
+      try { localStorage.setItem(LKEY, JSON.stringify(live.map((p) => ({ id: p.id, title: p.title, channel: p.channel, thumb: p.thumb, kind: p.kind, count: p.count ?? null })))); } catch { /* 容量いっぱいなど */ }
       st.error = ""; st.at = Date.now();
       await readRecent();
       const t = tidyRecent();
