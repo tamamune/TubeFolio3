@@ -335,7 +335,7 @@ document.addEventListener("click", (e) => {
   if ((b = t("[data-rsrm]"))) { e.preventDefault(); return hideResume(b.dataset.rsrm); }
   if ((b = t("[data-plrm]"))) { e.preventDefault(); const [pl, vid] = b.dataset.plrm.split("|"); return removeFromPl(pl, vid, b); }
   if ((b = t("[data-bm]"))) { e.preventDefault(); return bmToggle(b.dataset.bm); }
-  if ((b = t("[data-v]"))) return openV(b.dataset.v);
+  if ((b = t("[data-v]"))) { if (t("[data-ch],[data-wl],[data-more]")) return; return openV(b.dataset.v); }
   if ((b = t('[data-act="drawer"]'))) {
     tfMenu(false); const open = !document.body.classList.contains("nav-on");
     if (open && folderMode === "manage") { // 「設定」のとき: サイドバーと一緒に、右側(本体)も、チャンネルの一覧(すべて)を開く。「一覧」のときは、サイドバー(フォルダの一覧)だけ。すでにフォルダ・チャンネルの画面ならそのまま

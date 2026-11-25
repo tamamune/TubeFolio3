@@ -107,18 +107,26 @@ document.addEventListener("change", async (e) => {
   e.target.disabled = false;
 });
 /* ---------- チャンネル名を押したら、そのチャンネルのページを開く(新しいタブ) ---------- */
-function openChannel(el) {
+function openChannel(el, bg) { // bg: 裏のタブで開く(中クリック)
   let url = el.dataset.ch || "";
   const name = el.dataset.chn || "";
   if (!url) { // リンク先が分からない動画(保存した動画など)は、登録チャンネルから名前で探す
     const c = subMap().get(subNorm(name));
     if (c && !c.dummy) url = c.handle ? "/" + c.handle.replace(/^\/?/, "") : "/channel/" + c.id;
   }
+  if (url && !/^(https?:\/\/(www\.)?youtube\.com)?\/(@|channel\/|c\/|user\/)/.test(url)) url = ""; // チャンネルのリンクでなければ(動画のリンクなどは)使わない
   if (!url) url = `/results?search_query=${encodeURIComponent(name)}&sp=EgIQAg%253D%253D`; // それでも分からなければチャンネル検索
-  window.open(url.startsWith("http") ? url : "https://www.youtube.com" + url, "_blank", "noopener");
+  const full = url.startsWith("http") ? url : "https://www.youtube.com" + url;
+  try { toast("チャンネルを開きます: " + full.replace("https://www.youtube.com", "")); } catch {}
+  if (bg && chrome.tabs?.create) chrome.tabs.create({ url: full, active: false }); else window.open(full, "_blank", "noopener");
 }
+// 中クリックでもチャンネルを開く(動画の中クリック=裏のタブで再生、より先に受けて止める)
+document.addEventListener("mousedown", (e) => { if (e.button === 1 && e.target.closest?.("[data-ch]")) e.preventDefault(); }, true); // 自動スクロールのアイコンを出さない
+document.addEventListener("auxclick", (e) => { if (e.button !== 1) return; const b = e.target.closest?.("[data-ch]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); openChannel(b, true); }, true);
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches?.("[data-ch]")) { e.preventDefault(); e.stopPropagation(); openChannel(e.target); } }, true);
 
+// チャンネル名は、ほかのクリック処理(動画の再生)より先に、最初の段階(capture)で受けて止める
+document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-ch]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); openChannel(b); }, true);
 document.addEventListener("click", async (e) => {
   const t = (s) => e.target.closest(s);
   let b;

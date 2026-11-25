@@ -6,6 +6,7 @@ const SUB_STYLES = [
   ["B", "B: 小さな✓", "登録済みのチャンネル名の後ろに、小さな✓を付けます"],
   ["C", "C: 小さな点", "登録済みのチャンネル名の前に、小さな点を付けます"],
   ["D", "D: 下線", "登録済みの動画のサムネイルの下に、細いラインを引きます"],
+  ["E", "E: L字", "サムネイルの右下に、L字のラインを付けます(登録済みは差し色、未登録はオレンジ)"],
 ];
 let subStyle = ls.get("tf-sub-style", "B");
 if (!SUB_STYLES.some(([k]) => k === subStyle)) subStyle = "B";
@@ -75,7 +76,7 @@ const cn = (v) => {
   return `<small class="cn${s ? " sub" : ""}${link ? " link" : ""}"${link} title="${s ? "登録済みのチャンネル ・ " : ""}${link ? "チャンネルを開く" : ""}">${esc(v.channel)}</small>`
     + (left || fl ? `<small class="cm">${left ? `<span class="cmd">${esc(left)}</span>` : ""}${fl ? `<span class="cf" title="フォルダ">📁 ${esc(fl)}</span>` : ""}</small>` : "");
 };
-const subCls = (v) => (isSubV(v) ? "subc" : "");
+const subCls = (v) => (isSubV(v) ? "subc" : "unsubc");
 
 function paintLook() { const el = $("set-appear"); if (el) el.innerHTML = appearHtml(); } // 設定「一般」の先頭: 差し色・登録済みチャンネルの見分け方
 function appearHtml() { // 設定の他の項目と同じ「ラベル + 右に操作」の行
