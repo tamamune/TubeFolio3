@@ -483,7 +483,8 @@ $("set-kw").addEventListener("keydown", (e) => {
 });
 // 設定のタブ(一般 / 登録補助 など)
 function setSetTab(k) {
-  $("set-gen").hidden = k !== "gen"; $("set-kw").hidden = k !== "kw"; $("set-home").hidden = k !== "home"; $("set-sync").hidden = k !== "sync"; $("set-tags").hidden = k !== "tags"; $("set-log").hidden = k !== "log"; if (k === "log") paintLog();
+  for (const x of ["gen", "pl", "fd", "bm", "mu", "sync", "kw", "tags", "log"]) $("set-" + x).hidden = k !== x;
+  if (k === "log") paintLog();
   if (k === "tags" && typeof paintTags === "function") paintTags(); // tags.js
   document.querySelectorAll("[data-settab]").forEach((b) => { const on = b.dataset.settab === k; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
   if (k === "gen" && typeof paintLook === "function") paintLook();

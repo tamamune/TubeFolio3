@@ -635,7 +635,7 @@ function pkHtml(mini) {
     <div class="pk-main"><span class="pk-tag">ピックアップ · ${esc(c.label)}</span><h3 class="pk-t">${esc(v.title)}</h3><p class="pk-c">${esc(v.channel || "")}</p>
       <div class="pk-mini"><span class="pk-ml">続きから ▸</span>${minis}</div></div>
     <button type="button" class="pk-big" data-v="${esc(c.vid)}" aria-label="${esc(v.title)}を再生">${pkImg(c.vid, v)}${v.duration ? `<span class="dur">${esc(v.duration)}</span>` : ""}</button>
-    <div class="pk-ctl"><button type="button" class="btn s pk-nv" data-act="pk-prev" aria-label="前の動画">‹</button><button type="button" class="btn s pk-nv" data-act="pk-next" aria-label="次の動画">›</button><button type="button" class="btn s pk-up" data-act="pk-up">続きからを表示</button></div></div>`; // 元の動画は設定「ホームの表示」で選ぶ。「別の動画」(data-act="pk-next")は保留中
+    <div class="pk-ctl"><button type="button" class="btn s pk-nv" data-act="pk-prev" aria-label="前の動画">‹</button><button type="button" class="btn s pk-nv" data-act="pk-next" aria-label="次の動画">›</button><button type="button" class="btn s pk-up" data-act="pk-up">続きからを表示</button></div></div>`; // 元の動画は設定「一般」の「ホーム」で選ぶ。「別の動画」(data-act="pk-next")は保留中
 }
 function pkReplace(down, swap) { // バナーだけを作り直す(画面全体は描き直さない)。swap: 動画を切り替えるとき(ふわっと替わる)
   const el = $("pk"); if (!el) return false;
@@ -991,7 +991,7 @@ function paintSettings() {
   const sec = (id, title, body) => `<div class="set-sec ${shut.has(id) ? "shut" : ""}" data-sec="${id}"><button type="button" class="set-h set-hb" data-secb="${id}" aria-expanded="${!shut.has(id)}"><i>▾</i>${title}</button><div class="set-sb">${body}</div></div>`;
   const pkRows = pkSources().map(([id, label]) => `<label class="set-row"><span>${esc(label)} <small>${pkItems(id).length}本</small></span><input type="checkbox" data-pksrc="${esc(id)}" ${pkSel.includes(id) ? "checked" : ""}></label>`).join("");
   let h = sec("hero", "ホームのピックアップ", `<label class="set-row"><span>降りてくるまでの時間 <small>ホームを表示してから、この時間がたつと、選んだ動画が「続きから」の上に大きく降りてきます</small></span><select class="sel" data-pksec>${[[0, "使わない"], [3, "3秒"], [6, "6秒"], [10, "10秒"], [20, "20秒"], [30, "30秒"], [60, "1分"]].map(([v, n]) => `<option value="${v}" ${pkSec === v ? "selected" : ""}>${n}</option>`).join("")}</select></label><label class="set-row"><span>また降りてくる間隔 <small>「続きからを表示」で閉じたあと、この時間がたつと、別の動画がまた降りてきます</small></span><select class="sel" data-pkint>${[[0, "降りてこない(はじめの1回だけ)"], [1, "1分"], [2, "2分"], [3, "3分"], [5, "5分"], [10, "10分"], [30, "30分"]].map(([v, n]) => `<option value="${v}" ${pkInt === v ? "selected" : ""}>${n}</option>`).join("")}</select></label><div class="set-h">ピックアップの元の動画(複数選べます)</div>${pkRows}`);
-  h += sec("plm", "再生リストのメニューの並び順 <small>(上のバーの「再生リスト」を押したときの順番。行をドラッグして並べ替え)</small>", `<div id="set-plm">` + plmKeys().map((k) => `<div class="set-row plm-row" data-pk="${esc(k)}"><span class="plm-grip" aria-hidden="true">⋮⋮</span><span class="plm-ic">${k === "lib" ? "📁" : "▶"}</span><span class="plm-rt">${esc(plmName(k))}</span></div>`).join("") + `</div>`);
+  $("set-plm-box").innerHTML = `<div class="set-h">再生リストのメニューの並び順 <small>(上のバーの「再生リスト」を押したときの順番。行をドラッグして並べ替え)</small></div><div id="set-plm">` + plmKeys().map((k) => `<div class="set-row plm-row" data-pk="${esc(k)}"><span class="plm-grip" aria-hidden="true">⋮⋮</span><span class="plm-ic">${k === "lib" ? "📁" : "▶"}</span><span class="plm-rt">${esc(plmName(k))}</span></div>`).join("") + `</div>`;
   h += sec("order", "ホームの並び順と表示 <small>(行をドラッグして並べ替え・右へ動かすと上の項目と横並び=タブで切り替え / 左へ動かすと解除)</small>", `<div id="set-ord">` + fo.map((k, i) => `<div class="set-row ${pairs.has(k) && i < fo.length - 1 ? "paired" : ""} ${i > 0 && pairs.has(fo[i - 1]) ? "pin" : ""}" data-ok="${esc(k)}"><label><input type="checkbox" ${chk(k)}> <span>${esc(name(k))}</span></label>${i < fo.length - 1 ? `<button type="button" class="pr-b ${pairs.has(k) ? "on" : ""}" data-pairset="${esc(k)}" aria-pressed="${pairs.has(k)}" title="次の項目と隣り合わせにして、タブで切り替えて表示します">⇄ 次と切替</button>` : ""}</div>`).join("") + `</div>`);
   $("set-list").innerHTML = h;
 }
@@ -1285,7 +1285,7 @@ document.addEventListener("click", (e) => { // 上のバーの「再生リスト
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") plmShow(false); });
 
 // 設定「再生リストのメニューの並び順」: 行をドラッグして並べ替える
-$("set-list").addEventListener("pointerdown", (e) => {
+$("set-plm-box").addEventListener("pointerdown", (e) => {
   const row = e.target.closest("#set-plm .plm-row"), box = $("set-plm"); if (!row || !box || e.button > 0) return;
   const y0 = e.clientY; let on = false, moved = false;
   const move = (ev) => {

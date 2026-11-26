@@ -5,8 +5,9 @@
 (() => {
   const gen = document.getElementById("set-gen"); if (!gen) return;
   const CATS = [
-    ["look", "表示・サムネ", ["set-appear", "set-date", "set-ryd", "set-tps", "set-pvon", "set-pvn", "set-pvk", "set-pvd", "set-tpv", "set-tpvol", "set-auto", "set-shwheel"]],
-    ["play", "再生・検索", ["set-play", "set-wl", "set-cmhide", "set-relmode", "set-pubdate"]],
+    ["look", "表示・サムネ", ["set-appear", "set-date", "set-ryd", "set-tps", "set-tpv", "set-tpvol", "set-auto", "set-shwheel"]],
+    ["home", "ホーム", ["set-list"]],
+    ["play", "再生・検索", ["set-play", "set-cmhide", "set-relmode", "set-pubdate"]],
     ["tools", "再生画面のツール", ["set-seek", "set-step", "set-quality", "set-h264", "set-adff"]],
     ["pip", "ワイプ・PiP", ["set-mini", "set-minisize", "set-pipbtn", "set-pipauto"]],
     ["end", "動画の終わり", ["set-endmode", "set-endtf", "set-endslots"]],
